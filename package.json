@@ -1,0 +1,26 @@
+{
+  "name": "university-student-hub",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  
+  "scripts": {
+    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm run start --prefix backend"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yonas-baysasaw/University-Student-Hub.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yonas-baysasaw/University-Student-Hub/issues"
+  },
+  "homepage": "https://github.com/yonas-baysasaw/University-Student-Hub#readme"
+}
