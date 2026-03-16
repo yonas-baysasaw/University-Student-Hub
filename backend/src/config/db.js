@@ -3,13 +3,17 @@ import dns from "node:dns";
 import { ENV } from "./env.js";
 
 export const connectDB = async () => {
-  const dnsServers = ENV.MONGO_DNS_SERVERS.split(",")
-    .map((server) => server.trim())
-    .filter(Boolean);
+  const dnsServers = ENV.MONGO_DNS_SERVERS
+    ? ENV.MONGO_DNS_SERVERS.split(",").map((server) => server.trim()).filter(Boolean)
+    : [];
 
   if (dnsServers.length) {
-  
     dns.setServers(dnsServers);
+  }
+
+  if (!ENV.MONGO_URI) {
+    console.error("Error: MONGO_URI is not defined in environment variables.");
+    process.exit(1);
   }
 
   try {
