@@ -1,6 +1,7 @@
 import express from "express";
 import path from "path";
 import { ENV } from "./config/env.js";
+import { connectDB } from "./config/db.js";
 
 const app = express();
 
@@ -19,4 +20,11 @@ if (ENV.NODE_ENV === "production") {
   });
 }
 
-app.listen(ENV.PORT, () => console.log("Server is up and running"));
+const startServer = async () => {
+  await connectDB();
+  app.listen(ENV.PORT, () => {
+    console.log("Server is up and running");
+  });
+};
+
+startServer();
