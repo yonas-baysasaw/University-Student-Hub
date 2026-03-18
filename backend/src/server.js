@@ -6,6 +6,7 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { ENV } from "./config/env.js";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
+import User from './models/userModel.js'
 
 const app = express();
 const __dirname = path.resolve();
@@ -22,29 +23,34 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Google OAuth Strategy
+
+
 passport.use(new GoogleStrategy({
-    clientID: ENV.GOOGLE_CLIENT_ID,
-    clientSecret: ENV.GOOGLE_CLIENT_SECRET,
-    callbackURL: ENV.GOOGLE_CALLBACK_URL
-  },
-  (accessToken, refreshToken, profile, done) => {
-    const user = {
-      id: profile.id,
-      displayName: profile.displayName,
-      email: profile.emails[0].value,
-      provider: 'google'
-    };
+  clientID: ENV.GOOGLE_CLIENT_ID,
+  clientSecret: ENV.GOOGLE_CLIENT_SECRET,
+  callbackURL: ENV.GOOGLE_CALLBACK_URL
+}, async (accessToken, refreshToken, profile, done) => {
+  try {
+    let user = await User.findOne({ googleId: profile.id });
+    if (!user) {
+      user = await User.create({
+        googleId: profile.id,
+        displayName: profile.displayName,
+        email: profile.emails[0].value,
+        provider: 'google'
+      });
+    }
     done(null, user);
+  } catch (err) {
+    done(err, null);
   }
-));
+}));
 
 passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((user, done) => done(null, user));
 
 // Routes
-app.use(authRoutes);
-
+app.use("/api", authRoutes);
 
 
 app.get("/api/health", (req, res) => {
