@@ -9,9 +9,7 @@ import session from 'express-session';
 
 const app = express();
 const __dirname = path.resolve();
-
-
-
+app.set('trust proxy', 1);
 
 
 // Configure sessions for OAuth 2.0
@@ -19,7 +17,7 @@ app.use(session({
   secret: 'your-secret-key',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: process.env.NODE_ENV === 'production' }
+  cookie: { secure: ENV.NODE_ENV === 'production' }
 }));
 
 // Initialize Passport
@@ -77,9 +75,16 @@ const isAuthenticated = (req, res, next) => {
 };
 
 // Protected route
-app.get('/profile', isAuthenticated, (req, res) => {
+// app.get('/profile', isAuthenticated, (req, res) => {
+//   res.json({ user: req.user });
+// });
+app.get('/profile', (req, res) => {
+  console.log('isAuth:', req.isAuthenticated());
+  console.log('user:', req.user);
   res.json({ user: req.user });
 });
+
+
 
 // Logout route
 app.get('/logout', (req, res) => {
