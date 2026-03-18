@@ -1,76 +1,53 @@
 import express from "express";
 import path from "path";
+import session from "express-session";
+import passport from "passport";
+import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { ENV } from "./config/env.js";
 import { connectDB } from "./config/db.js";
-import passport from 'passport';
-import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-
-
+import authRoutes from "./routes/authRoutes.js";
 
 const app = express();
 const __dirname = path.resolve();
 app.set('trust proxy', 1);
 
+// Sessions
+app.use(session({
+  secret: 'your-secret-key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: ENV.NODE_ENV === 'production' }
+}));
 
-// Configure Google OAuth 2.0 strategy
+// Passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Google OAuth Strategy
 passport.use(new GoogleStrategy({
     clientID: ENV.GOOGLE_CLIENT_ID,
     clientSecret: ENV.GOOGLE_CLIENT_SECRET,
     callbackURL: ENV.GOOGLE_CALLBACK_URL
   },
   (accessToken, refreshToken, profile, done) => {
-    // In a real app, you'd find or create a user in your database
     const user = {
       id: profile.id,
       displayName: profile.displayName,
       email: profile.emails[0].value,
       provider: 'google'
     };
-   
-    return done(null, user);
+    done(null, user);
   }
 ));
 
-// Serialize user for session
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((user, done) => done(null, user));
 
-// Deserialize user from session
-passport.deserializeUser((user, done) => {
-  done(null, user);
-});
-
-// Routes for Google OAuth
-app.get('/auth/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] })
-);
-
-app.get('/auth/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
-    // Successful authentication
-    res.redirect('/profile');
-  }
-);
-
-// Middleware to check authentication
-const isAuthenticated = (req, res, next) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.redirect('/login');
-};
-app.get('/profile', (req, res) => {
-  res.json({ user: req.user });
-});
+// Routes
+app.use(authRoutes);
 
 
-// Logout route
-app.get('/logout', (req, res) => {
-  req.logout();
-  res.redirect('/');
-});
+
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Success" });
 });
