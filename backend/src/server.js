@@ -7,6 +7,7 @@ import { ENV } from "./config/env.js";
 import { connectDB } from "./config/db.js";
 import authRoutes from "./routes/authRoutes.js";
 import User from './models/userModel.js'
+import localStrategy from 'passport-local'
 
 const app = express();
 const __dirname = path.resolve();
@@ -23,6 +24,22 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
+passport.use(new localStrategy)
+.Strategy(async (username, password, done) => {
+  try {
+    const user = await User.findOne({ username });
+    if (!user) {
+      return done(null, false, { message: 'Incorrect username.' });
+    }
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return done(null, false, { message: 'Incorrect password.' });
+    }
+    return done(null, user);
+  } catch (err) {
+    return done(err);
+  }
+})
 
 
 passport.use(new GoogleStrategy({
