@@ -11,19 +11,7 @@ const app = express();
 const __dirname = path.resolve();
 app.set('trust proxy', 1);
 
-// Sessions
-// app.use(session({
-//   secret: 'your-secret-key',
-//   resave: false,
-//   saveUninitialized: false,
-//   cookie: { secure: ENV.NODE_ENV === 'production' }
-// }));
 
-// // Passport
-// app.use(passport.initialize());
-// app.use(passport.session());
-
-// Correct order
 app.use(session({
   secret: 'your-secret-key',
   resave: false,

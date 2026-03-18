@@ -1,6 +1,6 @@
 import express from 'express';
 import passport from 'passport';
-import { loginSuccess, logout } from '../controllers/authController.js';
+import { loginSuccess, logout } from '../controllers/authcontroller.js';
 import { isAuthenticated } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
