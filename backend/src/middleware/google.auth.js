@@ -1,5 +1,7 @@
+import session from 'express-session';
 app.use(passport.initialize());
 app.use(passport.session());
+
 
 
 // Configure sessions for OAuth 2.0

@@ -4,7 +4,7 @@ import { ENV } from "./config/env.js";
 import { connectDB } from "./config/db.js";
 import passport from 'passport';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
-import session from 'express-session';
+
 
 
 const app = express();
