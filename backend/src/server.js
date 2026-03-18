@@ -12,18 +12,6 @@ const __dirname = path.resolve();
 app.set('trust proxy', 1);
 
 
-// Configure sessions for OAuth 2.0
-app.use(session({
-  secret: 'your-secret-key',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: ENV.NODE_ENV === 'production' }
-}));
-
-// Initialize Passport
-app.use(passport.initialize());
-app.use(passport.session());
-
 // Configure Google OAuth 2.0 strategy
 passport.use(new GoogleStrategy({
     clientID: ENV.GOOGLE_CLIENT_ID,
@@ -73,17 +61,9 @@ const isAuthenticated = (req, res, next) => {
   }
   res.redirect('/login');
 };
-
-// Protected route
-// app.get('/profile', isAuthenticated, (req, res) => {
-//   res.json({ user: req.user });
-// });
 app.get('/profile', (req, res) => {
-  console.log('isAuth:', req.isAuthenticated());
-  console.log('user:', req.user);
   res.json({ user: req.user });
 });
-
 
 
 // Logout route
