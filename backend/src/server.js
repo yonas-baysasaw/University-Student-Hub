@@ -2,14 +2,11 @@ import express from 'express';
 import passport from 'passport';
 import 'dotenv/config';
 import session from 'express-session';
-import mongoose from 'mongoose';
 import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
 import { Strategy as LocalStrategy } from 'passport-local';
 import bcrypt from 'bcrypt';
-
 import User from './models/User.js';
 import connectDB from './config/db.js';
-
 import authRouter from './routes/authRoutes.js';
 import signUpRouter from './routes/signUpRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
@@ -23,9 +20,6 @@ import path from "path";
 const __dirname = path.resolve();
 const app = express();
 app.use(express.json());
-
-connectDB();
-
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -119,4 +113,3 @@ const startServer = async () => {
 };
 
 startServer();
-

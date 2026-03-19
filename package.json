@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  
-"scripts": {
-  "build": "npm install --prefix backend && npm install --prefix frontend --include=dev && npm run build --prefix frontend",
+  "scripts": {
+    "build": "npm install --prefix backend && npm install --prefix frontend --include=dev && npm run build --prefix frontend",
     "start": "npm run start --prefix backend"
   },
   "engines": {
@@ -22,5 +21,10 @@
   "bugs": {
     "url": "https://github.com/yonas-baysasaw/University-Student-Hub/issues"
   },
-  "homepage": "https://github.com/yonas-baysasaw/University-Student-Hub#readme"
+  "homepage": "https://github.com/yonas-baysasaw/University-Student-Hub#readme",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.2",
+    "daisyui": "^5.5.19",
+    "tailwindcss": "^4.2.2"
+  }
 }
