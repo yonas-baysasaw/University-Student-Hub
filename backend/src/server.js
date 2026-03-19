@@ -69,7 +69,7 @@ passport.use(new GoogleStrategy({
     return done(null, user);
   } catch (error) {
     return done(error, null);
-  }s
+  }
 }));
 
 /* ===== Local Strategy ===== */
@@ -92,7 +92,7 @@ app.use('/api/profile', profileRoutes);
 app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 
-app.get('api/logout', (req, res, next) => {
+app.get('/api/logout', (req, res, next) => {
   req.logout(err => {
     if (err) return next(err);
     res.redirect('/');
@@ -119,3 +119,4 @@ const startServer = async () => {
 };
 
 startServer();
+
