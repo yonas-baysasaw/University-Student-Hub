@@ -1,79 +1,107 @@
-import express from "express";
+import express from 'express';
+import passport from 'passport';
+import 'dotenv/config';
+import session from 'express-session';
+import mongoose from 'mongoose';
+import { Strategy as GoogleStrategy } from 'passport-google-oauth20';
+import { Strategy as LocalStrategy } from 'passport-local';
+import bcrypt from 'bcrypt';
+
+import User from './models/User.js';
+import connectDB from './config/db.js';
+
+import authRouter from './routes/authRoutes.js';
+import signUpRouter from './routes/signUpRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
+import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
+import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
+import { ENV } from './config/env.js';
 import path from "path";
-import session from "express-session";
-import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import { ENV } from "./config/env.js";
-import { connectDB } from "./config/db.js";
-import authRoutes from "./routes/authRoutes.js";
-import User from './models/userModel.js'
-import localStrategy from 'passport-local'
 
-const app = express();
+
+
 const __dirname = path.resolve();
-app.set('trust proxy', 1);
+const app = express();
+app.use(express.json());
 
+connectDB();
 
 app.use(session({
-  secret: 'your-secret-key',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: ENV.NODE_ENV === 'production' } // must match protocol
+  cookie: { secure: false }
 }));
 
 app.use(passport.initialize());
 app.use(passport.session());
 
-passport.use(new localStrategy)
-.Strategy(async (username, password, done) => {
+/* ===== Passport Serialize / Deserialize ===== */
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser(async (id, done) => {
   try {
-    const user = await User.findOne({ username });
-    if (!user) {
-      return done(null, false, { message: 'Incorrect username.' });
-    }
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return done(null, false, { message: 'Incorrect password.' });
-    }
-    return done(null, user);
-  } catch (err) {
-    return done(err);
+    const user = await User.findById(id);
+    done(null, user);
+  } catch (error) {
+    done(error, null);
   }
-})
+});
 
-
+/* ===== Google Strategy ===== */
 passport.use(new GoogleStrategy({
-  clientID: ENV.GOOGLE_CLIENT_ID,
-  clientSecret: ENV.GOOGLE_CLIENT_SECRET,
+  clientID: process.env.GOOGLE_CLIENT_ID,
+  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: ENV.GOOGLE_CALLBACK_URL
 }, async (accessToken, refreshToken, profile, done) => {
   try {
+    if (!profile.id) return done(new Error("Google profile ID missing"));
     let user = await User.findOne({ googleId: profile.id });
     if (!user) {
       user = await User.create({
         googleId: profile.id,
         displayName: profile.displayName,
         email: profile.emails[0].value,
-        provider: 'google'
+        provider: 'google',
+        profile
       });
+      console.log("New Google user created");
     }
-    done(null, user);
+    return done(null, user);
+  } catch (error) {
+    return done(error, null);
+  }s
+}));
+
+/* ===== Local Strategy ===== */
+passport.use(new LocalStrategy(async (username, password, done) => {
+  try {
+    const user = await User.findOne({ username });
+    if (!user) return done(null, false, { message: "User not found" });
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return done(null, false, { message: "Wrong password" });
+    return done(null, user);
   } catch (err) {
-    done(err, null);
+    return done(err);
   }
 }));
 
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((user, done) => done(null, user));
+/* ===== Routes ===== */
+app.use('/api/auth', authRouter);
+app.use('/api/register', signUpRouter);
+app.use('/api/profile', profileRoutes);
+app.use('/api/forgot-password', forgotPasswordRoutes);
+app.use('/api/reset-password', resetPasswordRoutes);
 
-// Routes
-app.use("/api", authRoutes);
-
+app.get('api/logout', (req, res, next) => {
+  req.logout(err => {
+    if (err) return next(err);
+    res.redirect('/');
+  });
+});
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Success" });
 });
-
 // make our app ready for deployment
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/dist")));
