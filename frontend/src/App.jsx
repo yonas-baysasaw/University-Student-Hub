@@ -6,6 +6,7 @@ import Home from './pages/Home';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Nav from './components/Nav';
 import Signup from './pages/Signup';
+import PasswordReset from './pages/PasswordReset';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -23,6 +24,7 @@ function AppRoutes() {
         <Route path="/" element={user ? <Home /> : <About />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
+         <Route path="/password/reset" element={user ? <Navigate to="/" replace /> : <PasswordReset />} />
         <Route path="*" element={<Navigate to={defaultRedirect} replace />} />
       </Routes>
     </>

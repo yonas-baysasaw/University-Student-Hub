@@ -66,9 +66,9 @@ const SignIn =() => {
 
         {/* Links */}
         <div className="flex justify-between text-sm text-gray-500 mt-4">
-          <span className="cursor-pointer hover:text-gray-700 hover:underline">
+          <a href="/password/reset" className="cursor-pointer hover:text-gray-700 hover:underline">
             Forgot Password?
-          </span>
+          </a>
           <span className="cursor-pointer hover:text-gray-700 hover:underline">
             <a href="/signup">Sign Up</a>
           </span>
