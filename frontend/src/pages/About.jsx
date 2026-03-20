@@ -5,7 +5,7 @@ function About() {
 
   return (
     <>
-    <a>Create account</a>
+    <a href="/signup">Create account</a>
     </>
   );
 }

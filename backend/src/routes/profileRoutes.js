@@ -13,12 +13,18 @@ function ensureAuth(req, res, next) {
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
   // req.user is populated by passport.deserializeUser
+  const photo =
+    req.user.profile?.photos?.[0]?.value ||
+    req.user.profile?.picture ||
+    null;
+
   res.json({
     id: req.user._id,
     username: req.user.username,
     email: req.user.email,
     displayName: req.user.displayName,
-    provider: req.user.provider
+    provider: req.user.provider,
+    photo
   });
 });
 

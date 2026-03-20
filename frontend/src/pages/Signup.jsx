@@ -1,6 +1,6 @@
-
 import { FaGoogle } from "react-icons/fa";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 
 const Signup = () => {
   const [username, setUsername] = useState("");
@@ -9,6 +9,18 @@ const Signup = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const navigate = useNavigate();
+  const successTimer = useRef();
+
+  useEffect(() => {
+    return () => {
+      if (successTimer.current) {
+        clearTimeout(successTimer.current);
+      }
+    };
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,11 +51,15 @@ const Signup = () => {
         throw new Error(data.message || "Unable to create account.");
       }
 
-      setSuccess("Account created. Please sign in.");
+      setSuccess("Account created. Redirecting to sign in...");
       setUsername("");
       setEmail("");
       setPassword("");
       setConfirmPassword("");
+
+      successTimer.current = setTimeout(() => {
+        navigate("/login", { replace: true });
+      }, 1200);
     } catch (error) {
       console.error(error);
       setError(error?.message || "Something went wrong, try again.");
@@ -53,18 +69,14 @@ const Signup = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="w-[380px] bg-white p-8 rounded-2xl shadow-md">
-        {/* Logo */}
         <div className="text-center mb-6">
           <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">
             <span className="text-sm font-bold text-gray-600">USH</span>
           </div>
-          <h2 className="text-xl font-semibold text-gray-800">
-            University Student Hub
-          </h2>
+          <h2 className="text-xl font-semibold text-gray-800">University Student Hub</h2>
           <p className="text-sm text-gray-500">Sign up to get started</p>
         </div>
 
-        {/* Form */}
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
           {(error || success) && (
             <div
@@ -82,72 +94,78 @@ const Signup = () => {
             onChange={(e) => setUsername(e.target.value)}
             className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
           />
-          {/* password */}
           <div className="relative">
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700">
-              👁
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
           </div>
 
-             {/* Confirm password */}
           <div className="relative">
             <input
-              type="password"
+              type={showConfirmPassword ? "text" : "password"}
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
             />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700">
-              👁
-            </span>
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 hover:text-gray-700"
+            >
+              {showConfirmPassword ? "Hide" : "Show"}
+            </button>
           </div>
-          {/* E-mail */}
-           <input
-            type="text"
+
+          <input
+            type="email"
             placeholder="E-mail address"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
           />
 
-          {/* Fixed Button */}
-          <button type="submit" className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white   flex items-center justify-center">
+          <button
+            type="submit"
+            className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white flex items-center justify-center"
+          >
             Sign Up
           </button>
         </form>
 
-        {/* Links */}
         <div className="flex justify-between text-sm text-gray-500 mt-4">
           <span>Have an account?</span>
-          <a
-            href="/login"
-            className="cursor-pointer hover:text-gray-700 hover:underline"
-          >
+          <a href="/login" className="cursor-pointer hover:text-gray-700 hover:underline">
             Sign in
           </a>
         </div>
 
-        {/* Divider */}
         <div className="flex items-center gap-3 my-6">
           <div className="flex-1 h-px bg-gray-200" />
           <span className="text-sm text-gray-400">or you can sign in with</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
-        {/* Social Buttons */}
         <div className="flex justify-center gap-4">
-          <a href="/api/auth/google" className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition" >
+          <a
+            href="/api/auth/google"
+            className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition"
+          >
             <FaGoogle className="text-gray-600 text-lg" />
           </a>
-        
         </div>
       </div>
     </div>
