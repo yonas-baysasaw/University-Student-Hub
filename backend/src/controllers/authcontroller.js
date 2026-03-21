@@ -1,5 +1,7 @@
+import { toPublicUser } from '../utils/userSerializer.js';
+
 export const loginSuccess = (req, res) => {
-  res.json({ user: req.user });
+  res.json({ user: toPublicUser(req.user) });
 };
 
 export const logout = (req, res, next) => {

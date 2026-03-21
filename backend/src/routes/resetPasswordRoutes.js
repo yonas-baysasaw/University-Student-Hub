@@ -1,27 +1,32 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
+import asyncHandler from '../middleware/asyncHandler.js';
 import User from '../models/User.js';
+
 const router = express.Router();
 
-router.post('/:token', async (req, res) => {
-  const { password } = req.body;
-  try {
+router.post(
+  '/:token',
+  asyncHandler(async (req, res) => {
+    const { password } = req.body;
     const user = await User.findOne({
       resetPasswordToken: req.params.token,
       resetPasswordExpires: { $gt: Date.now() }
     });
-    if (!user) return res.status(400).json({ message: "Invalid or expired token" });
+
+    if (!user) {
+      const error = new Error('Invalid or expired token');
+      error.status = 400;
+      throw error;
+    }
 
     user.password = await bcrypt.hash(password, 10);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
 
-    res.json({ message: "Password has been reset" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+    res.json({ message: 'Password has been reset' });
+  })
+);
 
 export default router;

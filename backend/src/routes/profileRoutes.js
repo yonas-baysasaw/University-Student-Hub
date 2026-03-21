@@ -1,4 +1,5 @@
 import express from 'express';
+import asyncHandler from '../middleware/asyncHandler.js';
 
 const router = express.Router();
 
@@ -12,7 +13,6 @@ function ensureAuth(req, res, next) {
 
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
-  // req.user is populated by passport.deserializeUser
   const photo =
     req.user.profile?.photos?.[0]?.value ||
     req.user.profile?.picture ||
@@ -29,8 +29,10 @@ router.get('/', ensureAuth, (req, res) => {
 });
 
 /* ===== Update Profile ===== */
-router.put('/', ensureAuth, async (req, res) => {
-  try {
+router.put(
+  '/',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
     const { username, displayName } = req.body;
 
     if (username !== undefined) req.user.username = username;
@@ -46,23 +48,21 @@ router.put('/', ensureAuth, async (req, res) => {
         displayName: req.user.displayName
       }
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Update failed', error: error.message });
-  }
-});
+  })
+);
 
 /* ===== Delete Account ===== */
-router.delete('/', ensureAuth, async (req, res) => {
-  try {
+router.delete(
+  '/',
+  ensureAuth,
+  asyncHandler(async (req, res, next) => {
     await req.user.deleteOne();
 
     req.logout(err => {
-      if (err) return res.status(500).json({ message: 'Logout failed' });
+      if (err) return next(err);
       res.json({ message: 'Account deleted' });
     });
-  } catch (error) {
-    res.status(500).json({ message: 'Delete failed', error: error.message });
-  }
-});
+  })
+);
 
 export default router;

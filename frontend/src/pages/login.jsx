@@ -1,92 +1,114 @@
+import { FaGoogle } from 'react-icons/fa';
+import { useState } from 'react';
 
-import { FaGoogle} from "react-icons/fa";
-import { useState } from "react";
+const SignIn = () => {
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [status, setStatus] = useState('');
+  const [loading, setLoading] = useState(false);
 
-const SignIn =() => {
-    const [username, setUsername] = useState("")
-    const [password, setPassword] = useState("")
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setStatus('');
 
-    const handleSubmit = async(e)=>{
-      e.preventDefault()
-      try {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers:{
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ username, password })
-        })
-      } catch (error) {
-        console.error(error)
-      }
+    const trimmedIdentifier = identifier.trim();
+    if (!trimmedIdentifier || !password) {
+      setError('Enter your username/email and password.');
+      return;
     }
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ identifier: trimmedIdentifier, password })
+      });
+
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.message || 'Invalid credentials');
+      }
+
+      setStatus('Signed in, redirecting…');
+      setTimeout(() => {
+        window.location.href = '/';
+      }, 400);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unable to sign in');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-md">
-        {/* Logo */}
+      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
         <div className="text-center mb-6">
           <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">
             <span className="text-sm font-bold text-gray-600">USH</span>
           </div>
-          <h2 className="text-xl font-semibold text-gray-800">
-            University Student Hub
-          </h2>
+          <h2 className="text-2xl font-semibold text-gray-800">University Student Hub</h2>
           <p className="text-sm text-gray-500">Sign in to continue</p>
         </div>
 
-        {/* Form */}
         <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
+          <label className="text-xs font-semibold tracking-wide text-gray-500">Username or email</label>
           <input
             type="text"
-            placeholder="Username or Email"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
+            placeholder="example@uni.edu"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
             className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
           />
 
-          <div className="relative">
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-gray-500 hover:text-gray-700">
-              👁
-            </span>
-          </div>
+          <label className="text-xs font-semibold tracking-wide text-gray-500">Password</label>
+          <input
+            type="password"
+            placeholder="Enter password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
+          />
 
-          {/* Fixed Button */}
-          <button type="submit" className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white   flex items-center justify-center">
-            Sign In
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Signing in…' : 'Sign In'}
           </button>
+
+          {(error || status) && (
+            <p className={`text-center text-sm ${error ? 'text-rose-500' : 'text-emerald-500'}`}>
+              {error || status}
+            </p>
+          )}
         </form>
 
-        {/* Links */}
-        <div className="flex justify-between text-sm text-gray-500 mt-4">
-          <a href="/password/reset" className="cursor-pointer hover:text-gray-700 hover:underline">
-            Forgot Password?
-          </a>
-          <span className="cursor-pointer hover:text-gray-700 hover:underline">
-            <a href="/signup">Sign Up</a>
-          </span>
+        <div className="flex justify-between items-center text-sm text-gray-500 mt-4">
+          <a href="/password/reset" className="hover:text-gray-700 hover:underline">Forgot password?</a>
+          <a href="/signup" className="hover:text-gray-700 hover:underline">Create account</a>
         </div>
 
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-6">
+        <div className="my-6 flex items-center gap-3">
           <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-sm text-gray-400">or</span>
+          <span className="text-sm text-gray-400">or continue with</span>
           <div className="flex-1 h-px bg-gray-200" />
         </div>
 
-        {/* Social Buttons */}
         <div className="flex justify-center gap-4">
-          <a href="/api/auth/google" className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition" >
+          <a
+            href="/api/auth/google"
+            className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition"
+            aria-label="Continue with Google"
+          >
             <FaGoogle className="text-gray-600 text-lg" />
           </a>
-        
         </div>
       </div>
     </div>

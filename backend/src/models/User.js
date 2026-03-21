@@ -6,7 +6,7 @@ const userSchema = new mongoose.Schema({
   username: { type: String, unique: true, sparse: true },
   email: { type: String, unique: true },
   password: String,
-  provider: String,
+  provider: { type: [String], default: [] },
   profile: Object,
   resetPasswordToken: String,
   resetPasswordExpires: Date

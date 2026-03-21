@@ -1,22 +1,17 @@
 import express from 'express';
-import bcrypt from 'bcrypt';
-import User from '../models/User.js';
+import asyncHandler from '../middleware/asyncHandler.js';
+import { createLocalUser } from '../services/userService.js';
+import { toPublicUser } from '../utils/userSerializer.js';
+
 const router = express.Router();
 
-router.post('/', async (req, res) => {
-  try {
-    const { username, password, email } = req.body;
-    const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({
-      username,
-      email,
-      password: hashedPassword,
-      provider: "local"
-    });
-    res.json(user);
-  } catch (err) {
-    res.status(500).json(err);
-  }
-});
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { username, email, password } = req.body;
+    const user = await createLocalUser({ username, email, password });
+    res.status(201).json({ user: toPublicUser(user) });
+  })
+);
 
 export default router;
