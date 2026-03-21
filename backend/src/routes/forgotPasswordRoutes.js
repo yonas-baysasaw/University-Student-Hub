@@ -1,14 +1,22 @@
 import express from 'express';
 import crypto from 'crypto';
-import User from '../models/User.js';
 import nodemailer from 'nodemailer';
+import asyncHandler from '../middleware/asyncHandler.js';
+import User from '../models/User.js';
+import { ENV } from '../config/env.js';
+
 const router = express.Router();
 
-router.post('/', async (req, res) => {
-  const { email } = req.body;
-  try {
+router.post(
+  '/',
+  asyncHandler(async (req, res) => {
+    const { email } = req.body;
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "User not found" });
+    if (!user) {
+      const error = new Error('User not found');
+      error.status = 404;
+      throw error;
+    }
 
     const token = crypto.randomBytes(20).toString('hex');
     user.resetPasswordToken = token;
@@ -17,23 +25,20 @@ router.post('/', async (req, res) => {
 
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS }
+      auth: { user: ENV.EMAIL_USER, pass: ENV.EMAIL_PASS }
     });
 
-    const resetURL = `http://localhost:${process.env.PORT}/reset-password/${token}`;
+    const resetURL = `${ENV.FRONTEND_URL}/reset-password/${token}`;
 
     await transporter.sendMail({
       to: user.email,
-      from: process.env.EMAIL_USER,
+      from: ENV.EMAIL_USER,
       subject: 'Password Reset',
       text: `Click here to reset your password: ${resetURL}`
     });
 
-    res.json({ message: "Password reset email sent" });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
+    res.json({ message: 'Password reset email sent' });
+  })
+);
 
 export default router;

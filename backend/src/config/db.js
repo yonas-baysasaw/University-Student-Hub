@@ -1,14 +1,18 @@
-import mongoose from "mongoose";
-import { ENV } from "./env.js";
+import mongoose from 'mongoose';
+import { ENV } from './env.js';
 
- const connectDB = async () => {
+const connectDB = async () => {
+  if (!ENV.MONGODB_URL) {
+    console.error('MongoDB connection string (MONGODB_URL) is missing');
+    process.exit(1);
+  }
   try {
-    const conn = await mongoose.connect(ENV.MONGODB_URL);
-    console.log(`✅ Connected to MONGODB: ${conn.connection.host}`);
+    const connection = await mongoose.connect(ENV.MONGODB_URL);
+    console.log(`Connected to MongoDB: ${connection.connection.host}`);
   } catch (error) {
-    console.error("💥 MONGODB connection error");
-    process.exit(1); // exit code 1 means failure, 0 means success
+    console.error('MongoDB connection error:', error);
+    process.exit(1);
   }
 };
 
-export default connectDB
+export default connectDB;

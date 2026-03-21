@@ -1,14 +1,26 @@
 import express from 'express';
 import passport from 'passport';
+import { loginSuccess, logout } from '../controllers/authcontroller.js';
+
 const router = express.Router();
 
-// Local login
-router.post('/login', passport.authenticate('local'), (req, res) => {
-  res.json(req.user);
-});
+const ensureIdentifier = (req, res, next) => {
+  if (!req.body.identifier) {
+    if (req.body.email) {
+      req.body.identifier = req.body.email;
+    } else if (req.body.username) {
+      req.body.identifier = req.body.username;
+    }
+  }
+  next();
+};
 
-// Google OAuth
+router.post('/login', ensureIdentifier, passport.authenticate('local'), loginSuccess);
+
+router.get('/logout', logout);
+
 router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
@@ -17,4 +29,4 @@ router.get(
   }
 );
 
-export default router
+export default router;
