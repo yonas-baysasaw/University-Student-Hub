@@ -72,6 +72,7 @@ const startServer = async () => {
   await connectDB();
   app.listen(ENV.PORT, () => {
     console.log(`Server listening on port ${ENV.PORT}`);
+    console.log(`Newwwwwwwwwwww Environment: ${ENV.NODE_ENV}` );
   });
 };
 

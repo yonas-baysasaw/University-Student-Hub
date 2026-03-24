@@ -6,7 +6,7 @@ import { toPublicUser } from '../utils/userSerializer.js';
 const router = express.Router();
 
 router.post(
-  '/',
+  '/', 
   asyncHandler(async (req, res) => {
     const { username, email, password } = req.body;
     const user = await createLocalUser({ username, email, password });
