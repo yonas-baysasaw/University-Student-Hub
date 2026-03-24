@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Nav from './components/Nav';
 import Signup from './pages/Signup';
 import PasswordReset from './pages/PasswordReset';
+import Reset from './pages/Reset';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -21,10 +22,12 @@ function AppRoutes() {
     <>
       {user ? <Navbar />: <Nav/>}
       <Routes>
+        
         <Route path="/" element={user ? <Home /> : <About />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
          <Route path="/password/reset" element={user ? <Navigate to="/" replace /> : <PasswordReset />} />
+          <Route path="/reset-password/:token" element={ <Reset /> } />
         <Route path="*" element={<Navigate to={defaultRedirect} replace />} />
       </Routes>
     </>
