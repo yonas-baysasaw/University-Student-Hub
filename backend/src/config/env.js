@@ -1,22 +1,6 @@
 import dotenv from 'dotenv';
 
 dotenv.config();
-const secureOverride = process.env.SESSION_COOKIE_SECURE?.toLowerCase();
-const defaultSecureCookie =
-process.env.PORT === 'production' && process.env.FRONTEND_URL.startsWith('https://');
-const secureCookies =
-  secureOverride === 'true'
-    ? true
-    : secureOverride === 'false'
-      ? false
-      : defaultSecureCookie;
-
-
-const requiredVars = ['SESSION_SECRET', 'MONGODB_URL'];
-const missingVars = requiredVars.filter((key) => !process.env[key]);
-if (missingVars.length) {
-  console.warn(`Missing environment variables: ${missingVars.join(', ')}`);
-}
 
 export const ENV = {
   PORT: process.env.PORT,
@@ -30,5 +14,4 @@ export const ENV = {
   EMAIL_USER: process.env.EMAIL_USER,
   EMAIL_PASS: process.env.EMAIL_PASS,
   FRONTEND_URL: process.env.FRONTEND_URL,
-  // SESSION_COOKIE_SECURE: secureCookies
 };

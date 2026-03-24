@@ -28,7 +28,7 @@ router.post(
       auth: { user: ENV.EMAIL_USER, pass: ENV.EMAIL_PASS }
     });
 
-    const resetURL = `${ENV.FRONTEND_URL}/api/reset-password/${token}`;
+    const resetURL = `${ENV.FRONTEND_URL}/reset-password/${token}`;
 
     await transporter.sendMail({
       to: user.email,
