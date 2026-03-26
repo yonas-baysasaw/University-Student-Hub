@@ -46,7 +46,7 @@ const SignIn = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100">
       <div className="w-[380px] bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
         <div className="text-center mb-6">
           <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">

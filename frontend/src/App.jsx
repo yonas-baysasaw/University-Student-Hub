@@ -20,10 +20,10 @@ function AppRoutes() {
 
   return (
     <>
-      {user ? <Navbar />: <Nav/>}
+      {user ? <></>: <Nav/>}
       <Routes>
         
-        <Route path="/" element={user ? <Home /> : <About />} />
+        <Route path="/" element={user ? <Navbar><Home /></Navbar> : <About />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
          <Route path="/password/reset" element={user ? <Navigate to="/" replace /> : <PasswordReset />} />

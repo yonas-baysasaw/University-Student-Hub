@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom';
 
 function Nav() {
   return (
-    <div className="navbar bg-base-100 shadow-sm px-6">
+  
+    <div className="max-w-5xl mx-auto navbar bg-base-100 shadow-sm px-6 ">
       <div className="flex-1">
         <Link to="/" className="btn btn-ghost text-xl">
           University Student Hub
@@ -28,6 +29,8 @@ function Nav() {
         </ul>
       </div>
     </div>
+    
+    
   );
 }
 
