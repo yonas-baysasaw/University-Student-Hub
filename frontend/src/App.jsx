@@ -9,6 +9,7 @@ import Signup from './pages/Signup';
 import PasswordReset from './pages/PasswordReset';
 import Reset from './pages/Reset';
 import ClassRoom from './pages/ClassRoom';
+import ChatRoom from './pages/ChatRoom';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -23,13 +24,13 @@ function AppRoutes() {
     <>
       {user ? <></>: <Nav/>}
       <Routes>
-        
         <Route path="/" element={user ? <Navbar><Home /></Navbar> : <About />} />
          <Route path="/classroom" element={user ? <Navbar><ClassRoom/></Navbar> : <About />} />
+         <Route path="/classroom/:chatId" element={user ? <Navbar><ChatRoom/></Navbar> : <About />} />
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/signup" element={user ? <Navigate to="/" replace /> : <Signup />} />
-         <Route path="/password/reset" element={user ? <Navigate to="/" replace /> : <PasswordReset />} />
-          <Route path="/reset-password/:token" element={ <Reset /> } />
+        <Route path="/password/reset" element={user ? <Navigate to="/" replace /> : <PasswordReset />} />
+        <Route path="/reset-password/:token" element={ <Reset /> } />
         <Route path="*" element={<Navigate to={defaultRedirect} replace />} />
       </Routes>
     </>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 function ClassRoom() {
     const [data, setData] = useState([]);
@@ -120,9 +121,12 @@ function ClassRoom() {
                                 <p className="text-sm text-slate-600 mt-1">Code: <span className="font-mono">{classroom.invitationCode}</span></p>
                                 <p className="text-sm text-slate-600 mt-2">Members: {classroom.members.length}</p>
                                 <div className="mt-4 flex gap-2">
-                                    <button className="flex-1 px-3 py-2 bg-slate-900 text-white text-sm rounded hover:bg-slate-700">
+                                    <Link
+                                        className="flex-1 px-3 py-2 text-center bg-slate-900 text-white text-sm rounded hover:bg-slate-700"
+                                        to={`/classroom/${classroom._id}`}
+                                    >
                                         Enter
-                                    </button>
+                                    </Link>
 
                                 </div>
                             </div>

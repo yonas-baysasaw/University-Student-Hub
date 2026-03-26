@@ -145,3 +145,47 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     messages,
   });
 });
+
+export const sendMessage = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+  if (!chatId) {
+    const error = new Error('Chat ID is required');
+    error.status = 400;
+    throw error;
+  }
+  const { content, messageType = 'text', fileUrl } = req.body ?? {};
+  const trimmedContent = typeof content === 'string' ? content.trim() : '';
+  if (!trimmedContent && !fileUrl) {
+    const error = new Error('Message content or file URL is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const chat = await Chat.findById(chatId).select('members');
+  if (!chat) {
+    const error = new Error('Chat not found');
+    error.status = 404;
+    throw error;
+  }
+
+  const isMember = chat.members.some(member => member.equals(req.user._id));
+  if (!isMember) {
+    throw forbidden('You are not part of this chat');
+  }
+
+  const message = await Message.create({
+    chat: chatId,
+    sender: req.user._id,
+    content: trimmedContent,
+    messageType,
+    fileUrl,
+    readBy: [req.user._id],
+  });
+
+  chat.lastMessage = message._id;
+  await chat.save();
+
+  const populated = await message.populate('sender', 'username avatar');
+
+  res.status(201).json({ message: populated });
+});

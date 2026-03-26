@@ -4,6 +4,7 @@ import {
   joinChatByCode,
   getUserChats,
   getChatMessages,
+  sendMessage,
 } from '../controllers/chatController.js';
 import { isAuthenticated } from '../middleware/authMiddleware.js';
 
@@ -14,6 +15,6 @@ router.use(isAuthenticated);
 router.post('/', createChat);
 router.post('/join', joinChatByCode);
 router.get('/', getUserChats);
-router.get('/:chatId/messages', getChatMessages);
+router.route('/:chatId/messages').get(getChatMessages).post(sendMessage);
 
 export default router;
