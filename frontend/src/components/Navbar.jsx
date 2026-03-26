@@ -1,7 +1,7 @@
 import { useAuth } from '../contexts/AuthContext';
 import profile from '../assets/profile.png'
 function Navbar({ children }) {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const photoUrl = user?.photo || user?.profile?.photos?.[0]?.value || profile;
   const displayName = user ? user.displayName ?? user.username ?? "Profile" : "Profile";
   return (
@@ -55,7 +55,7 @@ function Navbar({ children }) {
                 <a>Settings</a>
               </li>
               <li>
-                <a href="/api/logout">Logout</a>
+                <a onClick={logout}>Logout</a>
               </li>
             </ul>
           </div>
