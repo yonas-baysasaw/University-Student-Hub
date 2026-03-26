@@ -4,7 +4,8 @@ const AuthContext = createContext({
   user: null,
   checkingAuth: true,
   refreshAuth: () => Promise.resolve(),
-  setUser: () => {}
+  setUser: () => {},
+  logout: () => Promise.resolve()
 });
 
 export const AuthProvider = ({ children }) => {
@@ -34,12 +35,26 @@ export const AuthProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const logout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'GET',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('logout failed', error);
+    } finally {
+      setUser(null);
+    }
+  };
+
   const value = useMemo(
     () => ({
       user,
       checkingAuth,
       refreshAuth,
-      setUser
+      setUser,
+      logout
     }),
     [user, checkingAuth]
   );
