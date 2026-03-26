@@ -31,7 +31,7 @@ function Navbar({ children }) {
           <div className="hidden flex-none lg:block">
             <ul className="menu menu-horizontal">
               {/* Navbar menu content here */}
-              <li><a>class room</a></li>
+              <li><a href='classroom'>class room</a></li>
               <li><a>library</a></li>
             </ul>
           </div>
@@ -67,7 +67,7 @@ function Navbar({ children }) {
         <label htmlFor="my-drawer-2" aria-label="close sidebar" className="drawer-overlay"></label>
         <ul className="menu bg-base-200 min-h-full w-80 p-4">
           {/* Sidebar content here */}
-          <li><a>class room</a></li>
+          <li><a href='/classroom'>class room</a></li>
           <li><a>library</a></li>
         </ul>
       </div>
