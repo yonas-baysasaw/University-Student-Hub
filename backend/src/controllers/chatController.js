@@ -129,7 +129,7 @@ export const getChatMessages = asyncHandler(async (req, res) => {
 
   const [messages, total] = await Promise.all([
     Message.find({ chat: chatId })
-      .sort({ createdAt: -1 })
+      .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit)
       .populate('sender', 'username avatar')

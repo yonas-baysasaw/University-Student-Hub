@@ -25,10 +25,10 @@ function ChatRoom() {
       setLoading(true);
       setError(null);
       try {
-        const response = await fetch(`/api/chats/${chatId}/messages?limit=100`, {
-          credentials: 'include',
-          signal: controller.signal,
-        });
+      const response = await fetch(`/api/chats/${chatId}/messages?limit=100`, {
+       credentials: 'include',
+       signal: controller.signal,
+     });
         if (!response.ok) {
           throw new Error(`Failed to load messages (${response.status})`);
         }
@@ -76,7 +76,7 @@ function ChatRoom() {
       }
       const data = await response.json();
       const newMessage = data.message ?? data;
-      setMessages(prev => [newMessage, ...prev]);
+      setMessages(prev => [...prev, newMessage]);
       setDraft('');
     } catch (err) {
       setSendError(err.message);
