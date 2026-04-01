@@ -7,8 +7,6 @@ export const ENV = {
   NODE_ENV: process.env.NODE_ENV,
   isProduction: process.env.NODE_ENV,
   SESSION_SECRET: process.env.SESSION_SECRET ,
-  SESSION_COOKIE_SECURE: process.env.SESSION_COOKIE_SECURE,
-  MONGODB_URI: process.env.MONGODB_URI,
   MONGODB_URL: process.env.MONGODB_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
@@ -20,5 +18,4 @@ export const ENV = {
   AWS_BUCKET_NAME : process.env.AWS_BUCKET_NAME,
   AWS_ACCESS_KEY_ID : process.env.AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY : process.env.AWS_SECRET_ACCESS_KEY,
-  AWS_SESSION_TOKEN : process.env.AWS_SESSION_TOKEN,
 };
