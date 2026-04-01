@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { listOnlineUsers } from '../controllers/presenceController.js';
-import { isAuthenticated } from '../middleware/authMiddleware.js';
+import { isAuthenticated } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 

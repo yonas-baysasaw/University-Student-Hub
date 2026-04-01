@@ -6,7 +6,7 @@ import {
   getChatMessages,
   sendMessage,
 } from '../controllers/chatController.js';
-import { isAuthenticated } from '../middleware/authMiddleware.js';
+import { isAuthenticated } from '../middlewares/authMiddleware.js';
 
 const router = Router();
 

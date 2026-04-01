@@ -1,5 +1,5 @@
 import User from '../models/User.js';
-import asyncHandler from '../middleware/asyncHandler.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import { getOnlineUsers } from '../services/presenceService.js';
 
 export const listOnlineUsers = asyncHandler(async (req, res) => {

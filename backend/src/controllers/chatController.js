@@ -1,6 +1,6 @@
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
-import asyncHandler from '../middleware/asyncHandler.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import { customAlphabet } from 'nanoid';
 
 const forbidden = message => {

@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
-import asyncHandler from '../middleware/asyncHandler.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import User from '../models/User.js';
 import { ENV } from '../config/env.js';
 

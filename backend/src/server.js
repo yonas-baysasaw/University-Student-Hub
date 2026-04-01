@@ -18,7 +18,9 @@ import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import { initSocketServer } from './socket/index.js';
-import { notFound, errorHandler } from './middleware/errorHandler.js';
+import { notFound, errorHandler } from './middlewares/errorHandler.js';
+import uploadRoutes  from './routes/uploadRoutes.js'
+import fs from 'fs'
 
 const __dirname = path.resolve();
 const app = express();
@@ -54,6 +56,13 @@ if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
+function ensureUploadDirectoryExists() {
+    if (!fs.existsSync('profile picture')) {
+        fs.mkdirSync('profile picture')
+    }
+}
+
+
 app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
 app.use('/api/profile', profileRoutes);
@@ -61,6 +70,9 @@ app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
+app.use('/api', uploadRoutes)
+
+app.use(errorHandler)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -81,8 +93,9 @@ const start = async () => {
   await connectDB();
 
   await initSocketServer(server, sessionMiddleware);
-
+  ensureUploadDirectoryExists()
   server.listen(ENV.PORT, () => {
+
     console.log(`Server listening on port ${ENV.PORT}`);
   });
 };
