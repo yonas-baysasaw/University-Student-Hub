@@ -1,65 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  --bg-base: #f4f7fb;
+  --bg-soft: #eaf2ff;
+  --bg-card: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #475569;
+  --line: #dbe6f3;
+  --primary-700: #155e75;
+  --primary-600: #0891b2;
+  --primary-500: #06b6d4;
+  --success-600: #15803d;
+  font-family: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(0, 0, 0, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+* {
+  box-sizing: border-box;
+}
 
+html,
+body,
+#root {
+  min-height: 100%;
+}
 
-/* body {
+body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
-  min-height: 100vh;
-} */
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  background:
+    radial-gradient(900px 480px at 0% -10%, rgba(14, 165, 233, 0.12), transparent 55%),
+    radial-gradient(860px 540px at 100% 0%, rgba(6, 182, 212, 0.12), transparent 55%),
+    linear-gradient(180deg, var(--bg-base) 0%, #eef3f9 100%);
+  color: var(--text-main);
 }
 
-button {
-  border-radius: 8px;
+a {
+  color: inherit;
+}
+
+.font-display {
+  font-family: 'Space Grotesk', 'Manrope', sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.page-surface {
+  min-height: calc(100vh - 5.5rem);
+}
+
+.panel-card {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(250, 253, 255, 0.96) 100%);
+  border: 1px solid var(--line);
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.08);
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
   border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
+  background: linear-gradient(100deg, var(--primary-700), var(--primary-500));
+  color: #fff;
+  font-weight: 700;
+  transition: transform 0.16s ease, box-shadow 0.2s ease, opacity 0.2s ease;
 }
-button:hover {
-  border-color: #646cff;
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(8, 145, 178, 0.28);
 }
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  border: 1px solid #b8c8da;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
 }
-/* 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
+
+.btn-secondary:hover {
+  border-color: var(--primary-500);
+  color: var(--primary-700);
+  background: #f0f9ff;
+}
+
+.input-field {
+  width: 100%;
+  border-radius: 0.9rem;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+  height: 2.9rem;
+  padding: 0 0.9rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.input-field:focus {
+  outline: none;
+  border-color: var(--primary-500);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.18);
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.35s ease both;
+}
+
+.route-fade {
+  animation: routeFade 0.24s ease both;
+}
+
+.glass-nav {
+  border: 1px solid #d7e8f7;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.badge-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: #22c55e;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-  a:hover {
-    color: #747bff;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  button {
-    background-color: #f9f9f9;
+}
+
+@keyframes routeFade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
   }
-} */
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
