@@ -1,7 +1,9 @@
 import { FaGoogle } from 'react-icons/fa';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import AuthShell from '../components/AuthShell';
 
-const SignIn = () => {
+function SignIn() {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -33,86 +35,78 @@ const SignIn = () => {
         throw new Error(payload.message || 'Invalid credentials');
       }
 
-      setStatus('Signed in, redirecting…');
+      setStatus('Signed in successfully. Redirecting...');
       setTimeout(() => {
         window.location.href = '/';
-      }, 400);
-    } catch (err) {
-      console.error(err);
-      setError(err.message || 'Unable to sign in');
+      }, 450);
+    } catch (submitError) {
+      console.error(submitError);
+      setError(submitError.message || 'Unable to sign in');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-100">
-      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-xl border border-gray-200">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-sm font-bold text-gray-600">USH</span>
-          </div>
-          <h2 className="text-2xl font-semibold text-gray-800">University Student Hub</h2>
-          <p className="text-sm text-gray-500">Sign in to continue</p>
-        </div>
-
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <label className="text-xs font-semibold tracking-wide text-gray-500">Username or email</label>
+    <AuthShell title="Welcome back" subtitle="Sign in to continue to your workspace">
+      <form className="space-y-3.5" onSubmit={handleSubmit}>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Username or email</label>
           <input
             type="text"
-            placeholder="example@uni.edu"
+            placeholder="example@university.edu"
             value={identifier}
             onChange={(e) => setIdentifier(e.target.value)}
-            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
+            className="input-field text-sm"
           />
+        </div>
 
-          <label className="text-xs font-semibold tracking-wide text-gray-500">Password</label>
+        <div>
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Password</label>
           <input
             type="password"
-            placeholder="Enter password"
+            placeholder="Enter your password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
+            className="input-field text-sm"
           />
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Signing in…' : 'Sign In'}
-          </button>
-
-          {(error || status) && (
-            <p className={`text-center text-sm ${error ? 'text-rose-500' : 'text-emerald-500'}`}>
-              {error || status}
-            </p>
-          )}
-        </form>
-
-        <div className="flex justify-between items-center text-sm text-gray-500 mt-4">
-          <a href="/password/reset" className="hover:text-gray-700 hover:underline">Forgot password?</a>
-          <a href="/signup" className="hover:text-gray-700 hover:underline">Create account</a>
         </div>
 
-        <div className="my-6 flex items-center gap-3">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-sm text-gray-400">or continue with</span>
-          <div className="flex-1 h-px bg-gray-200" />
-        </div>
+        <button type="submit" disabled={loading} className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60">
+          {loading ? 'Signing in...' : 'Sign in'}
+        </button>
 
-        <div className="flex justify-center gap-4">
-          <a
-            href="/api/auth/google"
-            className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition"
-            aria-label="Continue with Google"
-          >
-            <FaGoogle className="text-gray-600 text-lg" />
-          </a>
-        </div>
+        {(error || status) && (
+          <p className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            {error || status}
+          </p>
+        )}
+      </form>
+
+      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <Link to="/password/reset" className="font-medium transition hover:text-slate-700 hover:underline">
+          Forgot password?
+        </Link>
+        <Link to="/signup" className="font-medium transition hover:text-slate-700 hover:underline">
+          Create account
+        </Link>
       </div>
-    </div>
+
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">or continue with</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <a
+        href="/api/auth/google"
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-600 transition hover:border-cyan-300 hover:bg-slate-50 hover:text-cyan-700"
+        aria-label="Continue with Google"
+      >
+        <FaGoogle className="text-base" />
+      </a>
+    </AuthShell>
   );
-};
+}
 
 export default SignIn;

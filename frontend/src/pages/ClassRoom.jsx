@@ -1,280 +1,222 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { readJsonOrThrow } from '../utils/http';
 
 function ClassRoom() {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showJoinModal, setShowJoinModal] = useState(false);
-    const [classroomName, setClassroomName] = useState('');
-    const [classroomCode, setClassroomCode] = useState('');
-    const [joinCode, setJoinCode] = useState('');
-    const [createError, setCreateError] = useState(null);
-    const [joinError, setJoinError] = useState(null);
-    const [isCreating, setIsCreating] = useState(false);
-    const [isJoining, setIsJoining] = useState(false);
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [classroomName, setClassroomName] = useState('');
+  const [classroomCode, setClassroomCode] = useState('');
+  const [joinCode, setJoinCode] = useState('');
+  const [createError, setCreateError] = useState('');
+  const [joinError, setJoinError] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
-    const fetchChats = useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const response = await fetch('/api/chats', { credentials: 'include' });
-            if (!response.ok) {
-                throw new Error(`Unable to load classrooms (${response.status})`);
-            }
-            const result = await response.json();
-            setData(result);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    }, []);
+  const fetchChats = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await fetch('/api/chats', { credentials: 'include' });
+      const result = await readJsonOrThrow(response, 'Unable to load classrooms');
+      setData(result);
+    } catch (fetchError) {
+      setError(fetchError.message);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-    useEffect(() => {
-        fetchChats();
-    }, [fetchChats]);
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
 
-    const handleCreateClass = async () => {
-        const trimmedName = classroomName.trim();
-        if (!trimmedName) {
-            setCreateError('Classroom name is required.');
-            return;
-        }
-
-        setCreateError(null);
-        setIsCreating(true);
-        try {
-            const payload = {
-                name: trimmedName,
-                ...(classroomCode.trim() ? { code: classroomCode.trim() } : {}),
-            };
-
-            const response = await fetch('/api/chats', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
-
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                throw new Error(body?.message ?? `Unable to create classroom (${response.status})`);
-            }
-
-            setShowCreateModal(false);
-            setClassroomName('');
-            setClassroomCode('');
-            await fetchChats();
-        } catch (err) {
-            setCreateError(err.message);
-        } finally {
-            setIsCreating(false);
-        }
-    };
-
-    const handleJoinClass = async () => {
-        const trimmedCode = joinCode.trim();
-        if (!trimmedCode) {
-            setJoinError('Invitation code is required.');
-            return;
-        }
-
-        setJoinError(null);
-        setIsJoining(true);
-        try {
-            const response = await fetch('/api/chats/join', {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ invitationCode: trimmedCode }),
-            });
-
-            if (!response.ok) {
-                const body = await response.json().catch(() => ({}));
-                throw new Error(body?.message ?? `Unable to join classroom (${response.status})`);
-            }
-
-            setShowJoinModal(false);
-            setJoinCode('');
-            await fetchChats();
-        } catch (err) {
-            setJoinError(err.message);
-        } finally {
-            setIsJoining(false);
-        }
-    };
-
-    const openCreateModal = () => {
-        setCreateError(null);
-        setShowCreateModal(true);
-    };
-
-    const openJoinModal = () => {
-        setJoinError(null);
-        setShowJoinModal(true);
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex justify-center items-center px-4 py-8">
-                <div className="max-w-5xl w-full bg-white rounded-2xl shadow-lg p-6">
-                    <p className="text-sm text-slate-600">Loading classrooms...</p>
-                </div>
-            </div>
-        );
+  const handleCreateClass = async () => {
+    const trimmedName = classroomName.trim();
+    if (!trimmedName) {
+      setCreateError('Classroom name is required.');
+      return;
     }
 
-    if (error) {
-        return (
-            <div className="min-h-screen bg-slate-50 flex justify-center items-center px-4 py-8">
-                <div className="max-w-5xl w-full bg-white rounded-2xl shadow-lg p-6 space-y-4">
-                    <p className="text-sm text-red-600">Error: {error}</p>
-                    <button
-                        onClick={fetchChats}
-                        className="px-4 py-2 bg-slate-900 text-white rounded-xl text-sm"
-                    >
-                        Retry
-                    </button>
-                </div>
-            </div>
-        );
+    setCreateError('');
+    setIsCreating(true);
+    try {
+      const payload = {
+        name: trimmedName,
+        ...(classroomCode.trim() ? { code: classroomCode.trim() } : {})
+      };
+
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      await readJsonOrThrow(response, 'Unable to create classroom');
+
+      setShowCreateModal(false);
+      setClassroomName('');
+      setClassroomCode('');
+      await fetchChats();
+    } catch (submitError) {
+      setCreateError(submitError.message);
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleJoinClass = async () => {
+    const trimmedCode = joinCode.trim();
+    if (!trimmedCode) {
+      setJoinError('Invitation code is required.');
+      return;
     }
 
-    const classrooms = data?.chats ?? [];
-    const hasClassrooms = classrooms.length > 0;
+    setJoinError('');
+    setIsJoining(true);
+    try {
+      const response = await fetch('/api/chats/join', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invitationCode: trimmedCode })
+      });
+      await readJsonOrThrow(response, 'Unable to join classroom');
 
+      setShowJoinModal(false);
+      setJoinCode('');
+      await fetchChats();
+    } catch (submitError) {
+      setJoinError(submitError.message);
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  if (loading) {
     return (
-        <div className="min-h-screen bg-slate-50">
-            <div className="max-w-5xl mx-auto px-4 py-10 space-y-8">
-                <section className="bg-white rounded-2xl shadow-lg border border-slate-100 p-6 space-y-6">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h2 className="text-2xl font-bold">{hasClassrooms ? 'Your Classrooms' : 'No classrooms yet'}</h2>
-                        <div className="flex flex-wrap gap-2">
-                            <button
-                                onClick={openCreateModal}
-                                className="px-5 py-2 rounded-full bg-slate-900 text-white text-sm font-semibold hover:bg-slate-700 transition"
-                            >
-                                create class
-                            </button>
-                            <button
-                                onClick={openJoinModal}
-                                className="px-5 py-2 rounded-full border border-slate-900 text-slate-900 text-sm font-semibold hover:bg-slate-900 hover:text-white transition"
-                            >
-                                join class
-                            </button>
-                        </div>
-                    </div>
-
-                    {!hasClassrooms ? (
-                        <p className="text-sm text-slate-500">
-                            Manage your profile, reset passwords, and explore campus highlights while you wait for your first classroom.
-                        </p>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {classrooms.map((classroom) => (
-                                <div
-                                    key={classroom._id}
-                                    className="bg-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-md transition"
-                                >
-                                    <h3 className="font-semibold text-lg text-slate-900">{classroom.name}</h3>
-                                    <p className="text-sm text-slate-600 mt-1">
-                                        Code: <span className="font-mono">{classroom.invitationCode}</span>
-                                    </p>
-                                    <p className="text-sm text-slate-600 mt-2">
-                                        Members: {classroom.members?.length ?? 0}
-                                    </p>
-                                    <div className="mt-4">
-                                        <Link
-                                            className="inline-flex w-full justify-center px-3 py-2 bg-slate-900 text-white text-sm rounded hover:bg-slate-700"
-                                            to={`/classroom/${classroom._id}`}
-                                        >
-                                            Enter
-                                        </Link>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </section>
-            </div>
-
-            {showCreateModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center px-4 py-8 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-                        <h2 className="text-2xl font-bold mb-4">Create Classroom</h2>
-                        {createError && <p className="mb-3 text-sm text-red-600">{createError}</p>}
-                        <input
-                            type="text"
-                            placeholder="Classroom Name"
-                            value={classroomName}
-                            onChange={(e) => setClassroomName(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg mb-4"
-                            disabled={isCreating}
-                        />
-                        <input
-                            type="text"
-                            placeholder="Classroom Code (optional)"
-                            value={classroomCode}
-                            onChange={(e) => setClassroomCode(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg mb-4"
-                            disabled={isCreating}
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleCreateClass}
-                                className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
-                                disabled={isCreating}
-                            >
-                                {isCreating ? 'Creating...' : 'Create'}
-                            </button>
-                            <button
-                                onClick={() => setShowCreateModal(false)}
-                                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100"
-                                disabled={isCreating}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showJoinModal && (
-                <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center px-4 py-8 z-50">
-                    <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-                        <h2 className="text-2xl font-bold mb-4">Join Classroom</h2>
-                        {joinError && <p className="mb-3 text-sm text-red-600">{joinError}</p>}
-                        <input
-                            type="text"
-                            placeholder="Invitation Code"
-                            value={joinCode}
-                            onChange={(e) => setJoinCode(e.target.value)}
-                            className="w-full px-4 py-2 border border-slate-300 rounded-lg mb-4"
-                            disabled={isJoining}
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={handleJoinClass}
-                                className="flex-1 px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-700 disabled:opacity-50"
-                                disabled={isJoining}
-                            >
-                                {isJoining ? 'Joining...' : 'Join'}
-                            </button>
-                            <button
-                                onClick={() => setShowJoinModal(false)}
-                                className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-100"
-                                disabled={isJoining}
-                            >
-                                Cancel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+      <div className="page-surface flex items-center justify-center px-4 py-8">
+        <div className="panel-card w-full max-w-6xl rounded-3xl p-6">
+          <p className="text-sm text-slate-600">Loading classrooms...</p>
         </div>
+      </div>
     );
+  }
+
+  if (error) {
+    return (
+      <div className="page-surface flex items-center justify-center px-4 py-8">
+        <div className="panel-card w-full max-w-6xl rounded-3xl p-6">
+          <p className="text-sm text-rose-600">Error: {error}</p>
+          <button onClick={fetchChats} className="btn-primary mt-4 px-5 py-2 text-sm">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const classrooms = data?.chats ?? [];
+
+  return (
+    <div className="page-surface px-4 py-8 md:px-6">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <section className="panel-card rounded-3xl p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">Course Classrooms</h2>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={() => setShowCreateModal(true)} className="btn-primary px-5 py-2 text-sm">
+                Create class
+              </button>
+              <button onClick={() => setShowJoinModal(true)} className="btn-secondary px-5 py-2 text-sm">
+                Join class
+              </button>
+            </div>
+          </div>
+
+          {classrooms.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">No classrooms yet. Create one for your course or join with an invitation code.</p>
+          ) : (
+            <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {classrooms.map((classroom) => (
+                <article key={classroom._id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <h3 className="font-display text-xl text-slate-900">{classroom.name}</h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Code: <span className="break-all font-mono">{classroom.invitationCode}</span>
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">Members: {classroom.members?.length ?? 0}</p>
+                  <Link
+                    to={`/classroom/${classroom._id}`}
+                    className="btn-primary mt-4 inline-flex w-full justify-center px-4 py-2 text-sm"
+                  >
+                    Enter classroom
+                  </Link>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-cyan-100 bg-white p-6 shadow-xl">
+            <h3 className="font-display text-2xl text-slate-900">Create classroom</h3>
+            {createError && <p className="mt-2 text-sm text-rose-600">{createError}</p>}
+            <input
+              type="text"
+              placeholder="Course / Classroom name"
+              value={classroomName}
+              onChange={(e) => setClassroomName(e.target.value)}
+              className="input-field mt-4 text-sm"
+            />
+            <input
+              type="text"
+              placeholder="Custom code (optional)"
+              value={classroomCode}
+              onChange={(e) => setClassroomCode(e.target.value)}
+              className="input-field mt-3 text-sm"
+            />
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button onClick={handleCreateClass} disabled={isCreating} className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60">
+                {isCreating ? 'Creating...' : 'Create'}
+              </button>
+              <button onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1 px-4 py-2 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showJoinModal && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-3xl border border-cyan-100 bg-white p-6 shadow-xl">
+            <h3 className="font-display text-2xl text-slate-900">Join classroom</h3>
+            {joinError && <p className="mt-2 text-sm text-rose-600">{joinError}</p>}
+            <input
+              type="text"
+              placeholder="Invitation code"
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              className="input-field mt-4 text-sm"
+            />
+            <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+              <button onClick={handleJoinClass} disabled={isJoining} className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60">
+                {isJoining ? 'Joining...' : 'Join'}
+              </button>
+              <button onClick={() => setShowJoinModal(false)} className="btn-secondary flex-1 px-4 py-2 text-sm">
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default ClassRoom;

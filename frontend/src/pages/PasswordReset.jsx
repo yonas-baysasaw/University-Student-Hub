@@ -1,91 +1,74 @@
-import { useState } from "react";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import AuthShell from '../components/AuthShell';
 
-const PasswordReset = () => {
-  const [email, setEmail] = useState("")
-  const [status, setStatus] = useState("")
-  const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+function PasswordReset() {
+  const [email, setEmail] = useState('');
+  const [status, setStatus] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError("")
-    setStatus("")
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setStatus('');
 
-    if (!email.trim()) {
-      setError("Please enter your email.")
-      return
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) {
+      setError('Please enter your email.');
+      return;
     }
 
-    setLoading(true)
-
+    setLoading(true);
     try {
-      const res = await fetch("/api/forgot-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ email: email.trim() })
-      })
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail })
+      });
 
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}))
-        throw new Error(payload.message || "Unable to send reset link.")
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.message || 'Unable to send reset link.');
       }
-
-      setStatus("Check your inbox for a password reset link.")
-    } catch (err) {
-      console.error(err)
-      setError(err.message || "Unable to send reset email.")
+      setStatus('Check your inbox for a password reset link.');
+    } catch (submitError) {
+      console.error(submitError);
+      setError(submitError.message || 'Unable to send reset email.');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-md">
-        {/* Logo */}
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-sm font-bold text-gray-600">USH</span>
-          </div>
-          <h2 className="text-xl font-semibold text-gray-800">
-            University Student Hub
-          </h2>
-          <p className="text-sm text-gray-500">Sign in to continue</p>
-        </div>
+    <AuthShell title="Reset password" subtitle="We will email you a secure reset link">
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <input
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="input-field text-sm"
+        />
 
-        {/* Form */}
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          <input
-            type="email"
-            placeholder="Email address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
-          />
+        <button type="submit" disabled={loading} className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60">
+          {loading ? 'Sending reset link...' : 'Send reset link'}
+        </button>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white font-semibold disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? "Sending link..." : "Send reset link"}
-          </button>
+        {(error || status) && (
+          <p className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            {error || status}
+          </p>
+        )}
+      </form>
 
-          {(error || status) && (
-            <p
-              className={`text-center text-sm mt-3 ${
-                error ? "text-rose-500" : "text-emerald-500"
-              }`}
-            >
-              {error || status}
-            </p>
-          )}
-        </form>
+      <div className="mt-4 text-center text-sm">
+        <Link to="/login" className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline">
+          Back to sign in
+        </Link>
       </div>
-    </div>
+    </AuthShell>
   );
-};
+}
 
 export default PasswordReset;

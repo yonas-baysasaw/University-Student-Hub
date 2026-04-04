@@ -1,45 +1,97 @@
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import profile from '../assets/profile.png'
+
 function Navbar({ children }) {
-  const { user, logout } = useAuth();
-  const photoUrl = user?.photo || user?.profile?.photos?.[0]?.value || profile;
-  const displayName = user ? user.displayName ?? user.username ?? "Profile" : "Profile";
+  const { user } = useAuth();
+  const photoUrl =
+    user?.photo ||
+    user?.profile?.photos?.[0]?.value ||
+    'https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp';
+  const displayName = user ? user.displayName ?? user.username ?? 'Profile' : 'Profile';
+
   return (
-  <div className="drawer">
-    <input id="my-drawer-2" type="checkbox" className="drawer-toggle" />
-    <div className="drawer-content flex flex-col">
-      {/* Navbar */}
-      <div className="navbar mx-auto bg-base-300 max-w-5xl">
-          <div className="flex-none lg:hidden">
-            <label htmlFor="my-drawer-2" aria-label="open sidebar" className="btn btn-square btn-ghost">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                className="inline-block h-6 w-6 stroke-current"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                ></path>
-              </svg>
-            </label>
+    <div className="pb-8">
+      <header className="px-3 pt-3 sm:px-4">
+        <div className="glass-nav mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 rounded-2xl px-3 py-2 sm:px-5">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-700 to-slate-900 text-xs font-bold text-cyan-100">
+              USH
+            </span>
+            <span className="font-display text-lg font-semibold text-slate-900 sm:text-xl">University Student Hub</span>
           </div>
-          <div className="mx-2 flex-1 px-2">   University Student Hub</div>
-          <div className="hidden flex-none lg:block">
-            <ul className="menu menu-horizontal">
-              {/* Navbar menu content here */}
-              <li><a href='classroom'>class room</a></li>
-              <li><a>library</a></li>
-            </ul>
-          </div>
-          <div className="dropdown dropdown-end">
-            <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar">
-              <div className="w-10 h-10 rounded-full overflow-hidden">
-                <img alt={`${displayName} avatar`} src={photoUrl} />
-              </div>
+
+          <div className="flex items-center gap-2">
+            <nav>
+              <ul className="flex items-center gap-1">
+                <li>
+                  <NavLink
+                    to="/"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Dashboard
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/classroom"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Classroom
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/library"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Library
+                  </NavLink>
+                </li>
+              </ul>
+            </nav>
+
+            <div className="dropdown dropdown-end">
+              <button type="button" tabIndex={0} className="btn btn-ghost btn-circle avatar">
+                <div className="h-10 w-10 overflow-hidden rounded-full border border-slate-200">
+                  <img alt={`${displayName} avatar`} src={photoUrl} />
+                </div>
+              </button>
+              <ul tabIndex={-1} className="menu dropdown-content z-[999] mt-3 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-slate-700 shadow-xl">
+                <li>
+                  <span className="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800">
+                    {displayName}
+                    <span className="badge-dot" />
+                  </span>
+                </li>
+                <li>
+                  <a href="/password/reset" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    Reset password
+                  </a>
+                </li>
+                <li>
+                  <a href="/api/logout" className="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                    Logout
+                  </a>
+                </li>
+              </ul>
             </div>
             <ul
               tabIndex="-1"
@@ -59,18 +111,10 @@ function Navbar({ children }) {
               </li>
             </ul>
           </div>
-      </div>
-        {/* Page content here */}
-        {children}
-    </div>
-      <div className="drawer-side">
-        <label htmlFor="my-drawer-2" aria-label="close sidebar" className="drawer-overlay"></label>
-        <ul className="menu bg-base-200 min-h-full w-80 p-4">
-          {/* Sidebar content here */}
-          <li><a href='/classroom'>class room</a></li>
-          <li><a>library</a></li>
-        </ul>
-      </div>
+        </div>
+      </header>
+
+      <main>{children}</main>
     </div>
   );
 }

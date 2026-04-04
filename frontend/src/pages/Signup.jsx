@@ -1,175 +1,150 @@
-import { FaGoogle } from "react-icons/fa";
-import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { FaGoogle } from 'react-icons/fa';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import AuthShell from '../components/AuthShell';
+import { getPasswordStrength } from '../utils/passwordStrength';
 
-const Signup = () => {
-  const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+function Signup() {
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
   const successTimer = useRef();
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
 
-  useEffect(() => {
-    return () => {
-      if (successTimer.current) {
-        clearTimeout(successTimer.current);
-      }
-    };
+  useEffect(() => () => {
+    if (successTimer.current) clearTimeout(successTimer.current);
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setSuccess("");
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setSuccess('');
 
     if (!username || !email || !password || !confirmPassword) {
-      setError("All fields are required.");
+      setError('All fields are required.');
       return;
     }
-
     if (password !== confirmPassword) {
-      setError("Passwords do not match.");
+      setError('Passwords do not match.');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters.');
       return;
     }
 
     try {
-      const res = await fetch("/api/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
       });
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.message || "Unable to create account.");
+        throw new Error(data.message || 'Unable to create account.');
       }
 
-      setSuccess("Account created. Redirecting to sign in...");
-      setUsername("");
-      setEmail("");
-      setPassword("");
-      setConfirmPassword("");
-
-      successTimer.current = setTimeout(() => {
-        navigate("/login", { replace: true });
-      }, 1200);
-    } catch (error) {
-      console.error(error);
-      setError(error?.message || "Something went wrong, try again.");
+      setSuccess('Account created. Redirecting to sign in...');
+      setUsername('');
+      setEmail('');
+      setPassword('');
+      setConfirmPassword('');
+      successTimer.current = setTimeout(() => navigate('/login', { replace: true }), 1200);
+    } catch (submitError) {
+      console.error(submitError);
+      setError(submitError?.message || 'Something went wrong, try again.');
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="w-[380px] bg-white p-8 rounded-2xl shadow-md">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 mx-auto mb-3 bg-gray-200 rounded-full flex items-center justify-center">
-            <span className="text-sm font-bold text-gray-600">USH</span>
+    <AuthShell title="Create account" subtitle="Set up your student workspace">
+      <form className="space-y-3.5" onSubmit={handleSubmit}>
+        {(error || success) && (
+          <div className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+            {error || success}
           </div>
-          <h2 className="text-xl font-semibold text-gray-800">University Student Hub</h2>
-          <p className="text-sm text-gray-500">Sign up to get started</p>
-        </div>
+        )}
 
-        <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-          {(error || success) && (
-            <div
-              className={`text-sm px-3 py-2 rounded ${
-                error ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"
-              }`}
-            >
-              {error || success}
-            </div>
-          )}
+        <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field text-sm" />
+        <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-sm" />
+
+        <div className="relative">
           <input
-            type="text"
-            placeholder="Username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="input-field pr-16 text-sm"
           />
-          <div className="relative">
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 hover:text-gray-700"
-            >
-              {showPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-
-          <div className="relative">
-            <input
-              type={showConfirmPassword ? "text" : "password"}
-              placeholder="Confirm password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword((prev) => !prev)}
-              aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500 hover:text-gray-700"
-            >
-              {showConfirmPassword ? "Hide" : "Show"}
-            </button>
-          </div>
-
-          <input
-            type="email"
-            placeholder="E-mail address"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full h-11 px-4 rounded-lg border border-gray-300 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-[#3d5661] focus:border-transparent"
-          />
-
           <button
-            type="submit"
-            className="w-full h-11 mt-2 bg-[#3d5661] text-xl hover:bg-[#324952] transition-colors text-white flex items-center justify-center"
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-slate-700"
           >
-            Sign Up
+            {showPassword ? 'Hide' : 'Show'}
           </button>
-        </form>
-
-        <div className="flex justify-between text-sm text-gray-500 mt-4">
-          <span>Have an account?</span>
-          <a href="/login" className="cursor-pointer hover:text-gray-700 hover:underline">
-            Sign in
-          </a>
         </div>
 
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px bg-gray-200" />
-          <span className="text-sm text-gray-400">or you can sign in with</span>
-          <div className="flex-1 h-px bg-gray-200" />
+        <div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className={`h-full rounded-full transition-all ${strength.color}`} style={{ width: `${Math.max(8, strength.score * 20)}%` }} />
+          </div>
+          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>Password strength: {strength.label}</p>
         </div>
 
-        <div className="flex justify-center gap-4">
-          <a
-            href="/api/auth/google"
-            className="w-12 h-12 flex items-center justify-center border border-gray-300 rounded-full hover:bg-gray-100 transition"
+        <div className="relative">
+          <input
+            type={showConfirmPassword ? 'text' : 'password'}
+            placeholder="Confirm password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            className="input-field pr-16 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => setShowConfirmPassword((prev) => !prev)}
+            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-slate-700"
           >
-            <FaGoogle className="text-gray-600 text-lg" />
-          </a>
+            {showConfirmPassword ? 'Hide' : 'Show'}
+          </button>
         </div>
+
+        <button type="submit" className="btn-primary h-11 w-full text-sm">
+          Sign up
+        </button>
+      </form>
+
+      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+        <span>Already have an account?</span>
+        <Link to="/login" className="font-medium transition hover:text-slate-700 hover:underline">
+          Sign in
+        </Link>
       </div>
-    </div>
+
+      <div className="my-5 flex items-center gap-3">
+        <div className="h-px flex-1 bg-slate-200" />
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">or continue with</span>
+        <div className="h-px flex-1 bg-slate-200" />
+      </div>
+
+      <a
+        href="/api/auth/google"
+        className="mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 text-slate-600 transition hover:border-cyan-300 hover:bg-slate-50 hover:text-cyan-700"
+        aria-label="Continue with Google"
+      >
+        <FaGoogle className="text-base" />
+      </a>
+    </AuthShell>
   );
-};
+}
 
 export default Signup;
