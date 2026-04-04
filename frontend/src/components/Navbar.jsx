@@ -93,6 +93,23 @@ function Navbar({ children }) {
                 </li>
               </ul>
             </div>
+            <ul
+              tabIndex="-1"
+              className="menu menu-sm dropdown-content bg-base-100 rounded-box z-1 mt-3 w-52 p-2 shadow"
+            >
+              <li>
+                <a className="justify-between">
+                  {displayName}
+                  <span className="badge">New</span>
+                </a>
+              </li>
+              <li>
+                <a>Settings</a>
+              </li>
+              <li>
+                <a onClick={logout}>Logout</a>
+              </li>
+            </ul>
           </div>
         </div>
       </header>

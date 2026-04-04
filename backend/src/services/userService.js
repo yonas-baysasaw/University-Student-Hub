@@ -33,6 +33,7 @@ export const createLocalUser = async ({ username, email, password }) => {
 };
 
 export const findOrLinkGoogleUser = async (profile) => {
+  console.log(profile)
   const email = profile.emails?.[0]?.value;
   let user = await User.findOne({ googleId: profile.id });
 
@@ -65,6 +66,28 @@ export const findOrLinkGoogleUser = async (profile) => {
 };
 
 export const getUserById = (id) => User.findById(id);
+
+export const updateUserAvatar = async (userId, avatarUrl) => {
+  if (!userId) {
+    const error = new Error('User id is required');
+    error.status = 400;
+    throw error;
+  }
+
+  const user = await User.findByIdAndUpdate(
+    userId,
+    { avatar: avatarUrl },
+    { new: true, runValidators: true }
+  );
+
+  if (!user) {
+    const error = new Error('User not found');
+    error.status = 404;
+    throw error;
+  }
+
+  return user;
+};
 
 export const findByIdentifier = async (identifier) => {
   const isEmail = typeof identifier === 'string' && identifier.includes('@');

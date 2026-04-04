@@ -1,5 +1,5 @@
 import express from 'express';
-import asyncHandler from '../middleware/asyncHandler.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 
 const router = express.Router();
 
@@ -14,6 +14,7 @@ function ensureAuth(req, res, next) {
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
   const photo =
+    req.user.avatar ||
     req.user.profile?.photos?.[0]?.value ||
     req.user.profile?.picture ||
     null;
@@ -45,7 +46,8 @@ router.put(
       user: {
         id: req.user._id,
         username: req.user.username,
-        displayName: req.user.displayName
+        displayName: req.user.displayName,
+        avatar: req.user.avatar || null
       }
     });
   })

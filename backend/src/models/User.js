@@ -1,17 +1,39 @@
 import mongoose from 'mongoose';
 
-const userSchema = new mongoose.Schema({
-  googleId: { type: String, unique: true, sparse: true },
-  displayName: String,
-  username: { type: String, unique: true, sparse: true },
-  email: { type: String, unique: true },
-  password: String,
-  provider: { type: [String], default: [] },
-  profile: Object,
-  resetPasswordToken: String,
-  resetPasswordExpires: Date
-});
+const userSchema = new mongoose.Schema(
+  {
+    username: {
+      type: String,
+      trim: true,
+      index: true,
+    },
+    email: {
+      type: String,
+      required: true,
+      trim: true,
+      lowercase: true,
+      unique: true,
+      index: true,
+    },
+    password: {
+      type: String,
+    },
+    avatar: {
+      type: String,
+    },
+    lastSeen: {
+      type: Date,
+      default: Date.now,
+    },
+    photo:String,
+  },
+  { timestamps: true }
+);
 
-const User = mongoose.model('User', userSchema);
+userSchema.methods.toJSON = function () {
+  const obj = this.toObject();
+  delete obj.password;
+  return obj;
+};
 
-export default User; 
+export default mongoose.model('User', userSchema);

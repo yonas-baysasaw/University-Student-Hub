@@ -1,8 +1,8 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Real-time group chat backend",
+  "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js"
@@ -12,16 +12,23 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1021.0",
     "bcrypt": "^6.0.0",
-    "bytes": "^3.1.2",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
+    "express-async-handler": "^1.2.0",
     "express-session": "^1.19.0",
-    "mongoose": "^9.3.1",
+    "helmet": "^7.0.0",
+    "mongoose": "^9.3.2",
+    "morgan": "^1.10.0",
+    "multer": "^2.1.1",
+    "nanoid": "^5.0.0",
     "nodemailer": "^8.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
-    "passport-local": "^1.0.0"
+    "passport-local": "^1.0.0",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0"
   }
 }

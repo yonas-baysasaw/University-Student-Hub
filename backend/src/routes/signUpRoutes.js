@@ -1,5 +1,5 @@
 import express from 'express';
-import asyncHandler from '../middleware/asyncHandler.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import { createLocalUser } from '../services/userService.js';
 import { toPublicUser } from '../utils/userSerializer.js';
 
