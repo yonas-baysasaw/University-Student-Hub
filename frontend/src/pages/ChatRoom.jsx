@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ClassroomMembersSidebar from '../components/ClassroomMembersSidebar';
 import ClassroomTabs from '../components/ClassroomTabs';
 import { useAuth } from '../contexts/AuthContext';
-import { fetchClassroomMeta } from '../utils/classroom';
+import { fetchClassroomMeta, getMemberName } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
 
 function ChatRoom() {
@@ -19,6 +19,14 @@ function ChatRoom() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
   const bottomRef = useRef(null);
+  const membersById = useMemo(() => {
+    const lookup = new Map();
+    for (const member of members) {
+      const id = member?._id ?? member?.id;
+      if (id) lookup.set(String(id), member);
+    }
+    return lookup;
+  }, [members]);
 
   useEffect(() => {
     if (!chatId) {
@@ -152,9 +160,13 @@ function ChatRoom() {
                 <div className="space-y-2">
                   {messages.map((message, index) => {
                     const sender = message?.sender;
-                    const senderName = sender?.username ?? sender?.displayName ?? 'Unknown';
-                    const senderId = sender?._id ?? sender?.id;
-                    const isSelf = senderId && (senderId === user?._id || senderId === user?.id);
+                    const senderId = typeof sender === 'string' ? sender : sender?._id ?? sender?.id;
+                    const senderFromMembers = senderId ? membersById.get(String(senderId)) : null;
+                    const senderProfile = typeof sender === 'object' && sender !== null ? sender : senderFromMembers;
+                    const senderName = getMemberName(senderProfile);
+                    const isSelf =
+                      senderId &&
+                      (String(senderId) === String(user?._id) || String(senderId) === String(user?.id));
                     const time = new Date(message?.createdAt ?? Date.now()).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit'

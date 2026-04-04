@@ -25,6 +25,7 @@ function ClassroomMembersSidebar({ members, membersError, user }) {
             const isYou = id && (id === user?._id || id === user?.id);
             const avatar =
               member?.avatar ||
+              member?.photo ||
               'https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.jpg';
 
             return (

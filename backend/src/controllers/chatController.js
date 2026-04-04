@@ -94,10 +94,10 @@ export const getUserChats = asyncHandler(async (req, res) => {
       .skip(skip)
       .limit(parsedLimit)
       .populate([
-        { path: 'members', select: 'username avatar' },
+        { path: 'members', select: 'username email avatar photo' },
         {
           path: 'lastMessage',
-          populate: { path: 'sender', select: 'username avatar' },
+          populate: { path: 'sender', select: 'username email avatar photo' },
         },
       ]),
   ]);
@@ -132,7 +132,7 @@ export const getChatMessages = asyncHandler(async (req, res) => {
       .sort({ createdAt: 1 })
       .skip(skip)
       .limit(limit)
-      .populate('sender', 'username avatar')
+      .populate('sender', 'username email avatar photo')
       .lean(),
     Message.countDocuments({ chat: chatId }),
   ]);
@@ -185,7 +185,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
   chat.lastMessage = message._id;
   await chat.save();
 
-  const populated = await message.populate('sender', 'username avatar');
+  const populated = await message.populate('sender', 'username email avatar photo');
 
   res.status(201).json({ message: populated });
 });

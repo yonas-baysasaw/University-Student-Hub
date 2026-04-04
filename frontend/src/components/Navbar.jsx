@@ -74,7 +74,10 @@ function Navbar({ children }) {
                   <img alt={`${displayName} avatar`} src={photoUrl} />
                 </div>
               </button>
-              <ul tabIndex={-1} className="menu dropdown-content z-[999] mt-3 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-slate-700 shadow-xl">
+              <ul
+                tabIndex={0}
+                className="menu menu-sm dropdown-content z-[999] mt-3 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-slate-700 shadow-xl"
+              >
                 <li>
                   <span className="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800">
                     {displayName}
@@ -87,7 +90,7 @@ function Navbar({ children }) {
                   </a>
                 </li>
                 <li>
-                  <a href="/api/auth/logout" className="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                  <a href="/api/auth/logout" className="rounded-xl border border-rose-100 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
                     Logout
                   </a>
                 </li>

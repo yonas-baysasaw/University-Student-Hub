@@ -6,7 +6,11 @@ export function isInstructor(user) {
 }
 
 export function getMemberName(member) {
-  return member?.username ?? member?.displayName ?? 'Member';
+  if (!member) return 'Participant';
+  if (member.username) return member.username;
+  if (member.displayName) return member.displayName;
+  if (member.email) return member.email.split('@')[0] || member.email;
+  return 'Participant';
 }
 
 export async function fetchClassroomMeta(chatId, signal) {

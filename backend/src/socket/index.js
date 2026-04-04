@@ -112,7 +112,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         chat.lastMessage = message._id;
         await chat.save();
 
-        const populated = await message.populate('sender', 'username avatar');
+        const populated = await message.populate('sender', 'username email avatar photo');
         io.to(chatId).emit('message', sanitizeMessage(populated));
       } catch (error) {
         socket.emit('error', { message: error.message });
