@@ -1,4 +1,4 @@
-import { createUploadSuccessResponse, createErrorResponse } from '../models/uploadModel.js'
+// import { createUploadSuccessResponse, createErrorResponse } from '../models/uploadModel.js'
 import { uploadFileToS3 } from '../services/uploadService.js'
 
 function getUploadedFile(req) {
@@ -13,8 +13,34 @@ function getUploadedFile(req) {
     return null
 }
 
-async function uploadController(req, res, next) {
+// async function uploadController(req, res, next) {
+//     try {
+//         const uploadedFile = getUploadedFile(req)
+
+//         if (!uploadedFile) {
+//             return res.status(400).json(createErrorResponse('No file uploaded.'))
+//         }
+
+//         const uploadResult = await uploadFileToS3(uploadedFile)
+
+//         return res.json(
+//             createUploadSuccessResponse({
+//                 filename: uploadedFile.originalname,
+//                 location: uploadResult.location,
+//                 key: uploadResult.key
+//             })
+//         )
+//     } catch (error) {
+//         return next(error)
+//     }
+// }
+
+async function uploadProfileController(req, res, next) {
     try {
+        if (!req.user?._id) {
+            return res.status(401).json(createErrorResponse('Unauthorized'))
+        }
+
         const uploadedFile = getUploadedFile(req)
 
         if (!uploadedFile) {
