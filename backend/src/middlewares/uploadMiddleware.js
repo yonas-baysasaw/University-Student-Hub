@@ -1,7 +1,7 @@
 import multer from 'multer'
 
 const storage = multer.memoryStorage()
-const upload = multer({ storage })
+
 
 function applicationFileFilter(_req, file, cb) {
     if (file?.mimetype?.startsWith('application/')) {
@@ -31,9 +31,8 @@ const imageUpload = multer({
 })
 
 
-const uploadAnyMiddleware = upload.any()
 const uploadApplicationMiddleware = applicationUpload.any()
 const uploadImageMiddleware = imageUpload.any()
 
 
-export { uploadAnyMiddleware, uploadApplicationMiddleware, uploadImageMiddleware }
+export {uploadApplicationMiddleware, uploadImageMiddleware }

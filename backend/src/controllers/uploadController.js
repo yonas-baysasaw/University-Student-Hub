@@ -23,16 +23,26 @@ async function uploadController(req, res, next) {
 
         const uploadResult = await uploadFileToS3(uploadedFile)
 
-        return res.json(
-            createUploadSuccessResponse({
-                filename: uploadedFile.originalname,
-                location: uploadResult.location,
-                key: uploadResult.key
-            })
-        )
+        req.user.avatar = uploadResult.location
+        await req.user.save()
+        console.log("ddlfksjd")
+
+        return res.json({
+            name:"yonas"
+            // ...createUploadSuccessResponse({
+            //     filename: uploadedFile.originalname,
+            //     location: uploadResult.location,
+            //     key: uploadResult.key,
+            //     name:"yonas"
+            // }),
+            // user: {
+            //     id: req.user._id,
+            //     avatar: req.user.avatar
+            // }
+        })
     } catch (error) {
         return next(error)
     }
 }
 
-export { uploadController }
+export {uploadProfileController }
