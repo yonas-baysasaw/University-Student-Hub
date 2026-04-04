@@ -70,9 +70,7 @@ app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
-app.use('/api', uploadRoutes)
-
-app.use(errorHandler)
+app.use('/api/upload', uploadRoutes)
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -88,6 +86,16 @@ app.use(notFound);
 app.use(errorHandler);
 
 const server = http.createServer(app);
+
+server.on('error', error => {
+  if (error?.code === 'EADDRINUSE') {
+    console.error(`Port ${ENV.PORT} is already in use. Stop the process using that port or change PORT in backend/.env.`);
+    process.exit(1);
+  }
+
+  console.error('Server error', error);
+  process.exit(1);
+});
 
 const start = async () => {
   await connectDB();

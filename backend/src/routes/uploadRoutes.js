@@ -6,7 +6,7 @@ import { isAuthenticated } from '../middlewares/authMiddleware.js'
 const routes = Router()
 routes.use(isAuthenticated)
 
-routes.post('/upload/profile', uploadImageMiddleware, uploadProfileController)
+routes.post('/profile', uploadImageMiddleware, uploadProfileController)
 // routes.post('/upload/file', uploadApplicationMiddleware, uploadController)
 
 

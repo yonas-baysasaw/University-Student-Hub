@@ -86,7 +86,7 @@ function Home() {
             <Link to="/password/reset" className="btn-secondary px-5 py-2.5 text-sm">
               Reset password
             </Link>
-            <a href="/api/logout" className="rounded-full px-2 py-2 text-sm font-semibold text-slate-500 transition hover:text-slate-800">
+            <a href="/api/auth/logout" className="rounded-full px-2 py-2 text-sm font-semibold text-slate-500 transition hover:text-slate-800">
               Sign out
             </a>
           </div>
