@@ -20,7 +20,6 @@ import presenceRoutes from './routes/presenceRoutes.js';
 import { initSocketServer } from './socket/index.js';
 import { notFound, errorHandler } from './middlewares/errorHandler.js';
 import uploadRoutes  from './routes/uploadRoutes.js'
-import fs from 'fs'
 
 const __dirname = path.resolve();
 const app = express();
@@ -74,12 +73,6 @@ if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-function ensureUploadDirectoryExists() {
-    if (!fs.existsSync('profile picture')) {
-        fs.mkdirSync('profile picture')
-    }
-}
-
 
 app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
@@ -90,7 +83,6 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
 app.use('/api/upload', uploadRoutes)
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
 if (ENV.isProduction) {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
@@ -105,21 +97,10 @@ app.use(errorHandler);
 
 const server = http.createServer(app);
 
-server.on('error', error => {
-  if (error?.code === 'EADDRINUSE') {
-    console.error(`Port ${ENV.PORT} is already in use. Stop the process using that port or change PORT in backend/.env.`);
-    process.exit(1);
-  }
-
-  console.error('Server error', error);
-  process.exit(1);
-});
-
 const start = async () => {
   await connectDB();
 
   await initSocketServer(server, sessionMiddleware);
-  ensureUploadDirectoryExists()
   server.listen(ENV.PORT, () => {
 
     console.log(`Server listening on port ${ENV.PORT}`);

@@ -1,5 +1,9 @@
-// import { createUploadSuccessResponse, createErrorResponse } from '../models/uploadModel.js'
 import { uploadFileToS3 } from '../services/uploadService.js'
+
+function createErrorResponse(message) {
+    return { message }
+}
+
 
 function getUploadedFile(req) {
     if (req.file) return req.file
@@ -13,31 +17,35 @@ function getUploadedFile(req) {
     return null
 }
 
-// async function uploadController(req, res, next) {
-//     try {
-//         const uploadedFile = getUploadedFile(req)
+async function uploadController(req, res, next) {
+    try {
+        const id = req.user?._id
+        if (!id) {
+            return res.status(401).json(createErrorResponse('Unauthorized'))
+        }
+        const uploadedFile = getUploadedFile(req)
 
-//         if (!uploadedFile) {
-//             return res.status(400).json(createErrorResponse('No file uploaded.'))
-//         }
+        if (!uploadedFile) {
+            return res.status(400).json(createErrorResponse('No file uploaded.'))
+        }
 
-//         const uploadResult = await uploadFileToS3(uploadedFile)
+        const uploadResult = await uploadFileToS3(uploadedFile, `${id}/Library`)
 
-//         return res.json(
-//             createUploadSuccessResponse({
-//                 filename: uploadedFile.originalname,
-//                 location: uploadResult.location,
-//                 key: uploadResult.key
-//             })
-//         )
-//     } catch (error) {
-//         return next(error)
-//     }
-// }
+        return res.json({
+            UserId : id,
+            filename: uploadedFile.originalname,
+            location: uploadResult.location,
+            key: uploadResult.key
+     })
+    } catch (error) {
+        return next(error)
+    }
+}
 
 async function uploadProfileController(req, res, next) {
+    const id = req.user?._id
     try {
-        if (!req.user?._id) {
+        if (!id) {
             return res.status(401).json(createErrorResponse('Unauthorized'))
         }
 
@@ -47,7 +55,7 @@ async function uploadProfileController(req, res, next) {
             return res.status(400).json(createErrorResponse('No file uploaded.'))
         }
 
-        const uploadResult = await uploadFileToS3(uploadedFile)
+        const uploadResult = await uploadFileToS3(uploadedFile, `${id}/profile picture`)
 
         req.user.avatar = uploadResult.location
         await req.user.save()
@@ -57,7 +65,7 @@ async function uploadProfileController(req, res, next) {
             location: uploadResult.location,
             key: uploadResult.key,  
             user: {
-                id: req.user._id,
+                id: id,
                 avatar: req.user.avatar
             }
         })
@@ -66,4 +74,4 @@ async function uploadProfileController(req, res, next) {
     }
 }
 
-export {uploadProfileController }
+export {uploadProfileController, uploadController }

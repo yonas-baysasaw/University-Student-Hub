@@ -1,5 +1,8 @@
 import multer from 'multer'
-import { createErrorResponse } from '../models/uploadModel.js'
+
+function createErrorResponse(message) {
+    return { message }
+}
 
 function getUploadClientError(err) {
     if (!err) return null
