@@ -1,6 +1,7 @@
 import { getMemberName } from '../utils/classroom';
-
+import defaultProfile from '../assets/profile.png';
 function ClassroomMembersSidebar({ members, membersError, user }) {
+  console.log(members)
   return (
     <aside className="h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24">
       <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
@@ -25,8 +26,7 @@ function ClassroomMembersSidebar({ members, membersError, user }) {
             const isYou = id && (id === user?._id || id === user?.id);
             const avatar =
               member?.avatar ||
-              member?.photo ||
-              'https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.jpg';
+              member?.photo || defaultProfile
 
             return (
               <article key={id} className="rounded-xl border border-slate-200 bg-white p-2.5">
