@@ -33,7 +33,6 @@ export const createLocalUser = async ({ username, email, password }) => {
 };
 
 export const findOrLinkGoogleUser = async (profile) => {
-  console.log(profile)
   const email = profile.emails?.[0]?.value;
   let user = await User.findOne({ googleId: profile.id });
 
@@ -45,8 +44,9 @@ export const findOrLinkGoogleUser = async (profile) => {
         user.provider.push('google');
       }
       user.googleId = profile.id;
-      user.displayName ||= profile.displayName;
-      user.profile = profile;
+      user.name ||= profile.displayName;
+      user.avatar ||= profile?.photos?.[0]?.value;
+      user.email_verified = true
       await user.save();
       return user;
     }
@@ -58,10 +58,12 @@ export const findOrLinkGoogleUser = async (profile) => {
 
   return User.create({
     googleId: profile.id,
-    displayName: profile.displayName,
+    name: profile.displayName,
     email,
     provider: ['google'],
-    profile
+    avatar: profile?.photos?.[0]?.value,
+    email_verified : true,
+    
   });
 };
 

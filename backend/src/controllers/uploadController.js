@@ -1,4 +1,4 @@
-// import { createUploadSuccessResponse, createErrorResponse } from '../models/uploadModel.js'
+import { createUploadSuccessResponse, createErrorResponse } from '../models/uploadModel.js'
 import { uploadFileToS3 } from '../services/uploadService.js'
 
 function getUploadedFile(req) {
@@ -51,20 +51,18 @@ async function uploadProfileController(req, res, next) {
 
         req.user.avatar = uploadResult.location
         await req.user.save()
-        console.log("ddlfksjd")
 
         return res.json({
-            name:"yonas"
-            // ...createUploadSuccessResponse({
-            //     filename: uploadedFile.originalname,
-            //     location: uploadResult.location,
-            //     key: uploadResult.key,
-            //     name:"yonas"
-            // }),
-            // user: {
-            //     id: req.user._id,
-            //     avatar: req.user.avatar
-            // }
+            ...createUploadSuccessResponse({
+                filename: uploadedFile.originalname,
+                location: uploadResult.location,
+                key: uploadResult.key,
+               
+            }),
+            user: {
+                id: req.user._id,
+                avatar: req.user.avatar
+            }
         })
     } catch (error) {
         return next(error)

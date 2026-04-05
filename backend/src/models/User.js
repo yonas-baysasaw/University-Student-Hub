@@ -7,6 +7,9 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
+    name:{
+      type:String,
+    },
     email: {
       type: String,
       required: true,
@@ -21,11 +24,14 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
     },
+    email_verified:{
+      type: Boolean,
+      default: false,
+    },
     lastSeen: {
       type: Date,
       default: Date.now,
     },
-    photo:String,
   },
   { timestamps: true }
 );

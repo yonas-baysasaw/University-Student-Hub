@@ -1,14 +1,12 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import defaultProfile from '../assets/profile.png';
 
 function Navbar({ children }) {
   const { user } = useAuth();
-  const photoUrl =
-    user?.photo ||
-    user?.profile?.photos?.[0]?.value ||
-    'https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp';
+  const photoUrl = user?.photo || defaultProfile;
   const displayName = user ? user.displayName ?? user.username ?? 'Profile' : 'Profile';
-
+  console.log(user)
   return (
     <div className="pb-8">
       <header className="px-3 pt-3 sm:px-4">

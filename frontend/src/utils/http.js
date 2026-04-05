@@ -17,7 +17,7 @@ export async function readJsonOrThrow(response, fallbackMessage = 'Request faile
   let payload;
   try {
     payload = raw ? JSON.parse(raw) : {};
-  } catch (error) {
+  } catch {
     throw new Error('Received invalid JSON from API.');
   }
 

@@ -24,6 +24,10 @@ import fs from 'fs'
 
 const __dirname = path.resolve();
 const app = express();
+const s3ImageOrigin =
+  ENV.AWS_BUCKET_NAME && ENV.AWS_REGION
+    ? `https://${ENV.AWS_BUCKET_NAME}.s3.${ENV.AWS_REGION}.amazonaws.com`
+    : null;
 
 const sessionCookieSettings = {
   secure: ENV.SESSION_COOKIE_SECURE,
@@ -37,7 +41,21 @@ const sessionMiddleware = session({
   cookie: sessionCookieSettings,
 });
 
-app.use(helmet());
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        imgSrc: [
+          "'self'",
+          'data:',
+          ...(s3ImageOrigin ? [s3ImageOrigin] : []),
+          'https://lh3.googleusercontent.com',
+          'https://*.googleusercontent.com',
+        ],
+      },
+    },
+  })
+);
 app.use(
   cors({
     origin: ENV.FRONTEND_URL || true,
