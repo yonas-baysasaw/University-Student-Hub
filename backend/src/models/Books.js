@@ -58,4 +58,4 @@ const bookSchema = new mongoose.Schema(
 
 bookSchema.index({ title: "text", description: "text" });
 
-export default mongoose.model("Video", bookSchema);
+export default mongoose.model("Book", bookSchema);

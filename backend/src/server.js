@@ -20,6 +20,8 @@ import presenceRoutes from './routes/presenceRoutes.js';
 import { initSocketServer } from './socket/index.js';
 import { notFound, errorHandler } from './middlewares/errorHandler.js';
 import uploadRoutes  from './routes/uploadRoutes.js'
+import booksRoutes from './routes/libraryRoutes.js'
+import { getAllBooks, getBookById } from './controllers/libraryController.js';
 
 const __dirname = path.resolve();
 const app = express();
@@ -82,6 +84,9 @@ app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
 app.use('/api/upload', uploadRoutes)
+app.get('/api/books', getAllBooks);
+app.get('/api/books/:bookId', getBookById);
+app.use('/api/books', booksRoutes)
 
 
 if (ENV.isProduction) {

@@ -1,4 +1,5 @@
 import { uploadFileToS3 } from '../services/uploadService.js'
+import Book from '../models/Books.js'
 
 function createErrorResponse(message) {
     return { message }
@@ -31,12 +32,25 @@ async function uploadController(req, res, next) {
 
         const uploadResult = await uploadFileToS3(uploadedFile, `${id}/Library`)
 
-        return res.json({
-            UserId : id,
-            filename: uploadedFile.originalname,
-            location: uploadResult.location,
-            key: uploadResult.key
-     })
+        const book = await Book.create({
+            userId: id,
+            title: req.body?.title?.trim() || uploadedFile.originalname,
+            description: req.body?.description || "",
+            bookUrl: uploadResult.location,
+            format: uploadedFile.mimetype,
+          })
+
+        return res.status(201).json({
+            id: book._id,
+            title: book.title,
+            description: book.description,
+            bookUrl: book.bookUrl,
+            format: book.format,
+            visibility: book.visibility,
+            createdAt: book.createdAt,
+        })
+
+
     } catch (error) {
         return next(error)
     }

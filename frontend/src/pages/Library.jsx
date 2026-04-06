@@ -1,20 +1,68 @@
 import { useMemo, useState } from 'react';
+import { useEffect } from 'react';
 
-const resources = [
-  { id: 'res-1', title: 'Calculus Practice Set', category: 'Math', type: 'PDF', level: 'Intermediate' },
-  { id: 'res-2', title: 'Academic Writing Guide', category: 'General', type: 'Guide', level: 'Beginner' },
-  { id: 'res-3', title: 'Data Structures Cheatsheet', category: 'Computer Science', type: 'Cheatsheet', level: 'Intermediate' },
-  { id: 'res-4', title: 'Physics Revision Notes', category: 'Physics', type: 'Notes', level: 'Advanced' },
-  { id: 'res-5', title: 'Research Methods Toolkit', category: 'General', type: 'Toolkit', level: 'Advanced' },
-  { id: 'res-6', title: 'Frontend UI Patterns', category: 'Computer Science', type: 'Article', level: 'Beginner' }
-];
+const useResources = () => {
+  const [resources, setResources] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    const loadBooks = async () => {
+      try {
+        setLoading(true);
+        setError('');
+
+        const res = await fetch('/api/books', { credentials: 'include' });
+        if (!res.ok) throw new Error('Failed to fetch /api/books');
+
+        const data = await res.json();
+        const books = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+
+        if (active) {
+          setResources(
+            books.map((book, index) => ({
+              id: book._id ?? book.id ?? `book-${index}`,
+              title: book.title ?? 'Untitled',
+              category: book.format ?? book.category ?? book.genre ?? 'General',
+              type: book.format ?? book.type ?? 'Book',
+              level: book.visibility ?? book.level ?? 'public',
+              description: book.description ?? '',
+              bookUrl: book.bookUrl ?? '',
+              createdAt: book.createdAt ?? ''
+            }))
+          );
+        }
+      } catch (err) {
+        if (active) {
+          setResources([]);
+          setError(err?.message || 'Could not load books');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadBooks();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  return { resources, loading, error };
+};
 
 function Library() {
+  const { resources, loading, error } = useResources();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('All');
   const [favorites, setFavorites] = useState([]);
 
-  const categories = useMemo(() => ['All', ...Array.from(new Set(resources.map((item) => item.category)))], []);
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(resources.map((item) => item.category)))],
+    [resources]
+  );
 
   const filteredResources = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -27,10 +75,17 @@ function Library() {
         item.level.toLowerCase().includes(normalized);
       return categoryMatch && queryMatch;
     });
-  }, [filter, query]);
+  }, [filter, query, resources]);
 
   const toggleFavorite = (id) => {
     setFavorites((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+  };
+
+  const formatDate = (value) => {
+    if (!value) return 'Unknown date';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return 'Unknown date';
+    return date.toLocaleString();
   };
 
   return (
@@ -62,7 +117,15 @@ function Library() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredResources.length === 0 ? (
+          {loading ? (
+            <div className="panel-card col-span-full rounded-2xl p-6 text-center text-sm text-slate-500">
+              Loading resources...
+            </div>
+          ) : error ? (
+            <div className="panel-card col-span-full rounded-2xl p-6 text-center text-sm text-rose-600">
+              {error}
+            </div>
+          ) : filteredResources.length === 0 ? (
             <div className="panel-card col-span-full rounded-2xl p-6 text-center text-sm text-slate-500">
               No resources found. Try another search term or category.
             </div>
@@ -87,11 +150,25 @@ function Library() {
                     Category: <span className="font-semibold text-slate-700">{item.category}</span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Type: <span className="font-semibold text-slate-700">{item.type}</span>
+                    Format: <span className="font-semibold text-slate-700">{item.type}</span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Level: <span className="font-semibold text-slate-700">{item.level}</span>
+                    Visibility: <span className="font-semibold text-slate-700">{item.level}</span>
                   </p>
+                  <p className="text-sm text-slate-600">
+                    Uploaded: <span className="font-semibold text-slate-700">{formatDate(item.createdAt)}</span>
+                  </p>
+                  {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
+                  {item.bookUrl ? (
+                    <a
+                      href={item.bookUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
+                    >
+                      Open book
+                    </a>
+                  ) : null}
                 </article>
               );
             })
