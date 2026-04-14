@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getAllBooks,
   getBookById,
+  createBook,
   updateBook,
   deleteBook,
 } from '../controllers/libraryController.js';
@@ -13,6 +14,7 @@ router.get('/', getAllBooks);
 router.get('/:bookId', getBookById);
 
 router.use(isAuthenticated);
+router.post('/', createBook);
 router.patch('/:bookId', updateBook);
 router.delete('/:bookId', deleteBook);
 

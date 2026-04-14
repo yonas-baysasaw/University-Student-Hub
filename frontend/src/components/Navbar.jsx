@@ -6,7 +6,7 @@ function Navbar({ children }) {
   const { user } = useAuth();
   const photoUrl = user?.photo || defaultProfile;
   const displayName = user ? user.displayName ?? user.username ?? 'Profile' : 'Profile';
-  console.log(user)
+
   return (
     <div className="pb-8">
       <header className="px-3 pt-3 sm:px-4">
@@ -63,6 +63,20 @@ function Navbar({ children }) {
                     Library
                   </NavLink>
                 </li>
+                <li>
+                  <NavLink
+                    to="/profile"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Profile
+                  </NavLink>
+                </li>
               </ul>
             </nav>
 
@@ -81,6 +95,11 @@ function Navbar({ children }) {
                     {displayName}
                     <span className="badge-dot" />
                   </span>
+                </li>
+                <li>
+                  <a href="/profile" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                    My profile
+                  </a>
                 </li>
                 <li>
                   <a href="/password/reset" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">

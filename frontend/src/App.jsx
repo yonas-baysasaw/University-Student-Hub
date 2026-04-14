@@ -5,6 +5,7 @@ import Nav from './components/Nav';
 import About from './pages/About';
 import Home from './pages/Home';
 import Library from './pages/Library';
+import Profile from './pages/Profile';
 import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
@@ -42,6 +43,7 @@ function AppRoutes() {
             <Route path="/classroom/:chatId/announcements" element={<ClassroomAnnouncements />} />
             <Route path="/classroom/:chatId/resources" element={<ClassroomResources />} />
             <Route path="/library" element={<Library />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route path="/password/reset" element={<Navigate to="/" replace />} />
@@ -68,6 +70,7 @@ function AppRoutes() {
           <Route path="/classroom/:chatId/announcements" element={<Navigate to="/login" replace />} />
           <Route path="/classroom/:chatId/resources" element={<Navigate to="/login" replace />} />
           <Route path="/library" element={<Navigate to="/login" replace />} />
+          <Route path="/profile" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

@@ -57,6 +57,32 @@ export const getBookById = asyncHandler(async (req, res) => {
   });
 });
 
+export const createBook = asyncHandler(async (req, res) => {
+  const { title, description, bookUrl, thumbnailUrl, format, visibility } = req.body ?? {};
+
+  if (!title?.trim() || !bookUrl?.trim()) {
+    return res.status(400).json({
+      success: false,
+      message: 'title and bookUrl are required',
+    });
+  }
+
+  const book = await Book.create({
+    userId: req.user._id,
+    title: title.trim(),
+    description: typeof description === 'string' ? description : '',
+    bookUrl: bookUrl.trim(),
+    thumbnailUrl: typeof thumbnailUrl === 'string' ? thumbnailUrl : '',
+    format: typeof format === 'string' ? format : '',
+    visibility: typeof visibility === 'string' ? visibility : 'public',
+  });
+
+  res.status(201).json({
+    success: true,
+    data: book,
+  });
+});
+
 
 export const updateBook = asyncHandler(async (req, res) => {
   const { bookId } = req.params;
