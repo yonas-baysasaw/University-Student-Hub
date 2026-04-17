@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import Library from './pages/Library';
 import BookDetail from './pages/BookDetail';
 import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
 import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
@@ -46,6 +47,7 @@ function AppRoutes() {
             <Route path="/library" element={<Library />} />
             <Route path="/library/:bookId" element={<BookDetail />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route path="/password/reset" element={<Navigate to="/" replace />} />
@@ -74,6 +76,7 @@ function AppRoutes() {
           <Route path="/library" element={<Navigate to="/login" replace />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
           <Route path="/profile" element={<Navigate to="/login" replace />} />
+          <Route path="/users/:userId" element={<PublicProfile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

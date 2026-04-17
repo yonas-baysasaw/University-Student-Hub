@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import defaultProfile from '../assets/profile.png';
 
-
-
 function Profile() {
   const { user } = useAuth();
-  const [activity, setActivity] = useState([]);
   const [sharedBooks, setSharedBooks] = useState([]);
+  const [viewedBooks, setViewedBooks] = useState([]);
+  const [likedBooks, setLikedBooks] = useState([]);
+  const [subscribedChannels, setSubscribedChannels] = useState([]);
   const [stats, setStats] = useState({
     totalBooks: 0,
     totalChatsCreated: 0,
@@ -45,8 +45,10 @@ function Profile() {
         const data = await res.json();
         if (!active) return;
 
-        setActivity(Array.isArray(data.activity) ? data.activity : []);
         setSharedBooks(Array.isArray(data.sharedBooks) ? data.sharedBooks : []);
+        setViewedBooks(Array.isArray(data.viewedBooks) ? data.viewedBooks : []);
+        setLikedBooks(Array.isArray(data.likedBooks) ? data.likedBooks : []);
+        setSubscribedChannels(Array.isArray(data.subscribedChannels) ? data.subscribedChannels : []);
         setStats(
           data.stats || {
             totalBooks: 0,
@@ -164,85 +166,142 @@ function Profile() {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <article className="panel-card rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Books uploaded</p>
-            <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalBooks}</p>
-          </article>
-          <article className="panel-card rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Classrooms created</p>
-            <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalChatsCreated}</p>
-          </article>
-          <article className="panel-card rounded-2xl p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Messages sent</p>
-            <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalMessages}</p>
-          </article>
-        </div>
+        <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
+          <aside className="panel-card h-fit rounded-2xl p-4 lg:sticky lg:top-24">
+            <h2 className="font-display text-xl text-slate-900">Side Nav</h2>
+            <p className="mt-1 text-sm text-slate-600">Your viewed books, subscriptions, and liked books.</p>
 
-        <div className="panel-card rounded-2xl p-5">
-          <div className="flex flex-wrap items-start gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                setUploadSuccess('');
-                setUploadError('');
-                setIsUploadModalOpen(true);
-              }}
-              className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
-            >
-              Upload book
-            </button>
-            <div>
-              <h2 className="font-display text-xl text-slate-900">Shared books</h2>
-              <p className="mt-1 text-sm text-slate-600">All books you have shared publicly or unlisted.</p>
-            </div>
-          </div>
-          {uploadSuccess ? (
-            <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {uploadSuccess}
-            </div>
-          ) : null}
-
-          <div className="mt-4 space-y-3">
-            {loading ? (
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">Loading shared books...</div>
-            ) : error ? (
-              <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
-            ) : sharedBooks.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
-                No shared books yet.
-              </div>
-            ) : (
-              sharedBooks.map(book => (
-                <article key={book._id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                    {book.thumbnailUrl ? (
-                      <img src={book.thumbnailUrl} alt={`${book.title || 'Book'} cover`} className="h-44 w-full object-cover" />
-                    ) : (
-                      <div className="flex h-44 w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        No cover
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h3 className="text-sm font-semibold text-slate-900">{book.title || 'Untitled'}</h3>
-                    <span className="text-xs text-slate-500">{formatDate(book.createdAt)}</span>
-                  </div>
-                  <p className="mt-1 text-sm text-slate-600">
-                    {(book.format || 'Unknown format').toString()} • {book.visibility || 'public'}
-                  </p>
-                  {book.description ? <p className="mt-1 text-sm text-slate-600">{book.description}</p> : null}
-                  {book._id ? (
-                    <Link
-                      to={`/library/${book._id}`}
-                      className="mt-2 inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
-                    >
-                      See detail page
+            <div className="mt-4 space-y-4">
+              <div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Books Viewed</h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{viewedBooks.length}</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {viewedBooks.slice(0, 6).map(book => (
+                    <Link key={`viewed-${book._id}`} to={`/library/${book._id}`} className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                      {book.title || 'Untitled'}
                     </Link>
-                  ) : null}
-                </article>
-              ))
-            )}
+                  ))}
+                  {viewedBooks.length === 0 ? <p className="px-2 text-xs text-slate-500">No viewed books yet.</p> : null}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Channels Subscribed</h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{subscribedChannels.length}</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {subscribedChannels.slice(0, 6).map(channel => (
+                    <Link key={`channel-${channel.id}`} to={`/users/${channel.id}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                      <img src={channel.avatar || defaultProfile} alt={`${channel.name} avatar`} className="h-6 w-6 rounded-full border border-slate-200 object-cover" />
+                      <span>{channel.name}</span>
+                    </Link>
+                  ))}
+                  {subscribedChannels.length === 0 ? <p className="px-2 text-xs text-slate-500">No channel subscriptions yet.</p> : null}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Books Liked</h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{likedBooks.length}</span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {likedBooks.slice(0, 6).map(book => (
+                    <Link key={`liked-${book._id}`} to={`/library/${book._id}`} className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                      {book.title || 'Untitled'}
+                    </Link>
+                  ))}
+                  {likedBooks.length === 0 ? <p className="px-2 text-xs text-slate-500">No liked books yet.</p> : null}
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
+              <article className="panel-card rounded-2xl p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Books uploaded</p>
+                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalBooks}</p>
+              </article>
+              <article className="panel-card rounded-2xl p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Classrooms created</p>
+                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalChatsCreated}</p>
+              </article>
+              <article className="panel-card rounded-2xl p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Messages sent</p>
+                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalMessages}</p>
+              </article>
+            </div>
+
+            <div className="panel-card rounded-2xl p-5">
+              <div className="flex flex-wrap items-start gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadSuccess('');
+                    setUploadError('');
+                    setIsUploadModalOpen(true);
+                  }}
+                  className="rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white hover:bg-cyan-700"
+                >
+                  Upload book
+                </button>
+                <div>
+                  <h2 className="font-display text-xl text-slate-900">Shared books</h2>
+                  <p className="mt-1 text-sm text-slate-600">All books you have shared publicly or unlisted.</p>
+                </div>
+              </div>
+              {uploadSuccess ? (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  {uploadSuccess}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-3">
+                {loading ? (
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">Loading shared books...</div>
+                ) : error ? (
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+                ) : sharedBooks.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
+                    No shared books yet.
+                  </div>
+                ) : (
+                  sharedBooks.map(book => (
+                    <article key={book._id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                      <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                        {book.thumbnailUrl ? (
+                          <img src={book.thumbnailUrl} alt={`${book.title || 'Book'} cover`} className="h-44 w-full object-cover" />
+                        ) : (
+                          <div className="flex h-44 w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            No cover
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h3 className="text-sm font-semibold text-slate-900">{book.title || 'Untitled'}</h3>
+                        <span className="text-xs text-slate-500">{formatDate(book.createdAt)}</span>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">
+                        {(book.format || 'Unknown format').toString()} | {book.visibility || 'public'}
+                      </p>
+                      {book.description ? <p className="mt-1 text-sm text-slate-600">{book.description}</p> : null}
+                      {book._id ? (
+                        <Link
+                          to={`/library/${book._id}`}
+                          className="mt-2 inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
+                        >
+                          See detail page
+                        </Link>
+                      ) : null}
+                    </article>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

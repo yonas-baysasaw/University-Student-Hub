@@ -32,6 +32,18 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    subscriptions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    subscribers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   { timestamps: true }
 );

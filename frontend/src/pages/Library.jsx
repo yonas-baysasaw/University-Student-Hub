@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import defaultProfile from '../assets/profile.png';
 
 const useResources = () => {
   const [resources, setResources] = useState([]);
@@ -33,6 +34,27 @@ const useResources = () => {
               description: book.description ?? '',
               bookUrl: book.bookUrl ?? '',
               thumbnailUrl: book.thumbnailUrl ?? '',
+              likesCount: Number.isFinite(book.likesCount) ? book.likesCount : 0,
+              downloadsCount: Number.isFinite(book.downloadsCount)
+                ? book.downloadsCount
+                : Number.isFinite(book.downloadCount)
+                  ? book.downloadCount
+                  : Number.isFinite(book.downloads)
+                    ? book.downloads
+                    : Number.isFinite(book.views)
+                      ? book.views
+                      : 0,
+              uploader: {
+                id: book?.uploader?.id || book?.uploader?._id || book?.userId?._id || null,
+                name:
+                  book?.uploader?.name ||
+                  book?.userId?.name ||
+                  book?.uploader?.username ||
+                  book?.userId?.username ||
+                  'Unknown user',
+                username: book?.uploader?.username || book?.userId?.username || '',
+                avatar: book?.uploader?.avatar || book?.userId?.avatar || '',
+              },
               createdAt: book.createdAt ?? ''
             }))
           );
@@ -166,6 +188,37 @@ function Library() {
                   </p>
                   <p className="text-sm text-slate-600">
                     Visibility: <span className="font-semibold text-slate-700">{item.level}</span>
+                  </p>
+                  <div className="mt-2 flex items-center gap-2">
+                    {item.uploader.id ? (
+                      <Link to={`/users/${item.uploader.id}`} className="inline-flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-100">
+                        <img
+                          src={item.uploader.avatar || defaultProfile}
+                          alt={`${item.uploader.name} avatar`}
+                          className="h-8 w-8 rounded-full border border-slate-200 object-cover"
+                        />
+                        <p className="text-sm text-slate-600">
+                          Uploaded by: <span className="font-semibold text-cyan-700 hover:underline">{item.uploader.name}</span>
+                        </p>
+                      </Link>
+                    ) : (
+                      <>
+                        <img
+                          src={item.uploader.avatar || defaultProfile}
+                          alt={`${item.uploader.name} avatar`}
+                          className="h-8 w-8 rounded-full border border-slate-200 object-cover"
+                        />
+                        <p className="text-sm text-slate-600">
+                          Uploaded by: <span className="font-semibold text-slate-700">{item.uploader.name}</span>
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-600">
+                    Likes: <span className="font-semibold text-slate-700">{item.likesCount}</span>
+                  </p>
+                  <p className="text-sm text-slate-600">
+                    Downloads: <span className="font-semibold text-slate-700">{item.downloadsCount}</span>
                   </p>
                   <p className="text-sm text-slate-600">
                     Uploaded: <span className="font-semibold text-slate-700">{formatDate(item.createdAt)}</span>

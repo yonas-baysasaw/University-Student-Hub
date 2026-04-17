@@ -3,6 +3,8 @@ import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
+import User from '../models/User.js';
+import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -13,6 +15,104 @@ function ensureAuth(req, res, next) {
   }
   return res.status(401).json({ message: 'Unauthorized' });
 }
+
+router.get(
+  '/public/:userId',
+  asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
+
+    const user = await User.findById(userId).select('username name avatar createdAt subscribers').lean();
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const viewerId = req.user?._id ? String(req.user._id) : null;
+    const subscribers = Array.isArray(user.subscribers) ? user.subscribers : [];
+    const viewerSubscribed = viewerId ? subscribers.some(id => String(id) === viewerId) : false;
+
+    const sharedBooks = await Book.find({
+      userId,
+      visibility: { $in: ['public', 'unlisted'] },
+    })
+      .sort({ createdAt: -1 })
+      .select('title description bookUrl thumbnailUrl format visibility createdAt updatedAt likesCount dislikesCount views')
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      profile: {
+        id: String(user._id),
+        name: user.name || user.username || 'User',
+        username: user.username || '',
+        avatar: user.avatar || '',
+        joinedAt: user.createdAt || null,
+        subscribersCount: subscribers.length,
+      },
+      stats: {
+        sharedBooks: sharedBooks.length,
+      },
+      viewerState: {
+        subscribed: viewerSubscribed,
+      },
+      sharedBooks,
+    });
+  })
+);
+
+router.post(
+  '/public/:userId/subscribe',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const { userId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ success: false, message: 'Invalid user id' });
+    }
+
+    const currentUserId = String(req.user._id);
+    if (currentUserId === userId) {
+      return res.status(400).json({ success: false, message: 'You cannot subscribe to your own profile' });
+    }
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    const currentUser = await User.findById(req.user._id);
+    if (!currentUser) {
+      return res.status(404).json({ success: false, message: 'Current user not found' });
+    }
+
+    const subscriptions = Array.isArray(currentUser.subscriptions) ? currentUser.subscriptions : [];
+    const subscribers = Array.isArray(targetUser.subscribers) ? targetUser.subscribers : [];
+
+    const isSubscribed = subscriptions.some(id => String(id) === userId);
+
+    if (isSubscribed) {
+      currentUser.subscriptions = subscriptions.filter(id => String(id) !== userId);
+      targetUser.subscribers = subscribers.filter(id => String(id) !== currentUserId);
+    } else {
+      currentUser.subscriptions = [...subscriptions, targetUser._id];
+      targetUser.subscribers = [...subscribers, currentUser._id];
+    }
+
+    await Promise.all([currentUser.save(), targetUser.save()]);
+
+    return res.status(200).json({
+      success: true,
+      subscribed: !isSubscribed,
+      profile: {
+        id: String(targetUser._id),
+        subscribersCount: Array.isArray(targetUser.subscribers) ? targetUser.subscribers.length : 0,
+      },
+    });
+  })
+);
 
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
@@ -39,8 +139,10 @@ router.get(
   ensureAuth,
   asyncHandler(async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
+    const currentUser = await User.findById(req.user._id).select('subscriptions').lean();
+    const subscribedIds = Array.isArray(currentUser?.subscriptions) ? currentUser.subscriptions : [];
 
-    const [books, sharedBooks, chats, messages, totalBooks, totalChatsCreated, totalMessages] = await Promise.all([
+    const [books, sharedBooks, chats, messages, totalBooks, totalChatsCreated, totalMessages, viewedBooks, likedBooks, subscribedChannels] = await Promise.all([
       Book.find({ userId: req.user._id })
         .sort({ createdAt: -1 })
         .limit(limit)
@@ -64,6 +166,19 @@ router.get(
       Book.countDocuments({ userId: req.user._id }),
       Chat.countDocuments({ creator: req.user._id }),
       Message.countDocuments({ sender: req.user._id }),
+      Book.find({ viewedBy: req.user._id })
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .select('title description thumbnailUrl format visibility createdAt updatedAt')
+        .lean(),
+      Book.find({ likedBy: req.user._id })
+        .sort({ updatedAt: -1 })
+        .limit(limit)
+        .select('title description thumbnailUrl format visibility createdAt updatedAt')
+        .lean(),
+      User.find({ _id: { $in: subscribedIds } })
+        .select('username name avatar')
+        .lean(),
     ]);
 
     const bookActivity = books.map(book => ({
@@ -103,6 +218,14 @@ router.get(
       },
       sharedBooks,
       activity,
+      viewedBooks,
+      likedBooks,
+      subscribedChannels: subscribedChannels.map(channel => ({
+        id: String(channel._id),
+        name: channel.name || channel.username || 'User',
+        username: channel.username || '',
+        avatar: channel.avatar || '',
+      })),
     });
   })
 );
