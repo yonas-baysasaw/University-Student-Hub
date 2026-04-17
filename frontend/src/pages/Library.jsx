@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
 const useResources = () => {
   const [resources, setResources] = useState([]);
@@ -24,12 +25,14 @@ const useResources = () => {
           setResources(
             books.map((book, index) => ({
               id: book._id ?? book.id ?? `book-${index}`,
+              bookId: book._id ?? book.id ?? null,
               title: book.title ?? 'Untitled',
               category: book.format ?? book.category ?? book.genre ?? 'General',
               type: book.format ?? book.type ?? 'Book',
               level: book.visibility ?? book.level ?? 'public',
               description: book.description ?? '',
               bookUrl: book.bookUrl ?? '',
+              thumbnailUrl: book.thumbnailUrl ?? '',
               createdAt: book.createdAt ?? ''
             }))
           );
@@ -134,6 +137,15 @@ function Library() {
               const isFavorite = favorites.includes(item.id);
               return (
                 <article key={item.id} className="panel-card fade-in-up rounded-2xl p-5">
+                  <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                    {item.thumbnailUrl ? (
+                      <img src={item.thumbnailUrl} alt={`${item.title} cover`} className="h-44 w-full object-cover" />
+                    ) : (
+                      <div className="flex h-44 w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                        No cover
+                      </div>
+                    )}
+                  </div>
                   <div className="flex items-start justify-between gap-2">
                     <h2 className="font-display text-xl text-slate-900">{item.title}</h2>
                     <button
@@ -159,15 +171,13 @@ function Library() {
                     Uploaded: <span className="font-semibold text-slate-700">{formatDate(item.createdAt)}</span>
                   </p>
                   {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
-                  {item.bookUrl ? (
-                    <a
-                      href={item.bookUrl}
-                      target="_blank"
-                      rel="noreferrer"
+                  {item.bookId ? (
+                    <Link
+                      to={`/library/${item.bookId}`}
                       className="mt-3 inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
                     >
-                      Open book
-                    </a>
+                      See detail page
+                    </Link>
                   ) : null}
                 </article>
               );

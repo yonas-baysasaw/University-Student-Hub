@@ -48,7 +48,7 @@ router.get(
         .lean(),
       Book.find({ userId: req.user._id, visibility: { $in: ['public', 'unlisted'] } })
         .sort({ createdAt: -1 })
-        .select('title description bookUrl format visibility createdAt updatedAt')
+        .select('title description bookUrl thumbnailUrl format visibility createdAt updatedAt')
         .lean(),
       Chat.find({ creator: req.user._id })
         .sort({ createdAt: -1 })

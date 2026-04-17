@@ -1,5 +1,6 @@
 import { uploadFileToS3 } from '../services/uploadService.js'
 import Book from '../models/Books.js'
+import { createPdfThumbnailBuffer } from '../services/pdfThumbnailService.js'
 
 function createErrorResponse(message) {
     return { message }
@@ -31,12 +32,31 @@ async function uploadController(req, res, next) {
         }
 
         const uploadResult = await uploadFileToS3(uploadedFile, `${id}/Library`)
+        let thumbnailUrl = ''
+
+        const isPdfUpload =
+            uploadedFile?.mimetype === 'application/pdf' ||
+            uploadedFile?.originalname?.toLowerCase()?.endsWith('.pdf')
+
+        if (isPdfUpload) {
+            const thumbnailBuffer = await createPdfThumbnailBuffer(uploadedFile.buffer)
+            if (thumbnailBuffer) {
+                const thumbnailFile = {
+                    originalname: `${uploadedFile.originalname || 'book'}-cover.png`,
+                    buffer: thumbnailBuffer,
+                    mimetype: 'image/png',
+                }
+                const thumbnailUploadResult = await uploadFileToS3(thumbnailFile, `${id}/Library/covers`)
+                thumbnailUrl = thumbnailUploadResult.location
+            }
+        }
 
         const book = await Book.create({
             userId: id,
             title: req.body?.title?.trim() || uploadedFile.originalname,
             description: req.body?.description || "",
             bookUrl: uploadResult.location,
+            thumbnailUrl,
             format: uploadedFile.mimetype,
           })
 
@@ -45,6 +65,7 @@ async function uploadController(req, res, next) {
             title: book.title,
             description: book.description,
             bookUrl: book.bookUrl,
+            thumbnailUrl: book.thumbnailUrl,
             format: book.format,
             visibility: book.visibility,
             createdAt: book.createdAt,
