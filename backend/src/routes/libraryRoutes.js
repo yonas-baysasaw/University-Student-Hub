@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import {
+  deleteBook,
   getAllBooks,
   getBookById,
   updateBook,
-  deleteBook,
 } from '../controllers/libraryController.js';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
 

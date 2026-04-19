@@ -1,11 +1,11 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 export const ENV = {
   PORT: process.env.PORT,
   NODE_ENV: process.env.NODE_ENV,
-  isProduction: process.env.NODE_ENV === "production",
+  isProduction: process.env.NODE_ENV === 'production',
   SESSION_SECRET: process.env.SESSION_SECRET,
   MONGODB_URL: process.env.MONGODB_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

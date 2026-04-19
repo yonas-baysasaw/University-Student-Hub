@@ -1,9 +1,9 @@
+import crypto from 'node:crypto';
 import express from 'express';
-import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import { ENV } from '../config/env.js';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import User from '../models/User.js';
-import { ENV } from '../config/env.js';
 
 const router = express.Router();
 
@@ -25,7 +25,7 @@ router.post(
 
     const transporter = nodemailer.createTransport({
       service: 'Gmail',
-      auth: { user: ENV.EMAIL_USER, pass: ENV.EMAIL_PASS }
+      auth: { user: ENV.EMAIL_USER, pass: ENV.EMAIL_PASS },
     });
 
     const resetURL = `${ENV.FRONTEND_URL}/reset-password/${token}`;
@@ -34,11 +34,11 @@ router.post(
       to: user.email,
       from: ENV.EMAIL_USER,
       subject: 'Password Reset',
-      text: `Click here to reset your password: ${resetURL}`
+      text: `Click here to reset your password: ${resetURL}`,
     });
 
     res.json({ message: 'Password reset email sent' });
-  })
+  }),
 );
 
 export default router;

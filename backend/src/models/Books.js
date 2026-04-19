@@ -1,10 +1,10 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const bookSchema = new mongoose.Schema(
   {
     userId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
+      ref: 'User',
       required: true,
       index: true,
     },
@@ -17,7 +17,7 @@ const bookSchema = new mongoose.Schema(
     description: {
       type: String,
       maxlength: 5000,
-      default: "",
+      default: '',
     },
     bookUrl: {
       type: String,
@@ -25,21 +25,20 @@ const bookSchema = new mongoose.Schema(
     },
     thumbnailUrl: {
       type: String,
-      default: "",
+      default: '',
     },
 
-    
     format: {
       type: String,
       default: String,
     },
     visibility: {
       type: String,
-      enum: ["public", "private", "unlisted"],
-      default: "public",
+      enum: ['public', 'private', 'unlisted'],
+      default: 'public',
       index: true,
     },
-    
+
     views: {
       type: Number,
       default: 0,
@@ -53,9 +52,9 @@ const bookSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-bookSchema.index({ title: "text", description: "text" });
+bookSchema.index({ title: 'text', description: 'text' });
 
-export default mongoose.model("Book", bookSchema);
+export default mongoose.model('Book', bookSchema);

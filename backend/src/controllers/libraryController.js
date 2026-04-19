@@ -1,26 +1,25 @@
-import Book from '../models/Books.js';
-import asyncHandler from '../middlewares/asyncHandler.js';
 import mongoose from 'mongoose';
+import asyncHandler from '../middlewares/asyncHandler.js';
+import Book from '../models/Books.js';
 
-const listFilterForRequest = req => {
-  const canUsePrivateBooks = req.isAuthenticated && req.isAuthenticated();
+const listFilterForRequest = (req) => {
+  const canUsePrivateBooks = req.isAuthenticated?.();
 
   if (!canUsePrivateBooks) {
     return { visibility: 'public' };
   }
 
   return {
-    $or: [
-      { visibility: 'public' },
-      { userId: req.user?._id },
-    ],
+    $or: [{ visibility: 'public' }, { userId: req.user?._id }],
   };
 };
 
-const ensureValidBookId = bookId => mongoose.Types.ObjectId.isValid(bookId);
+const ensureValidBookId = (bookId) => mongoose.Types.ObjectId.isValid(bookId);
 
 export const getAllBooks = asyncHandler(async (req, res) => {
-  const books = await Book.find(listFilterForRequest(req)).sort({ createdAt: -1 }).lean();
+  const books = await Book.find(listFilterForRequest(req))
+    .sort({ createdAt: -1 })
+    .lean();
 
   res.status(200).json({
     success: true,
@@ -57,7 +56,6 @@ export const getBookById = asyncHandler(async (req, res) => {
   });
 });
 
-
 export const updateBook = asyncHandler(async (req, res) => {
   const { bookId } = req.params;
 
@@ -77,7 +75,14 @@ export const updateBook = asyncHandler(async (req, res) => {
     });
   }
 
-  const allowedFields = ['title', 'description', 'bookUrl', 'thumbnailUrl', 'format', 'visibility'];
+  const allowedFields = [
+    'title',
+    'description',
+    'bookUrl',
+    'thumbnailUrl',
+    'format',
+    'visibility',
+  ];
   for (const field of allowedFields) {
     if (req.body[field] !== undefined) {
       book[field] = req.body[field];
@@ -102,7 +107,10 @@ export const deleteBook = asyncHandler(async (req, res) => {
     });
   }
 
-  const deleted = await Book.findOneAndDelete({ _id: bookId, userId: req.user._id });
+  const deleted = await Book.findOneAndDelete({
+    _id: bookId,
+    userId: req.user._id,
+  });
 
   if (!deleted) {
     return res.status(404).json({

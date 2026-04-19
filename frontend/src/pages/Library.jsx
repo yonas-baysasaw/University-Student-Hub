@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 const useResources = () => {
   const [resources, setResources] = useState([]);
@@ -18,7 +17,11 @@ const useResources = () => {
         if (!res.ok) throw new Error('Failed to fetch /api/books');
 
         const data = await res.json();
-        const books = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+        const books = Array.isArray(data)
+          ? data
+          : Array.isArray(data.data)
+            ? data.data
+            : [];
 
         if (active) {
           setResources(
@@ -30,8 +33,8 @@ const useResources = () => {
               level: book.visibility ?? book.level ?? 'public',
               description: book.description ?? '',
               bookUrl: book.bookUrl ?? '',
-              createdAt: book.createdAt ?? ''
-            }))
+              createdAt: book.createdAt ?? '',
+            })),
           );
         }
       } catch (err) {
@@ -60,8 +63,11 @@ function Library() {
   const [favorites, setFavorites] = useState([]);
 
   const categories = useMemo(
-    () => ['All', ...Array.from(new Set(resources.map((item) => item.category)))],
-    [resources]
+    () => [
+      'All',
+      ...Array.from(new Set(resources.map((item) => item.category))),
+    ],
+    [resources],
   );
 
   const filteredResources = useMemo(() => {
@@ -78,7 +84,9 @@ function Library() {
   }, [filter, query, resources]);
 
   const toggleFavorite = (id) => {
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   const formatDate = (value) => {
@@ -92,10 +100,15 @@ function Library() {
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
       <section className="mx-auto max-w-6xl space-y-5">
         <div className="panel-card rounded-3xl p-6 md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Library</p>
-          <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">Find learning resources faster</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            Library
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">
+            Find learning resources faster
+          </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 md:text-base">
-            Search and filter resources instantly, and mark important materials as favorites for quick access.
+            Search and filter resources instantly, and mark important materials
+            as favorites for quick access.
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -106,7 +119,11 @@ function Library() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <select className="input-field text-sm md:w-56" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select
+              className="input-field text-sm md:w-56"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
               {categories.map((category) => (
                 <option key={category} value={category}>
                   {category}
@@ -133,13 +150,20 @@ function Library() {
             filteredResources.map((item) => {
               const isFavorite = favorites.includes(item.id);
               return (
-                <article key={item.id} className="panel-card fade-in-up rounded-2xl p-5">
+                <article
+                  key={item.id}
+                  className="panel-card fade-in-up rounded-2xl p-5"
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-display text-xl text-slate-900">{item.title}</h2>
+                    <h2 className="font-display text-xl text-slate-900">
+                      {item.title}
+                    </h2>
                     <button
                       type="button"
                       className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                        isFavorite ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        isFavorite
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}
                       onClick={() => toggleFavorite(item.id)}
                     >
@@ -147,18 +171,34 @@ function Library() {
                     </button>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">
-                    Category: <span className="font-semibold text-slate-700">{item.category}</span>
+                    Category:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.category}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Format: <span className="font-semibold text-slate-700">{item.type}</span>
+                    Format:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.type}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Visibility: <span className="font-semibold text-slate-700">{item.level}</span>
+                    Visibility:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.level}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Uploaded: <span className="font-semibold text-slate-700">{formatDate(item.createdAt)}</span>
+                    Uploaded:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {formatDate(item.createdAt)}
+                    </span>
                   </p>
-                  {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
+                  {item.description ? (
+                    <p className="mt-2 text-sm text-slate-600">
+                      {item.description}
+                    </p>
+                  ) : null}
                   {item.bookUrl ? (
                     <a
                       href={item.bookUrl}

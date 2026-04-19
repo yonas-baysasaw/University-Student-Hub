@@ -5,7 +5,7 @@ export const loginSuccess = (req, res) => {
 };
 
 export const logout = (req, res, next) => {
-  req.logout(err => {
+  req.logout((err) => {
     if (err) return next(err);
     res.redirect('/');
   });

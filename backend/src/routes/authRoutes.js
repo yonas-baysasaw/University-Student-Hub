@@ -4,7 +4,7 @@ import { loginSuccess, logout } from '../controllers/authcontroller.js';
 
 const router = express.Router();
 
-const ensureIdentifier = (req, res, next) => {
+const ensureIdentifier = (req, _res, next) => {
   if (!req.body.identifier) {
     if (req.body.email) {
       req.body.identifier = req.body.email;
@@ -15,18 +15,26 @@ const ensureIdentifier = (req, res, next) => {
   next();
 };
 
-router.post('/login', ensureIdentifier, passport.authenticate('local'), loginSuccess);
+router.post(
+  '/login',
+  ensureIdentifier,
+  passport.authenticate('local'),
+  loginSuccess,
+);
 
 router.get('/logout', logout);
 
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+router.get(
+  '/google',
+  passport.authenticate('google', { scope: ['profile', 'email'] }),
+);
 
 router.get(
   '/google/callback',
   passport.authenticate('google', { failureRedirect: '/login' }),
-  (req, res) => {
+  (_req, res) => {
     res.redirect('/');
-  }
+  },
 );
 
 export default router;

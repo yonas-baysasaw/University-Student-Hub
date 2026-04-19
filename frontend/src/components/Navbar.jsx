@@ -1,12 +1,14 @@
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import defaultProfile from '../assets/profile.png';
+import { useAuth } from '../contexts/AuthContext';
 
 function Navbar({ children }) {
   const { user } = useAuth();
   const photoUrl = user?.photo || defaultProfile;
-  const displayName = user ? user.displayName ?? user.username ?? 'Profile' : 'Profile';
-  console.log(user)
+  const displayName = user
+    ? (user.displayName ?? user.username ?? 'Profile')
+    : 'Profile';
+  console.log(user);
   return (
     <div className="pb-8">
       <header className="px-3 pt-3 sm:px-4">
@@ -15,7 +17,9 @@ function Navbar({ children }) {
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-700 to-slate-900 text-xs font-bold text-cyan-100">
               USH
             </span>
-            <span className="font-display text-lg font-semibold text-slate-900 sm:text-xl">University Student Hub</span>
+            <span className="font-display text-lg font-semibold text-slate-900 sm:text-xl">
+              University Student Hub
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -67,15 +71,16 @@ function Navbar({ children }) {
             </nav>
 
             <div className="dropdown dropdown-end">
-              <button type="button" tabIndex={0} className="btn btn-ghost btn-circle avatar">
+              <button
+                type="button"
+                tabIndex={0}
+                className="btn btn-ghost btn-circle avatar"
+              >
                 <div className="h-10 w-10 overflow-hidden rounded-full border border-slate-200">
                   <img alt={`${displayName} avatar`} src={photoUrl} />
                 </div>
               </button>
-              <ul
-                tabIndex={0}
-                className="menu menu-sm dropdown-content z-[999] mt-3 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-slate-700 shadow-xl"
-              >
+              <ul className="menu menu-sm dropdown-content z-[999] mt-3 w-56 rounded-2xl border border-slate-200 bg-white p-2 text-slate-700 shadow-xl">
                 <li>
                   <span className="flex items-center justify-between rounded-xl px-3 py-2 font-semibold text-slate-800">
                     {displayName}
@@ -83,12 +88,18 @@ function Navbar({ children }) {
                   </span>
                 </li>
                 <li>
-                  <a href="/password/reset" className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">
+                  <a
+                    href="/password/reset"
+                    className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                  >
                     Reset password
                   </a>
                 </li>
                 <li>
-                  <a href="/api/auth/logout" className="rounded-xl border border-rose-100 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50">
+                  <a
+                    href="/api/auth/logout"
+                    className="rounded-xl border border-rose-100 px-3 py-2 text-sm font-semibold text-rose-600 hover:bg-rose-50"
+                  >
                     Logout
                   </a>
                 </li>

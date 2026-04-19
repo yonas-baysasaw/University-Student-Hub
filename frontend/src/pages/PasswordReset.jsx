@@ -24,7 +24,7 @@ function PasswordReset() {
       const res = await fetch('/api/forgot-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail })
+        body: JSON.stringify({ email: trimmedEmail }),
       });
 
       if (!res.ok) {
@@ -41,7 +41,10 @@ function PasswordReset() {
   };
 
   return (
-    <AuthShell title="Reset password" subtitle="We will email you a secure reset link">
+    <AuthShell
+      title="Reset password"
+      subtitle="We will email you a secure reset link"
+    >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <input
           type="email"
@@ -51,19 +54,28 @@ function PasswordReset() {
           className="input-field text-sm"
         />
 
-        <button type="submit" disabled={loading} className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {loading ? 'Sending reset link...' : 'Send reset link'}
         </button>
 
         {(error || status) && (
-          <p className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          <p
+            className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
+          >
             {error || status}
           </p>
         )}
       </form>
 
       <div className="mt-4 text-center text-sm">
-        <Link to="/login" className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline">
+        <Link
+          to="/login"
+          className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline"
+        >
           Back to sign in
         </Link>
       </div>

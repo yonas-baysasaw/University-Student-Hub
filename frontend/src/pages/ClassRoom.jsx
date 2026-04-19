@@ -21,7 +21,10 @@ function ClassRoom() {
     setError('');
     try {
       const response = await fetch('/api/chats', { credentials: 'include' });
-      const result = await readJsonOrThrow(response, 'Unable to load classrooms');
+      const result = await readJsonOrThrow(
+        response,
+        'Unable to load classrooms',
+      );
       setData(result);
     } catch (fetchError) {
       setError(fetchError.message);
@@ -46,14 +49,14 @@ function ClassRoom() {
     try {
       const payload = {
         name: trimmedName,
-        ...(classroomCode.trim() ? { code: classroomCode.trim() } : {})
+        ...(classroomCode.trim() ? { code: classroomCode.trim() } : {}),
       };
 
       const response = await fetch('/api/chats', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
       await readJsonOrThrow(response, 'Unable to create classroom');
 
@@ -82,7 +85,7 @@ function ClassRoom() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invitationCode: trimmedCode })
+        body: JSON.stringify({ invitationCode: trimmedCode }),
       });
       await readJsonOrThrow(response, 'Unable to join classroom');
 
@@ -111,7 +114,11 @@ function ClassRoom() {
       <div className="page-surface flex items-center justify-center px-4 py-8">
         <div className="panel-card w-full max-w-6xl rounded-3xl p-6">
           <p className="text-sm text-rose-600">Error: {error}</p>
-          <button onClick={fetchChats} className="btn-primary mt-4 px-5 py-2 text-sm">
+          <button
+            type="button"
+            onClick={fetchChats}
+            className="btn-primary mt-4 px-5 py-2 text-sm"
+          >
             Retry
           </button>
         </div>
@@ -126,28 +133,51 @@ function ClassRoom() {
       <div className="mx-auto max-w-6xl space-y-6">
         <section className="panel-card rounded-3xl p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">Course Classrooms</h2>
+            <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">
+              Course Classrooms
+            </h2>
             <div className="flex flex-wrap gap-2">
-              <button onClick={() => setShowCreateModal(true)} className="btn-primary px-5 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="btn-primary px-5 py-2 text-sm"
+              >
                 Create class
               </button>
-              <button onClick={() => setShowJoinModal(true)} className="btn-secondary px-5 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setShowJoinModal(true)}
+                className="btn-secondary px-5 py-2 text-sm"
+              >
                 Join class
               </button>
             </div>
           </div>
 
           {classrooms.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">No classrooms yet. Create one for your course or join with an invitation code.</p>
+            <p className="mt-4 text-sm text-slate-500">
+              No classrooms yet. Create one for your course or join with an
+              invitation code.
+            </p>
           ) : (
             <div className="mt-5 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {classrooms.map((classroom) => (
-                <article key={classroom._id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                  <h3 className="font-display text-xl text-slate-900">{classroom.name}</h3>
+                <article
+                  key={classroom._id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                >
+                  <h3 className="font-display text-xl text-slate-900">
+                    {classroom.name}
+                  </h3>
                   <p className="mt-1 text-sm text-slate-600">
-                    Code: <span className="break-all font-mono">{classroom.invitationCode}</span>
+                    Code:{' '}
+                    <span className="break-all font-mono">
+                      {classroom.invitationCode}
+                    </span>
                   </p>
-                  <p className="mt-2 text-sm text-slate-600">Members: {classroom.members?.length ?? 0}</p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Members: {classroom.members?.length ?? 0}
+                  </p>
                   <Link
                     to={`/classroom/${classroom._id}`}
                     className="btn-primary mt-4 inline-flex w-full justify-center px-4 py-2 text-sm"
@@ -164,8 +194,12 @@ function ClassRoom() {
       {showCreateModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl border border-cyan-100 bg-white p-6 shadow-xl">
-            <h3 className="font-display text-2xl text-slate-900">Create classroom</h3>
-            {createError && <p className="mt-2 text-sm text-rose-600">{createError}</p>}
+            <h3 className="font-display text-2xl text-slate-900">
+              Create classroom
+            </h3>
+            {createError && (
+              <p className="mt-2 text-sm text-rose-600">{createError}</p>
+            )}
             <input
               type="text"
               placeholder="Course / Classroom name"
@@ -181,10 +215,19 @@ function ClassRoom() {
               className="input-field mt-3 text-sm"
             />
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button onClick={handleCreateClass} disabled={isCreating} className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60">
+              <button
+                type="button"
+                onClick={handleCreateClass}
+                disabled={isCreating}
+                className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60"
+              >
                 {isCreating ? 'Creating...' : 'Create'}
               </button>
-              <button onClick={() => setShowCreateModal(false)} className="btn-secondary flex-1 px-4 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="btn-secondary flex-1 px-4 py-2 text-sm"
+              >
                 Cancel
               </button>
             </div>
@@ -195,8 +238,12 @@ function ClassRoom() {
       {showJoinModal && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl border border-cyan-100 bg-white p-6 shadow-xl">
-            <h3 className="font-display text-2xl text-slate-900">Join classroom</h3>
-            {joinError && <p className="mt-2 text-sm text-rose-600">{joinError}</p>}
+            <h3 className="font-display text-2xl text-slate-900">
+              Join classroom
+            </h3>
+            {joinError && (
+              <p className="mt-2 text-sm text-rose-600">{joinError}</p>
+            )}
             <input
               type="text"
               placeholder="Invitation code"
@@ -205,10 +252,19 @@ function ClassRoom() {
               className="input-field mt-4 text-sm"
             />
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-              <button onClick={handleJoinClass} disabled={isJoining} className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60">
+              <button
+                type="button"
+                onClick={handleJoinClass}
+                disabled={isJoining}
+                className="btn-primary flex-1 px-4 py-2 text-sm disabled:opacity-60"
+              >
                 {isJoining ? 'Joining...' : 'Join'}
               </button>
-              <button onClick={() => setShowJoinModal(false)} className="btn-secondary flex-1 px-4 py-2 text-sm">
+              <button
+                type="button"
+                onClick={() => setShowJoinModal(false)}
+                className="btn-secondary flex-1 px-4 py-2 text-sm"
+              >
                 Cancel
               </button>
             </div>

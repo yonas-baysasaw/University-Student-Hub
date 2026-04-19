@@ -1,27 +1,27 @@
-import http from 'http';
+import http from 'node:http';
+import path from 'node:path';
+import cors from 'cors';
 import express from 'express';
 import session from 'express-session';
-import passport from 'passport';
-import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import path from 'path';
+import passport from 'passport';
 import 'dotenv/config';
 import connectDB from './config/db.js';
 import { ENV } from './config/env.js';
 import configurePassport from './config/passport.js';
-import authRoutes from './routes/authRoutes.js';
-import signUpRouter from './routes/signUpRoutes.js';
-import profileRoutes from './routes/profileRoutes.js';
-import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
-import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
-import chatRoutes from './routes/chatRoutes.js';
-import presenceRoutes from './routes/presenceRoutes.js';
-import { initSocketServer } from './socket/index.js';
-import { notFound, errorHandler } from './middlewares/errorHandler.js';
-import uploadRoutes  from './routes/uploadRoutes.js'
-import booksRoutes from './routes/libraryRoutes.js'
 import { getAllBooks, getBookById } from './controllers/libraryController.js';
+import { errorHandler, notFound } from './middlewares/errorHandler.js';
+import authRoutes from './routes/authRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
+import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
+import booksRoutes from './routes/libraryRoutes.js';
+import presenceRoutes from './routes/presenceRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
+import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
+import signUpRouter from './routes/signUpRoutes.js';
+import uploadRoutes from './routes/uploadRoutes.js';
+import { initSocketServer } from './socket/index.js';
 
 const __dirname = path.resolve();
 const app = express();
@@ -55,13 +55,13 @@ app.use(
         ],
       },
     },
-  })
+  }),
 );
 app.use(
   cors({
     origin: ENV.FRONTEND_URL || true,
     credentials: true,
-  })
+  }),
 );
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -75,7 +75,6 @@ if (ENV.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-
 app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
 app.use('/api/profile', profileRoutes);
@@ -83,16 +82,15 @@ app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
-app.use('/api/upload', uploadRoutes)
+app.use('/api/upload', uploadRoutes);
 app.get('/api/books', getAllBooks);
 app.get('/api/books/:bookId', getBookById);
-app.use('/api/books', booksRoutes)
-
+app.use('/api/books', booksRoutes);
 
 if (ENV.isProduction) {
   app.use(express.static(path.join(__dirname, '../frontend/dist')));
 
-  app.get(/^\/.*$/, (req, res) => {
+  app.get(/^\/.*$/, (_req, res) => {
     res.sendFile(path.join(__dirname, '../frontend', 'dist', 'index.html'));
   });
 }
@@ -107,12 +105,11 @@ const start = async () => {
 
   await initSocketServer(server, sessionMiddleware);
   server.listen(ENV.PORT, () => {
-
     console.log(`Server listening on port ${ENV.PORT}`);
   });
 };
 
-start().catch(error => {
+start().catch((error) => {
   console.error('Failed to start server', error);
   process.exit(1);
 });

@@ -1,5 +1,5 @@
-import express from 'express';
 import bcrypt from 'bcrypt';
+import express from 'express';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import User from '../models/User.js';
 
@@ -11,7 +11,7 @@ router.post(
     const { password } = req.body;
     const user = await User.findOne({
       resetPasswordToken: req.params.token,
-      resetPasswordExpires: { $gt: Date.now() }
+      resetPasswordExpires: { $gt: Date.now() },
     });
 
     if (!user) {
@@ -26,7 +26,7 @@ router.post(
     await user.save();
 
     res.json({ message: 'Password has been reset' });
-  })
+  }),
 );
 
 export default router;

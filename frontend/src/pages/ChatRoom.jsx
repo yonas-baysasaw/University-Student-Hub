@@ -44,11 +44,17 @@ function ChatRoom() {
         setError('');
       }
       try {
-        const response = await fetch(`/api/chats/${chatId}/messages?limit=100`, {
-          credentials: 'include',
-          signal: controller.signal
-        });
-        const payload = await readJsonOrThrow(response, 'Unable to load discussion');
+        const response = await fetch(
+          `/api/chats/${chatId}/messages?limit=100`,
+          {
+            credentials: 'include',
+            signal: controller.signal,
+          },
+        );
+        const payload = await readJsonOrThrow(
+          response,
+          'Unable to load discussion',
+        );
         setMessages(payload?.messages ?? []);
       } catch (loadError) {
         if (loadError.name !== 'AbortError' && !silent) {
@@ -87,7 +93,7 @@ function ChatRoom() {
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  }, []);
 
   const handleSend = async (event) => {
     event.preventDefault();
@@ -101,7 +107,7 @@ function ChatRoom() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed, messageType: 'text' })
+        body: JSON.stringify({ content: trimmed, messageType: 'text' }),
       });
       const payload = await readJsonOrThrow(response, 'Unable to send message');
       setMessages((prev) => [...prev, payload?.message ?? payload]);
@@ -117,7 +123,9 @@ function ChatRoom() {
     return (
       <div className="page-surface flex justify-center px-4 py-8">
         <div className="panel-card w-full max-w-6xl rounded-3xl p-8">
-          <p className="text-sm font-medium text-slate-600">Loading discussion room...</p>
+          <p className="text-sm font-medium text-slate-600">
+            Loading discussion room...
+          </p>
         </div>
       </div>
     );
@@ -128,7 +136,10 @@ function ChatRoom() {
       <div className="page-surface flex justify-center px-4 py-8">
         <div className="panel-card w-full max-w-6xl rounded-3xl p-8">
           <p className="text-rose-600">Error: {error}</p>
-          <Link to="/classroom" className="mt-3 inline-block text-sm font-semibold text-cyan-700 underline">
+          <Link
+            to="/classroom"
+            className="mt-3 inline-block text-sm font-semibold text-cyan-700 underline"
+          >
             &larr; Back to classrooms
           </Link>
         </div>
@@ -141,10 +152,17 @@ function ChatRoom() {
       <div className="panel-card w-full max-w-6xl rounded-3xl p-4 sm:p-5 md:p-6">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
           <div>
-            <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">{chatName}</h2>
-            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Discussion room</p>
+            <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">
+              {chatName}
+            </h2>
+            <p className="text-xs uppercase tracking-[0.14em] text-slate-500">
+              Discussion room
+            </p>
           </div>
-          <Link to="/classroom" className="btn-secondary px-4 py-2 text-xs uppercase tracking-wide">
+          <Link
+            to="/classroom"
+            className="btn-secondary px-4 py-2 text-xs uppercase tracking-wide"
+          >
             View classrooms
           </Link>
         </div>
@@ -155,28 +173,54 @@ function ChatRoom() {
           <div>
             <div className="h-[56vh] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4">
               {messages.length === 0 ? (
-                <p className="text-sm text-slate-500">No messages yet. Start the discussion.</p>
+                <p className="text-sm text-slate-500">
+                  No messages yet. Start the discussion.
+                </p>
               ) : (
                 <div className="space-y-2">
                   {messages.map((message, index) => {
                     const sender = message?.sender;
-                    const senderId = typeof sender === 'string' ? sender : sender?._id ?? sender?.id;
-                    const senderFromMembers = senderId ? membersById.get(String(senderId)) : null;
-                    const senderProfile = typeof sender === 'object' && sender !== null ? sender : senderFromMembers;
+                    const senderId =
+                      typeof sender === 'string'
+                        ? sender
+                        : (sender?._id ?? sender?.id);
+                    const senderFromMembers = senderId
+                      ? membersById.get(String(senderId))
+                      : null;
+                    const senderProfile =
+                      typeof sender === 'object' && sender !== null
+                        ? sender
+                        : senderFromMembers;
                     const senderName = getMemberName(senderProfile);
                     const isSelf =
                       senderId &&
-                      (String(senderId) === String(user?._id) || String(senderId) === String(user?.id));
-                    const time = new Date(message?.createdAt ?? Date.now()).toLocaleTimeString([], {
+                      (String(senderId) === String(user?._id) ||
+                        String(senderId) === String(user?.id));
+                    const time = new Date(
+                      message?.createdAt ?? Date.now(),
+                    ).toLocaleTimeString([], {
                       hour: '2-digit',
-                      minute: '2-digit'
+                      minute: '2-digit',
                     });
                     return (
-                      <div key={message?._id ?? message?.id ?? `${senderId}-${index}`} className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-[90%] rounded-2xl border px-4 py-2 text-sm shadow-sm sm:max-w-[80%] ${isSelf ? 'border-cyan-200 bg-cyan-50 text-cyan-900' : 'border-slate-200 bg-slate-50 text-slate-800'}`}>
-                          {!isSelf && <p className="mb-0.5 text-[11px] font-semibold text-slate-500">{senderName}</p>}
+                      <div
+                        key={
+                          message?._id ?? message?.id ?? `${senderId}-${index}`
+                        }
+                        className={`flex ${isSelf ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div
+                          className={`max-w-[90%] rounded-2xl border px-4 py-2 text-sm shadow-sm sm:max-w-[80%] ${isSelf ? 'border-cyan-200 bg-cyan-50 text-cyan-900' : 'border-slate-200 bg-slate-50 text-slate-800'}`}
+                        >
+                          {!isSelf && (
+                            <p className="mb-0.5 text-[11px] font-semibold text-slate-500">
+                              {senderName}
+                            </p>
+                          )}
                           <p>{message?.content ?? '<no content>'}</p>
-                          <p className="mt-1 text-[11px] text-slate-500">{time}</p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {time}
+                          </p>
                         </div>
                       </div>
                     );
@@ -186,7 +230,10 @@ function ChatRoom() {
               )}
             </div>
 
-            <form onSubmit={handleSend} className="mt-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 sm:flex-row">
+            <form
+              onSubmit={handleSend}
+              className="mt-4 flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 sm:flex-row"
+            >
               <input
                 type="text"
                 value={draft}
@@ -195,14 +242,24 @@ function ChatRoom() {
                 className="input-field h-10 text-sm"
                 disabled={sending}
               />
-              <button type="submit" disabled={sending || !draft.trim()} className="btn-primary px-5 py-2 text-sm disabled:opacity-60">
+              <button
+                type="submit"
+                disabled={sending || !draft.trim()}
+                className="btn-primary px-5 py-2 text-sm disabled:opacity-60"
+              >
                 {sending ? 'Sending...' : 'Send'}
               </button>
             </form>
-            {sendError && <p className="mt-2 text-sm text-rose-600">{sendError}</p>}
+            {sendError && (
+              <p className="mt-2 text-sm text-rose-600">{sendError}</p>
+            )}
           </div>
 
-          <ClassroomMembersSidebar members={members} membersError={membersError} user={user} />
+          <ClassroomMembersSidebar
+            members={members}
+            membersError={membersError}
+            user={user}
+          />
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ const router = express.Router();
 
 /* ===== Middleware: Ensure Authenticated ===== */
 function ensureAuth(req, res, next) {
-  if (req.isAuthenticated && req.isAuthenticated()) {
+  if (req.isAuthenticated?.()) {
     return next();
   }
   return res.status(401).json({ message: 'Unauthorized' });
@@ -25,7 +25,7 @@ router.get('/', ensureAuth, (req, res) => {
     email: req.user.email,
     displayName: req.user.displayName,
     provider: req.user.provider,
-    photo
+    photo,
   });
 });
 
@@ -47,10 +47,10 @@ router.put(
         id: req.user._id,
         username: req.user.username,
         displayName: req.user.displayName,
-        avatar: req.user.avatar || null
-      }
+        avatar: req.user.avatar || null,
+      },
     });
-  })
+  }),
 );
 
 /* ===== Delete Account ===== */
@@ -60,11 +60,11 @@ router.delete(
   asyncHandler(async (req, res, next) => {
     await req.user.deleteOne();
 
-    req.logout(err => {
+    req.logout((err) => {
       if (err) return next(err);
       res.json({ message: 'Account deleted' });
     });
-  })
+  }),
 );
 
 export default router;

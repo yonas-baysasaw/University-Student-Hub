@@ -26,7 +26,7 @@ export const createLocalUser = async ({ username, email, password }) => {
     username,
     email,
     password: hashedPassword,
-    provider: ['local']
+    provider: ['local'],
   });
 
   return user;
@@ -46,7 +46,7 @@ export const findOrLinkGoogleUser = async (profile) => {
       user.googleId = profile.id;
       user.name ||= profile.displayName;
       user.avatar ||= profile?.photos?.[0]?.value;
-      user.email_verified = true
+      user.email_verified = true;
       await user.save();
       return user;
     }
@@ -62,8 +62,7 @@ export const findOrLinkGoogleUser = async (profile) => {
     email,
     provider: ['google'],
     avatar: profile?.photos?.[0]?.value,
-    email_verified : true,
-    
+    email_verified: true,
   });
 };
 
@@ -79,7 +78,7 @@ export const updateUserAvatar = async (userId, avatarUrl) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { avatar: avatarUrl },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   if (!user) {

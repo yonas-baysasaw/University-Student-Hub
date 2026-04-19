@@ -1,19 +1,25 @@
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import Navbar from './components/Navbar';
+import {
+  BrowserRouter,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+} from 'react-router-dom';
 import Nav from './components/Nav';
+import Navbar from './components/Navbar';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import About from './pages/About';
-import Home from './pages/Home';
-import Library from './pages/Library';
-import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
+import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
+import Home from './pages/Home';
+import Library from './pages/Library';
 import Login from './pages/login';
-import Signup from './pages/Signup';
+import NotFound from './pages/NotFound';
 import PasswordReset from './pages/PasswordReset';
 import Reset from './pages/Reset';
-import NotFound from './pages/NotFound';
+import Signup from './pages/Signup';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -23,9 +29,15 @@ function AppRoutes() {
     return (
       <div className="page-surface flex items-center justify-center px-4 py-10">
         <div className="panel-card w-full max-w-md rounded-3xl p-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">University Student Hub</p>
-          <h2 className="mt-2 font-display text-2xl text-slate-900">Loading your session</h2>
-          <p className="mt-2 text-sm text-slate-500">Please wait while we set up your workspace.</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            University Student Hub
+          </p>
+          <h2 className="mt-2 font-display text-2xl text-slate-900">
+            Loading your session
+          </h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Please wait while we set up your workspace.
+          </p>
         </div>
       </div>
     );
@@ -39,13 +51,25 @@ function AppRoutes() {
             <Route path="/" element={<Home />} />
             <Route path="/classroom" element={<ClassRoom />} />
             <Route path="/classroom/:chatId" element={<ChatRoom />} />
-            <Route path="/classroom/:chatId/announcements" element={<ClassroomAnnouncements />} />
-            <Route path="/classroom/:chatId/resources" element={<ClassroomResources />} />
+            <Route
+              path="/classroom/:chatId/announcements"
+              element={<ClassroomAnnouncements />}
+            />
+            <Route
+              path="/classroom/:chatId/resources"
+              element={<ClassroomResources />}
+            />
             <Route path="/library" element={<Library />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
-            <Route path="/password/reset" element={<Navigate to="/" replace />} />
-            <Route path="/reset-password/:token" element={<Navigate to="/" replace />} />
+            <Route
+              path="/password/reset"
+              element={<Navigate to="/" replace />}
+            />
+            <Route
+              path="/reset-password/:token"
+              element={<Navigate to="/" replace />}
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
@@ -64,9 +88,18 @@ function AppRoutes() {
           <Route path="/password/reset" element={<PasswordReset />} />
           <Route path="/reset-password/:token" element={<Reset />} />
           <Route path="/classroom" element={<Navigate to="/login" replace />} />
-          <Route path="/classroom/:chatId" element={<Navigate to="/login" replace />} />
-          <Route path="/classroom/:chatId/announcements" element={<Navigate to="/login" replace />} />
-          <Route path="/classroom/:chatId/resources" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/classroom/:chatId"
+            element={<Navigate to="/login" replace />}
+          />
+          <Route
+            path="/classroom/:chatId/announcements"
+            element={<Navigate to="/login" replace />}
+          />
+          <Route
+            path="/classroom/:chatId/resources"
+            element={<Navigate to="/login" replace />}
+          />
           <Route path="/library" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,18 +1,22 @@
 import { Server } from 'socket.io';
+import { ENV } from '../config/env.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import {
+  getOnlineUsers,
+  markOffline,
+  markOnline,
+} from '../services/presenceService.js';
 import { authenticateSocket } from './middleware/jwt.js';
-import { markOnline, markOffline, getOnlineUsers } from '../services/presenceService.js';
-import { ENV } from '../config/env.js';
 
-const getMemberIds = chat => chat.members.map(member => member.toString());
+const _getMemberIds = (chat) => chat.members.map((member) => member.toString());
 
 const shouldJoinChat = (chat, userId) => {
-  return chat?.members?.some(member => member.toString() === userId);
+  return chat?.members?.some((member) => member.toString() === userId);
 };
 
-const sanitizeMessage = message => ({
+const sanitizeMessage = (message) => ({
   ...message.toObject(),
   id: message._id,
 });
@@ -31,19 +35,18 @@ export const initSocketServer = async (server, sessionMiddleware) => {
   if (sessionMiddleware) {
     io.use((socket, next) => {
       const req = socket.request;
-      const res =
-        req.res || {
-          getHeader: () => undefined,
-          setHeader: () => undefined,
-          writeHead: () => undefined,
-        };
+      const res = req.res || {
+        getHeader: () => undefined,
+        setHeader: () => undefined,
+        writeHead: () => undefined,
+      };
       sessionMiddleware(req, res, next);
     });
   }
 
   io.use(authenticateSocket);
 
-  io.on('connection', socket => {
+  io.on('connection', (socket) => {
     const { user } = socket;
 
     (async () => {
@@ -63,8 +66,13 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           return;
         }
 
-        const chats = await Chat.find({ _id: { $in: chatIds }, members: user._id }, '_id');
-        chats.forEach(chat => socket.join(chat.id));
+        const chats = await Chat.find(
+          { _id: { $in: chatIds }, members: user._id },
+          '_id',
+        );
+        for (const chat of chats) {
+          socket.join(chat.id);
+        }
       } catch (error) {
         socket.emit('error', { message: error.message });
       }
@@ -89,35 +97,41 @@ export const initSocketServer = async (server, sessionMiddleware) => {
       }
     });
 
-    socket.on('sendMessage', async ({ chatId, content, messageType = 'text', fileUrl }) => {
-      try {
-        if (!chatId) {
-          throw new Error('Chat id is required');
+    socket.on(
+      'sendMessage',
+      async ({ chatId, content, messageType = 'text', fileUrl }) => {
+        try {
+          if (!chatId) {
+            throw new Error('Chat id is required');
+          }
+
+          const chat = await Chat.findById(chatId).select('members');
+          if (!shouldJoinChat(chat, user.id)) {
+            throw new Error('You are not a member of this chat');
+          }
+
+          const message = await Message.create({
+            chat: chatId,
+            sender: user._id,
+            content,
+            messageType,
+            fileUrl,
+            readBy: [user._id],
+          });
+
+          chat.lastMessage = message._id;
+          await chat.save();
+
+          const populated = await message.populate(
+            'sender',
+            'username email avatar photo',
+          );
+          io.to(chatId).emit('message', sanitizeMessage(populated));
+        } catch (error) {
+          socket.emit('error', { message: error.message });
         }
-
-        const chat = await Chat.findById(chatId).select('members');
-        if (!shouldJoinChat(chat, user.id)) {
-          throw new Error('You are not a member of this chat');
-        }
-
-        const message = await Message.create({
-          chat: chatId,
-          sender: user._id,
-          content,
-          messageType,
-          fileUrl,
-          readBy: [user._id],
-        });
-
-        chat.lastMessage = message._id;
-        await chat.save();
-
-        const populated = await message.populate('sender', 'username email avatar photo');
-        io.to(chatId).emit('message', sanitizeMessage(populated));
-      } catch (error) {
-        socket.emit('error', { message: error.message });
-      }
-    });
+      },
+    );
 
     socket.on('typing', ({ chatId }) => {
       if (!chatId) {
@@ -149,7 +163,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
 
         await Message.updateMany(
           { chat: chatId, readBy: { $ne: user._id } },
-          { $addToSet: { readBy: user._id } }
+          { $addToSet: { readBy: user._id } },
         );
 
         io.to(chatId).emit('readReceipt', {

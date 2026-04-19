@@ -26,7 +26,7 @@ const membershipSchema = new mongoose.Schema(
       default: Date.now,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 membershipSchema.index({ user: 1, chat: 1 }, { unique: true });
