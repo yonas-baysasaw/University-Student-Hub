@@ -63,17 +63,18 @@ function Navbar({ children }) {
             <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-700 to-slate-900 text-xs font-bold text-cyan-100">
               USH
             </span>
-            <span className="font-display text-lg font-semibold text-slate-900 sm:text-xl">University Student Hub</span>
+            <span className="hidden font-display text-lg font-semibold text-slate-900 sm:inline sm:text-xl">University Student Hub</span>
+            <span className="font-display text-sm font-semibold text-slate-900 sm:hidden">USH</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <nav>
-              <ul className="flex items-center gap-1">
+            <nav className="max-w-[calc(100vw-7.75rem)] overflow-x-auto">
+              <ul className="flex min-w-max items-center gap-1">
                 <li>
                   <NavLink
                     to="/"
                     className={({ isActive }) =>
-                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                         isActive
                           ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                           : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
@@ -87,7 +88,7 @@ function Navbar({ children }) {
                   <NavLink
                     to="/classroom"
                     className={({ isActive }) =>
-                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                         isActive
                           ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                           : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
@@ -101,7 +102,7 @@ function Navbar({ children }) {
                   <NavLink
                     to="/library"
                     className={({ isActive }) =>
-                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                         isActive
                           ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                           : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
@@ -115,7 +116,7 @@ function Navbar({ children }) {
                   <NavLink
                     to="/liqu-ai"
                     className={({ isActive }) =>
-                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                         isActive
                           ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                           : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
@@ -129,7 +130,7 @@ function Navbar({ children }) {
                   <NavLink
                     to="/profile"
                     className={({ isActive }) =>
-                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                      `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                         isActive
                           ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                           : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'

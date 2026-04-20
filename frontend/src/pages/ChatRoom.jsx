@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ClassroomMembersSidebar from '../components/ClassroomMembersSidebar';
 import ClassroomTabs from '../components/ClassroomTabs';
@@ -18,7 +18,7 @@ function ChatRoom() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState('');
-  const bottomRef = useRef(null);
+  const [showMembersDrawer, setShowMembersDrawer] = useState(false);
   const membersById = useMemo(() => {
     const lookup = new Map();
     for (const member of members) {
@@ -85,10 +85,6 @@ function ChatRoom() {
     };
   }, [chatId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
   const handleSend = async (event) => {
     event.preventDefault();
     const trimmed = draft.trim();
@@ -144,9 +140,18 @@ function ChatRoom() {
             <h2 className="font-display text-2xl text-slate-900 sm:text-3xl">{chatName}</h2>
             <p className="text-xs uppercase tracking-[0.14em] text-slate-500">Discussion room</p>
           </div>
-          <Link to="/classroom" className="btn-secondary px-4 py-2 text-xs uppercase tracking-wide">
-            View classrooms
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowMembersDrawer(true)}
+              className="btn-secondary px-4 py-2 text-xs uppercase tracking-wide lg:hidden"
+            >
+              Participants
+            </button>
+            <Link to="/classroom" className="btn-secondary px-4 py-2 text-xs uppercase tracking-wide">
+              View classrooms
+            </Link>
+          </div>
         </div>
 
         <ClassroomTabs />
@@ -181,7 +186,6 @@ function ChatRoom() {
                       </div>
                     );
                   })}
-                  <div ref={bottomRef} />
                 </div>
               )}
             </div>
@@ -202,9 +206,43 @@ function ChatRoom() {
             {sendError && <p className="mt-2 text-sm text-rose-600">{sendError}</p>}
           </div>
 
-          <ClassroomMembersSidebar members={members} membersError={membersError} user={user} />
+          <ClassroomMembersSidebar
+            members={members}
+            membersError={membersError}
+            user={user}
+            className="hidden lg:block"
+          />
         </div>
       </div>
+
+      {showMembersDrawer && (
+        <div className="fixed inset-0 z-[1200] lg:hidden">
+          <button
+            type="button"
+            aria-label="Close participants drawer"
+            className="absolute inset-0 bg-slate-950/55"
+            onClick={() => setShowMembersDrawer(false)}
+          />
+          <div className="absolute right-0 top-0 h-full w-[86vw] max-w-sm overflow-y-auto bg-white p-3 shadow-2xl">
+            <div className="mb-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Participants</p>
+              <button
+                type="button"
+                onClick={() => setShowMembersDrawer(false)}
+                className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold text-slate-700"
+              >
+                Close
+              </button>
+            </div>
+            <ClassroomMembersSidebar
+              members={members}
+              membersError={membersError}
+              user={user}
+              className="h-full rounded-xl border-slate-200 shadow-none"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
