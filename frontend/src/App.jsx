@@ -12,6 +12,9 @@ import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
+import LiquAI from './pages/LiquAI';
+import StudyBuddy from './pages/StudyBuddy';
+import DidExit from './pages/DidExit';
 import Login from './pages/login';
 import Signup from './pages/Signup';
 import PasswordReset from './pages/PasswordReset';
@@ -46,6 +49,9 @@ function AppRoutes() {
             <Route path="/classroom/:chatId/resources" element={<ClassroomResources />} />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:bookId" element={<BookDetail />} />
+            <Route path="/liqu-ai" element={<LiquAI />} />
+            <Route path="/liqu-ai/study-buddy" element={<StudyBuddy />} />
+            <Route path="/liqu-ai/did-exit" element={<DidExit />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
@@ -75,6 +81,9 @@ function AppRoutes() {
           <Route path="/classroom/:chatId/resources" element={<Navigate to="/login" replace />} />
           <Route path="/library" element={<Navigate to="/login" replace />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
+          <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
+          <Route path="/liqu-ai/study-buddy" element={<Navigate to="/login" replace />} />
+          <Route path="/liqu-ai/did-exit" element={<Navigate to="/login" replace />} />
           <Route path="/profile" element={<Navigate to="/login" replace />} />
           <Route path="/users/:userId" element={<PublicProfile />} />
           <Route path="*" element={<NotFound />} />

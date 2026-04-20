@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
+import { fetchLibraryBooks } from '../utils/books';
 
 const useResources = () => {
   const [resources, setResources] = useState([]);
@@ -16,49 +17,8 @@ const useResources = () => {
         setLoading(true);
         setError('');
 
-        const res = await fetch('/api/books', { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch /api/books');
-
-        const data = await res.json();
-        const books = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
-
-        if (active) {
-          setResources(
-            books.map((book, index) => ({
-              id: book._id ?? book.id ?? `book-${index}`,
-              bookId: book._id ?? book.id ?? null,
-              title: book.title ?? 'Untitled',
-              category: book.format ?? book.category ?? book.genre ?? 'General',
-              type: book.format ?? book.type ?? 'Book',
-              level: book.visibility ?? book.level ?? 'public',
-              description: book.description ?? '',
-              bookUrl: book.bookUrl ?? '',
-              thumbnailUrl: book.thumbnailUrl ?? '',
-              likesCount: Number.isFinite(book.likesCount) ? book.likesCount : 0,
-              downloadsCount: Number.isFinite(book.downloadsCount)
-                ? book.downloadsCount
-                : Number.isFinite(book.downloadCount)
-                  ? book.downloadCount
-                  : Number.isFinite(book.downloads)
-                    ? book.downloads
-                    : Number.isFinite(book.views)
-                      ? book.views
-                      : 0,
-              uploader: {
-                id: book?.uploader?.id || book?.uploader?._id || book?.userId?._id || null,
-                name:
-                  book?.uploader?.name ||
-                  book?.userId?.name ||
-                  book?.uploader?.username ||
-                  book?.userId?.username ||
-                  'Unknown user',
-                username: book?.uploader?.username || book?.userId?.username || '',
-                avatar: book?.uploader?.avatar || book?.userId?.avatar || '',
-              },
-              createdAt: book.createdAt ?? ''
-            }))
-          );
-        }
+        const books = await fetchLibraryBooks();
+        if (active) setResources(books);
       } catch (err) {
         if (active) {
           setResources([]);
@@ -225,12 +185,20 @@ function Library() {
                   </p>
                   {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
                   {item.bookId ? (
-                    <Link
-                      to={`/library/${item.bookId}`}
-                      className="mt-3 inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
-                    >
-                      See detail page
-                    </Link>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Link
+                        to={`/library/${item.bookId}`}
+                        className="inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
+                      >
+                        See detail page
+                      </Link>
+                      <Link
+                        to={`/liqu-ai/study-buddy?bookId=${item.bookId}`}
+                        className="inline-block rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"
+                      >
+                        Study with Liqu AI
+                      </Link>
+                    </div>
                   ) : null}
                 </article>
               );

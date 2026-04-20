@@ -352,6 +352,12 @@ function BookDetail() {
                     Download
                   </button>
                 ) : null}
+                <Link
+                  to={`/liqu-ai/study-buddy?bookId=${book._id}`}
+                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+                >
+                  Open in Study buddy
+                </Link>
                 <button
                   type="button"
                   onClick={() => handleReaction('like')}
