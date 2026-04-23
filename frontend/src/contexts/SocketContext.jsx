@@ -1,3 +1,4 @@
+// @refresh reset
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
@@ -23,9 +24,11 @@ export function SocketProvider({ children }) {
     // Already connected
     if (socketRef.current?.connected) return;
 
+    // Use polling first so the Vite dev proxy can upgrade to WebSocket
     const s = io('/', {
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      transports: ['polling', 'websocket'],
+      path: '/socket.io',
     });
 
     s.on('connect', () => {

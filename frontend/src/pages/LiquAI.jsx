@@ -488,12 +488,9 @@ function MessageContent({ content, isUser }) {
     return <p className="whitespace-pre-wrap">{content}</p>;
   }
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      className="prose prose-sm max-w-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:bg-slate-100 prose-code:px-1 prose-code:rounded prose-headings:text-slate-900 prose-a:text-cyan-700"
-    >
-      {content}
-    </ReactMarkdown>
+    <div className="prose prose-sm max-w-none prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:bg-slate-100 prose-code:px-1 prose-code:rounded prose-headings:text-slate-900 prose-a:text-cyan-700">
+      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+    </div>
   );
 }
 
