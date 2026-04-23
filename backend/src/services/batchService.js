@@ -299,26 +299,36 @@ async function processExamInBatches(examId, content) {
 
     // Process remaining batches sequentially in the background
     if (chunks.length > 1) {
-      processRemainingBatches(examId, chunks.slice(1), totalBatches).catch((err) => {
-        console.error(
-          `Background batch processing failed for exam ${examId}:`,
-          err,
-        );
-        Exam.findByIdAndUpdate(examId, {
-          processingStatus: 'failed',
-          processingError: err.message,
-        }).catch(() => {});
-        try {
-          const io = getIo();
-          if (io) io.to(`exam:${examId}`).emit('exam:processingFailed', { examId, error: err.message });
-        } catch (_) {}
-      });
+      processRemainingBatches(examId, chunks.slice(1), totalBatches).catch(
+        (err) => {
+          console.error(
+            `Background batch processing failed for exam ${examId}:`,
+            err,
+          );
+          Exam.findByIdAndUpdate(examId, {
+            processingStatus: 'failed',
+            processingError: err.message,
+          }).catch(() => {});
+          try {
+            const io = getIo();
+            if (io)
+              io.to(`exam:${examId}`).emit('exam:processingFailed', {
+                examId,
+                error: err.message,
+              });
+          } catch (_) {}
+        },
+      );
     } else {
       await Exam.findByIdAndUpdate(examId, { processingStatus: 'complete' });
       try {
         const io = getIo();
         const total = await Question.countDocuments({ examId });
-        if (io) io.to(`exam:${examId}`).emit('exam:processingComplete', { examId, totalQuestions: total });
+        if (io)
+          io.to(`exam:${examId}`).emit('exam:processingComplete', {
+            examId,
+            totalQuestions: total,
+          });
       } catch (_) {}
     }
   } catch (error) {
@@ -332,7 +342,11 @@ async function processExamInBatches(examId, content) {
     await Exam.findByIdAndUpdate(examId, statusUpdate).catch(() => {});
     try {
       const io = getIo();
-      if (io) io.to(`exam:${examId}`).emit('exam:processingFailed', { examId, error: error.message });
+      if (io)
+        io.to(`exam:${examId}`).emit('exam:processingFailed', {
+          examId,
+          error: error.message,
+        });
     } catch (_) {}
     throw error;
   }
@@ -354,7 +368,12 @@ async function processRemainingBatches(examId, chunks, totalBatches) {
     ]);
 
     if (questions && questions.length > 0) {
-      const total = await storeQuestions(examId, questions, chunk.batchNumber, totalBatches);
+      const total = await storeQuestions(
+        examId,
+        questions,
+        chunk.batchNumber,
+        totalBatches,
+      );
       console.log(
         `✅ Batch ${chunk.batchNumber} stored: ${questions.length} new, ${total} total`,
       );
@@ -366,7 +385,11 @@ async function processRemainingBatches(examId, chunks, totalBatches) {
   try {
     const io = getIo();
     const total = await Question.countDocuments({ examId });
-    if (io) io.to(`exam:${examId}`).emit('exam:processingComplete', { examId, totalQuestions: total });
+    if (io)
+      io.to(`exam:${examId}`).emit('exam:processingComplete', {
+        examId,
+        totalQuestions: total,
+      });
   } catch (_) {}
 }
 

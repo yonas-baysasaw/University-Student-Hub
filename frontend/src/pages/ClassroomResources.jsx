@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import ClassroomMembersSidebar from '../components/ClassroomMembersSidebar';
 import ClassroomTabs from '../components/ClassroomTabs';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchClassroomMeta, isInstructor } from '../utils/classroom';
 
 function ClassroomResourcesContent({ chatId, user }) {
-  const [members, setMembers] = useState([]);
-  const [membersError, setMembersError] = useState('');
   const [chatName, setChatName] = useState('Class Resources');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceLink, setResourceLink] = useState('');
@@ -38,10 +35,9 @@ function ClassroomResourcesContent({ chatId, user }) {
     const loadMeta = async () => {
       try {
         const chat = await fetchClassroomMeta(chatId, controller.signal);
-        setMembers(chat?.members ?? []);
         setChatName(chat?.name ?? 'Class Resources');
       } catch (error) {
-        if (error.name !== 'AbortError') setMembersError(error.message);
+        if (error.name !== 'AbortError') setChatName('Class Resources');
       }
     };
     loadMeta();
@@ -96,7 +92,7 @@ function ClassroomResourcesContent({ chatId, user }) {
 
         <ClassroomTabs />
 
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        <div>
           <div>
             <section className="rounded-2xl border border-slate-200 bg-white p-4">
               <h3 className="font-display text-xl text-slate-900">
@@ -182,12 +178,6 @@ function ClassroomResourcesContent({ chatId, user }) {
               )}
             </section>
           </div>
-
-          <ClassroomMembersSidebar
-            members={members}
-            membersError={membersError}
-            user={user}
-          />
         </div>
       </div>
     </div>

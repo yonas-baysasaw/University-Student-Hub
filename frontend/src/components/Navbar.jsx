@@ -49,7 +49,10 @@ function Navbar({ children }) {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ geminiApiKey: apiKey.trim(), geminiModelId: modelId }),
+        body: JSON.stringify({
+          geminiApiKey: apiKey.trim(),
+          geminiModelId: modelId,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to save');
@@ -81,7 +84,7 @@ function Navbar({ children }) {
     }
   }
 
-  const byokActive = !!(user?.geminiApiKey);
+  const byokActive = !!user?.geminiApiKey;
 
   return (
     <div className="pb-8">
@@ -93,13 +96,14 @@ function Navbar({ children }) {
               USH
             </span>
             <span className="font-display text-lg font-semibold text-slate-900 sm:text-xl">
-              University Student Hub
+              <span className="sm:hidden">USH</span>
+              <span className="hidden sm:inline">University Student Hub</span>
             </span>
           </div>
 
           <div className="flex items-center gap-2">
-            <nav>
-              <ul className="flex items-center gap-1">
+            <nav className="overflow-x-auto max-w-[calc(100vw-7.75rem)]">
+              <ul className="flex min-w-max items-center gap-1">
                 {[
                   { to: '/', label: 'Dashboard' },
                   { to: '/classroom', label: 'Classroom' },
@@ -112,7 +116,7 @@ function Navbar({ children }) {
                       to={to}
                       end={to === '/'}
                       className={({ isActive }) =>
-                        `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        `whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
                           isActive
                             ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
                             : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
@@ -153,7 +157,9 @@ function Navbar({ children }) {
                         {displayName}
                       </p>
                       {email && (
-                        <p className="truncate text-xs text-slate-500">{email}</p>
+                        <p className="truncate text-xs text-slate-500">
+                          {email}
+                        </p>
                       )}
                     </div>
                   </div>
@@ -234,7 +240,10 @@ function Navbar({ children }) {
             </p>
 
             {/* API key input */}
-            <label htmlFor="byok-api-key" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="byok-api-key"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Gemini API Key
             </label>
             <div className="mb-3 flex gap-2">
@@ -266,7 +275,10 @@ function Navbar({ children }) {
             </div>
 
             {/* Model selector */}
-            <label htmlFor="byok-model" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="byok-model"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Model
             </label>
             <select

@@ -172,7 +172,9 @@ function BrowseTab() {
             key={exam.id}
             exam={exam}
             currentUserId={user?._id ?? user?.id}
-            onDelete={(id) => setExams((prev) => prev.filter((e) => e.id !== id))}
+            onDelete={(id) =>
+              setExams((prev) => prev.filter((e) => e.id !== id))
+            }
             onUpdate={(updated) =>
               setExams((prev) =>
                 prev.map((e) => (e.id === updated.id ? updated : e)),
@@ -383,7 +385,10 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                 ✕
               </button>
             </div>
-            <label htmlFor="exam-card-title" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="exam-card-title"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Title
             </label>
             <input
@@ -393,7 +398,10 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
               onChange={(e) => setEditTitle(e.target.value)}
               className="input-field mb-3 w-full text-sm"
             />
-            <label htmlFor="exam-card-subject" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="exam-card-subject"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Subject
             </label>
             <input

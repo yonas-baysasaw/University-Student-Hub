@@ -1,10 +1,16 @@
 import defaultProfile from '../assets/profile.png';
 import { getMemberName } from '../utils/classroom';
 
-function ClassroomMembersSidebar({ members, membersError, user }) {
-  console.log(members);
+function ClassroomMembersSidebar({
+  members,
+  membersError,
+  user,
+  className = '',
+}) {
   return (
-    <aside className="h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24">
+    <aside
+      className={`h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24 ${className}`}
+    >
       <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
         <p className="text-[11px] uppercase tracking-[0.16em] text-cyan-200">
           Class Members

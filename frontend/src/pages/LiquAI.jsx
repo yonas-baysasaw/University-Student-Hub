@@ -397,7 +397,13 @@ function LiquAI() {
 
 // ── Session Sidebar ───────────────────────────────────────────────────────────
 
-function SessionSidebar({ sessions, activeSessionId, onNew, onLoad, onDelete }) {
+function SessionSidebar({
+  sessions,
+  activeSessionId,
+  onNew,
+  onLoad,
+  onDelete,
+}) {
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       <div className="p-3">

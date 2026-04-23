@@ -110,13 +110,17 @@ function ExamPractice() {
 
     function onProcessingComplete({ examId: eid }) {
       if (eid !== examId) return;
-      setExam((prev) => prev ? { ...prev, processingStatus: 'complete' } : prev);
+      setExam((prev) =>
+        prev ? { ...prev, processingStatus: 'complete' } : prev,
+      );
       clearInterval(pollRef.current);
     }
 
     function onProcessingFailed({ examId: eid }) {
       if (eid !== examId) return;
-      setExam((prev) => prev ? { ...prev, processingStatus: 'failed' } : prev);
+      setExam((prev) =>
+        prev ? { ...prev, processingStatus: 'failed' } : prev,
+      );
       clearInterval(pollRef.current);
     }
 
@@ -547,10 +551,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
 
             {/* Explanation (normal mode only) */}
             {mode === 'normal' && userAnswers[currentIndex] !== null && (
-              <ExplanationBlock
-                question={current}
-                navigate={navigate}
-              />
+              <ExplanationBlock question={current} navigate={navigate} />
             )}
           </div>
 
@@ -636,9 +637,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
           />
           <div className="relative z-10 panel-card w-full max-w-md rounded-3xl p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-lg text-slate-900">
-                Edit Exam
-              </h2>
+              <h2 className="font-display text-lg text-slate-900">Edit Exam</h2>
               <button
                 type="button"
                 onClick={() => setEditOpen(false)}
@@ -647,7 +646,10 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
                 ✕
               </button>
             </div>
-            <label htmlFor="exam-edit-title" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="exam-edit-title"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Title
             </label>
             <input
@@ -657,7 +659,10 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
               onChange={(e) => setEditTitle(e.target.value)}
               className="input-field mb-3 w-full text-sm"
             />
-            <label htmlFor="exam-edit-subject" className="mb-1 block text-xs font-semibold text-slate-700">
+            <label
+              htmlFor="exam-edit-subject"
+              className="mb-1 block text-xs font-semibold text-slate-700"
+            >
               Subject
             </label>
             <input
@@ -749,7 +754,13 @@ function ExplanationBlock({ question, navigate }) {
 
 // ── Left sidebar question navigator ──────────────────────────────────────────
 
-function QuestionNav({ questions, userAnswers, flagged, currentIndex, onSelect }) {
+function QuestionNav({
+  questions,
+  userAnswers,
+  flagged,
+  currentIndex,
+  onSelect,
+}) {
   return (
     <div className="panel-card rounded-2xl p-4">
       <h3 className="mb-3 font-display text-sm text-slate-900">

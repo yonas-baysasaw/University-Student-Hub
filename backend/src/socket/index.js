@@ -219,7 +219,10 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         // Override Gemini key if user has BYOK
         let serviceToUse = geminiService;
         if (user.geminiApiKey) {
-          serviceToUse = await geminiService.forUser(user.geminiApiKey, user.geminiModelId);
+          serviceToUse = await geminiService.forUser(
+            user.geminiApiKey,
+            user.geminiModelId,
+          );
         }
 
         const resolvedSessionId = session._id.toString();

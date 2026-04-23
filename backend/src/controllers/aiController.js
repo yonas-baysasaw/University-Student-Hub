@@ -96,7 +96,8 @@ async function getSessionController(req, res, next) {
       userId: req.user._id,
     });
 
-    if (!session) return res.status(404).json({ message: 'Session not found.' });
+    if (!session)
+      return res.status(404).json({ message: 'Session not found.' });
     return res.json(session);
   } catch (error) {
     return next(error);
@@ -123,7 +124,9 @@ async function listModelsController(req, res, next) {
   try {
     const apiKey = req.query.apiKey || req.user?.geminiApiKey;
     if (!apiKey) {
-      return res.status(400).json({ message: 'apiKey query parameter required.' });
+      return res
+        .status(400)
+        .json({ message: 'apiKey query parameter required.' });
     }
 
     // Use the Gemini REST API to list models
@@ -140,9 +143,7 @@ async function listModelsController(req, res, next) {
 
     // Filter to models that support generateContent
     const models = (data.models || [])
-      .filter((m) =>
-        m.supportedGenerationMethods?.includes('generateContent'),
-      )
+      .filter((m) => m.supportedGenerationMethods?.includes('generateContent'))
       .map((m) => ({ name: m.name, displayName: m.displayName || m.name }));
 
     return res.json({ models });

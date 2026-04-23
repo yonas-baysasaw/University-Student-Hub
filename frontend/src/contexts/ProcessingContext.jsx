@@ -16,7 +16,13 @@ export function ProcessingProvider({ children }) {
   useEffect(() => {
     if (!socket) return;
 
-    function onBatchComplete({ examId, batchNumber, totalBatches, newQuestionCount, totalQuestions }) {
+    function onBatchComplete({
+      examId,
+      batchNumber,
+      totalBatches,
+      newQuestionCount,
+      totalQuestions,
+    }) {
       setProcessing((prev) => {
         const next = new Map(prev);
         next.set(examId, { batchNumber, totalBatches, totalQuestions });
