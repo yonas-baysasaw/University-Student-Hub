@@ -1,5 +1,6 @@
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
+import { getIo } from '../socket/index.js';
 import { geminiService } from './geminiService.js';
 
 // Ported and adapted from did-exit/js/batch-processor.js
@@ -186,7 +187,7 @@ async function processChunkWithAI(chunk) {
   }
 }
 
-async function storeQuestions(examId, questions, batchNumber) {
+async function storeQuestions(examId, questions, batchNumber, totalBatches) {
   if (!questions || questions.length === 0) return 0;
 
   // Determine the current max questionIndex for this exam to append correctly
@@ -214,6 +215,21 @@ async function storeQuestions(examId, questions, batchNumber) {
 
   const total = await Question.countDocuments({ examId });
   await Exam.findByIdAndUpdate(examId, { totalQuestions: total });
+
+  // Emit socket event so connected clients can append new questions
+  try {
+    const io = getIo();
+    if (io) {
+      io.to(`exam:${examId}`).emit('exam:batchComplete', {
+        examId,
+        batchNumber,
+        totalBatches: totalBatches ?? batchNumber,
+        newQuestionCount: questions.length,
+        totalQuestions: total,
+      });
+    }
+  } catch (_) {}
+
   return total;
 }
 
@@ -277,12 +293,13 @@ async function processExamInBatches(examId, content) {
       return;
     }
 
-    await storeQuestions(examId, firstQuestions, 1);
+    const totalBatches = chunks.length;
+    await storeQuestions(examId, firstQuestions, 1, totalBatches);
     console.log(`✅ First batch stored: ${firstQuestions.length} questions`);
 
     // Process remaining batches sequentially in the background
     if (chunks.length > 1) {
-      processRemainingBatches(examId, chunks.slice(1)).catch((err) => {
+      processRemainingBatches(examId, chunks.slice(1), totalBatches).catch((err) => {
         console.error(
           `Background batch processing failed for exam ${examId}:`,
           err,
@@ -291,9 +308,18 @@ async function processExamInBatches(examId, content) {
           processingStatus: 'failed',
           processingError: err.message,
         }).catch(() => {});
+        try {
+          const io = getIo();
+          if (io) io.to(`exam:${examId}`).emit('exam:processingFailed', { examId, error: err.message });
+        } catch (_) {}
       });
     } else {
       await Exam.findByIdAndUpdate(examId, { processingStatus: 'complete' });
+      try {
+        const io = getIo();
+        const total = await Question.countDocuments({ examId });
+        if (io) io.to(`exam:${examId}`).emit('exam:processingComplete', { examId, totalQuestions: total });
+      } catch (_) {}
     }
   } catch (error) {
     console.error(`processExamInBatches error for ${examId}:`, error);
@@ -304,11 +330,15 @@ async function processExamInBatches(examId, content) {
         }
       : { processingStatus: 'failed', processingError: error.message };
     await Exam.findByIdAndUpdate(examId, statusUpdate).catch(() => {});
+    try {
+      const io = getIo();
+      if (io) io.to(`exam:${examId}`).emit('exam:processingFailed', { examId, error: error.message });
+    } catch (_) {}
     throw error;
   }
 }
 
-async function processRemainingBatches(examId, chunks) {
+async function processRemainingBatches(examId, chunks, totalBatches) {
   for (const chunk of chunks) {
     // Rate limit between background batches
     await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));
@@ -324,7 +354,7 @@ async function processRemainingBatches(examId, chunks) {
     ]);
 
     if (questions && questions.length > 0) {
-      const total = await storeQuestions(examId, questions, chunk.batchNumber);
+      const total = await storeQuestions(examId, questions, chunk.batchNumber, totalBatches);
       console.log(
         `✅ Batch ${chunk.batchNumber} stored: ${questions.length} new, ${total} total`,
       );
@@ -333,6 +363,11 @@ async function processRemainingBatches(examId, chunks) {
 
   await Exam.findByIdAndUpdate(examId, { processingStatus: 'complete' });
   console.log(`🏁 All batches complete for exam ${examId}`);
+  try {
+    const io = getIo();
+    const total = await Question.countDocuments({ examId });
+    if (io) io.to(`exam:${examId}`).emit('exam:processingComplete', { examId, totalQuestions: total });
+  } catch (_) {}
 }
 
 export { createTextChunks, isFatalAIError, processExamInBatches };

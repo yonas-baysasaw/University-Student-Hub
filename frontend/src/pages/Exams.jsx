@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
+import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
 
 const TABS = ['Browse', 'Upload'];
@@ -61,6 +63,7 @@ function Exams() {
 // ── Browse Tab ────────────────────────────────────────────────────────────────
 
 function BrowseTab() {
+  const { user } = useAuth();
   const [exams, setExams] = useState([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -165,7 +168,17 @@ function BrowseTab() {
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {exams.map((exam) => (
-          <ExamCard key={exam.id} exam={exam} />
+          <ExamCard
+            key={exam.id}
+            exam={exam}
+            currentUserId={user?._id ?? user?.id}
+            onDelete={(id) => setExams((prev) => prev.filter((e) => e.id !== id))}
+            onUpdate={(updated) =>
+              setExams((prev) =>
+                prev.map((e) => (e.id === updated.id ? updated : e)),
+              )
+            }
+          />
         ))}
       </div>
 
@@ -197,67 +210,249 @@ function BrowseTab() {
   );
 }
 
-function ExamCard({ exam }) {
+function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
   const status = STATUS_LABELS[exam.processingStatus] ?? STATUS_LABELS.pending;
-  const canPractice =
-    exam.processingStatus === 'complete' && exam.totalQuestions > 0;
+  // Allow practice as soon as any questions are available
+  const canPractice = exam.totalQuestions > 0;
+  const isProcessing =
+    exam.processingStatus === 'processing' ||
+    exam.processingStatus === 'pending';
+  const isOwner =
+    currentUserId &&
+    (exam.uploadedBy?._id ?? exam.uploadedBy?.id ?? exam.uploadedBy) ===
+      currentUserId;
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState(exam.filename);
+  const [editSubject, setEditSubject] = useState(exam.subject ?? '');
+  const [editSaving, setEditSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function saveEdit() {
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: editTitle, subject: editSubject }),
+      });
+      const data = await readJsonOrThrow(res, 'Failed to update');
+      onUpdate?.(data);
+      setEditOpen(false);
+      toast.success('Exam updated');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteExam() {
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || 'Delete failed');
+      }
+      onDelete?.(exam.id);
+      toast.success('Exam deleted');
+    } catch (err) {
+      toast.error(err.message);
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   return (
-    <article className="panel-card flex flex-col justify-between rounded-2xl p-5 transition hover:shadow-md">
-      <div>
-        <div className="flex items-start justify-between gap-2">
-          <h3
-            className="font-display text-base text-slate-900 leading-snug"
-            title={exam.filename}
-          >
-            {exam.filename.length > 40
-              ? `${exam.filename.slice(0, 38)}…`
-              : exam.filename}
-          </h3>
-          <span
-            className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${status.cls}`}
-          >
-            {status.label}
-          </span>
+    <>
+      <article className="panel-card flex flex-col justify-between rounded-2xl p-5 transition hover:shadow-md">
+        <div>
+          <div className="flex items-start justify-between gap-2">
+            <h3
+              className="font-display text-base leading-snug text-slate-900"
+              title={exam.filename}
+            >
+              {exam.filename.length > 40
+                ? `${exam.filename.slice(0, 38)}…`
+                : exam.filename}
+            </h3>
+            <div className="flex shrink-0 items-center gap-1">
+              <span
+                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${status.cls}`}
+              >
+                {status.label}
+              </span>
+              {isOwner && (
+                <div className="dropdown dropdown-end">
+                  <button
+                    type="button"
+                    tabIndex={0}
+                    className="rounded-full p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 text-base leading-none"
+                  >
+                    ⋯
+                  </button>
+                  <ul className="menu menu-sm dropdown-content z-[999] mt-1 w-40 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditTitle(exam.filename);
+                          setEditSubject(exam.subject ?? '');
+                          setEditOpen(true);
+                        }}
+                        className="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                      >
+                        Edit
+                      </button>
+                    </li>
+                    <li>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete(true)}
+                        className="rounded-xl px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {(exam.subject || exam.topic) && (
+            <p className="mt-1 text-xs text-slate-500">
+              {[exam.subject, exam.topic].filter(Boolean).join(' · ')}
+            </p>
+          )}
+
+          <p className="mt-2 text-xs text-slate-500">
+            {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''}{' '}
+            · {exam.uploadedBy?.username ?? 'Unknown'}
+          </p>
         </div>
 
-        {(exam.subject || exam.topic) && (
-          <p className="mt-1 text-xs text-slate-500">
-            {[exam.subject, exam.topic].filter(Boolean).join(' · ')}
-          </p>
-        )}
+        <div className="mt-4">
+          {canPractice ? (
+            <Link
+              to={`/exams/${exam.id}`}
+              className="btn-primary block w-full py-2 text-center text-sm"
+            >
+              {isProcessing ? 'Practice (extracting more…)' : 'Practice now'}
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              {isProcessing ? (
+                <>
+                  <span className="loading loading-spinner loading-xs" />
+                  Extracting questions…
+                </>
+              ) : exam.processingStatus === 'failed' ? (
+                <span className="text-rose-600">Processing failed</span>
+              ) : (
+                <span>Not yet available</span>
+              )}
+            </div>
+          )}
+        </div>
+      </article>
 
-        <p className="mt-2 text-xs text-slate-500">
-          {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''} ·{' '}
-          {exam.uploadedBy?.username ?? 'Unknown'}
-        </p>
-      </div>
-
-      <div className="mt-4">
-        {canPractice ? (
-          <Link
-            to={`/exams/${exam.id}`}
-            className="btn-primary block w-full py-2 text-center text-sm"
-          >
-            Practice now
-          </Link>
-        ) : (
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            {exam.processingStatus === 'processing' ||
-            exam.processingStatus === 'pending' ? (
-              <>
-                <span className="loading loading-spinner loading-xs" />
-                Questions are being extracted…
-              </>
-            ) : exam.processingStatus === 'failed' ? (
-              <span className="text-rose-600">Processing failed</span>
-            ) : (
-              <span>Not yet available</span>
-            )}
+      {/* Edit modal */}
+      {editOpen && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40 cursor-default"
+            onClick={() => setEditOpen(false)}
+            aria-label="Close modal"
+          />
+          <div className="relative z-10 panel-card w-full max-w-md rounded-3xl p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg text-slate-900">Edit Exam</h2>
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100"
+              >
+                ✕
+              </button>
+            </div>
+            <label htmlFor="exam-card-title" className="mb-1 block text-xs font-semibold text-slate-700">
+              Title
+            </label>
+            <input
+              id="exam-card-title"
+              type="text"
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              className="input-field mb-3 w-full text-sm"
+            />
+            <label htmlFor="exam-card-subject" className="mb-1 block text-xs font-semibold text-slate-700">
+              Subject
+            </label>
+            <input
+              id="exam-card-subject"
+              type="text"
+              value={editSubject}
+              onChange={(e) => setEditSubject(e.target.value)}
+              placeholder="e.g. Biology, Mathematics…"
+              className="input-field mb-5 w-full text-sm"
+            />
+            <button
+              type="button"
+              onClick={saveEdit}
+              disabled={editSaving}
+              className="btn-primary w-full py-2.5 text-sm disabled:opacity-50"
+            >
+              {editSaving ? 'Saving…' : 'Save changes'}
+            </button>
           </div>
-        )}
-      </div>
-    </article>
+        </div>
+      )}
+
+      {/* Delete confirmation */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/40 cursor-default"
+            onClick={() => setConfirmDelete(false)}
+            aria-label="Close modal"
+          />
+          <div className="relative z-10 panel-card w-full max-w-sm rounded-3xl p-6 shadow-2xl">
+            <h2 className="font-display text-lg text-slate-900">
+              Delete exam?
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              This will permanently delete the exam and all its questions.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={deleteExam}
+                disabled={deleting}
+                className="flex-1 rounded-2xl bg-rose-600 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirmDelete(false)}
+                className="btn-secondary flex-1 py-2.5 text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

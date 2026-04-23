@@ -67,4 +67,29 @@ router.delete(
   }),
 );
 
+/* ===== Save BYOK API Key + Model ===== */
+router.post(
+  '/api-key',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const { geminiApiKey = '', geminiModelId = '' } = req.body;
+    req.user.geminiApiKey = geminiApiKey.trim();
+    req.user.geminiModelId = geminiModelId.trim();
+    await req.user.save();
+    res.json({ message: 'API key saved' });
+  }),
+);
+
+/* ===== Clear BYOK API Key ===== */
+router.delete(
+  '/api-key',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    req.user.geminiApiKey = '';
+    req.user.geminiModelId = '';
+    await req.user.save();
+    res.json({ message: 'API key cleared' });
+  }),
+);
+
 export default router;

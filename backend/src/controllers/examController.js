@@ -1,6 +1,9 @@
+import { DeleteObjectCommand } from '@aws-sdk/client-s3';
 import Attempt from '../models/Attempt.js';
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
+import { s3Client } from '../config/s3Client.js';
+import { ENV } from '../config/env.js';
 import { processExamInBatches } from '../services/batchService.js';
 import {
   analyzePDF,
@@ -296,6 +299,70 @@ async function getAttemptsController(req, res, next) {
   }
 }
 
+// ── Update Exam Metadata ──────────────────────────────────────────────────────
+
+async function updateExamController(req, res, next) {
+  try {
+    const userId = req.user._id;
+    const { examId } = req.params;
+    const { filename, subject } = req.body;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (exam.uploadedBy.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'Only the uploader can edit this exam.' });
+    }
+
+    if (filename !== undefined) exam.filename = filename.trim() || exam.filename;
+    if (subject !== undefined) exam.subject = subject.trim();
+    await exam.save();
+
+    return res.json(formatExam(exam));
+  } catch (error) {
+    return next(error);
+  }
+}
+
+// ── Delete Exam ───────────────────────────────────────────────────────────────
+
+async function deleteExamController(req, res, next) {
+  try {
+    const userId = req.user._id;
+    const { examId } = req.params;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (exam.uploadedBy.toString() !== userId.toString()) {
+      return res.status(403).json({ message: 'Only the uploader can delete this exam.' });
+    }
+
+    // Delete S3 object
+    if (exam.fileKey) {
+      try {
+        await s3Client.send(
+          new DeleteObjectCommand({ Bucket: ENV.AWS_BUCKET_NAME, Key: exam.fileKey }),
+        );
+      } catch (s3Err) {
+        console.warn(`Failed to delete S3 object ${exam.fileKey}:`, s3Err.message);
+      }
+    }
+
+    // For non-duplicate exams, remove their questions and attempts too
+    if (!exam.isDuplicate) {
+      await Promise.all([
+        Question.deleteMany({ examId }),
+        Attempt.deleteMany({ examId }),
+      ]);
+    }
+
+    await Exam.findByIdAndDelete(examId);
+
+    return res.json({ message: 'Exam deleted.' });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function canAccessExam(exam, userId) {
@@ -335,10 +402,12 @@ function formatQuestion(q) {
 }
 
 export {
+  deleteExamController,
   getAttemptsController,
   getExamController,
   getQuestionsController,
   listExamsController,
   submitAttemptController,
+  updateExamController,
   uploadExamController,
 };

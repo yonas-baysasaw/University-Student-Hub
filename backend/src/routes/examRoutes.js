@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import multer from 'multer';
 import {
+  deleteExamController,
   getAttemptsController,
   getExamController,
   getQuestionsController,
   listExamsController,
   submitAttemptController,
+  updateExamController,
   uploadExamController,
 } from '../controllers/examController.js';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
@@ -26,6 +28,8 @@ router.use(isAuthenticated);
 router.post('/upload', pdfUpload.single('pdf'), uploadExamController);
 router.get('/', listExamsController);
 router.get('/:examId', getExamController);
+router.patch('/:examId', updateExamController);
+router.delete('/:examId', deleteExamController);
 router.get('/:examId/questions', getQuestionsController);
 router.post('/:examId/attempts', submitAttemptController);
 router.get('/:examId/attempts', getAttemptsController);

@@ -23,6 +23,8 @@ const sanitizeMessage = (message) => ({
 
 let io;
 
+export const getIo = () => io;
+
 export const initSocketServer = async (server, sessionMiddleware) => {
   io = new Server(server, {
     cors: {
@@ -173,6 +175,74 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         });
       } catch (error) {
         socket.emit('error', { message: error.message });
+      }
+    });
+
+    // ── Exam rooms (for real-time batch processing updates) ──────────────────
+    socket.on('joinExamRoom', ({ examId }) => {
+      if (examId) socket.join(`exam:${examId}`);
+    });
+
+    socket.on('leaveExamRoom', ({ examId }) => {
+      if (examId) socket.leave(`exam:${examId}`);
+    });
+
+    // ── AI streaming chat ────────────────────────────────────────────────────
+    socket.on('ai:chat', async ({ messages, sessionId }) => {
+      try {
+        if (!Array.isArray(messages) || messages.length === 0) {
+          socket.emit('ai:error', { message: 'messages array is required' });
+          return;
+        }
+
+        // Lazy import to avoid circular deps at module load time
+        const { geminiService } = await import('../services/geminiService.js');
+        const ChatSession = (await import('../models/ChatSession.js')).default;
+
+        // Resolve or create a chat session
+        let session = sessionId
+          ? await ChatSession.findOne({ _id: sessionId, userId: user._id })
+          : null;
+
+        if (!session) {
+          const firstUserMsg = messages.find((m) => m.role === 'user');
+          const title = firstUserMsg
+            ? firstUserMsg.content.slice(0, 60)
+            : 'New chat';
+          session = await ChatSession.create({
+            userId: user._id,
+            title,
+            messages: [],
+          });
+        }
+
+        // Override Gemini key if user has BYOK
+        let serviceToUse = geminiService;
+        if (user.geminiApiKey) {
+          serviceToUse = await geminiService.forUser(user.geminiApiKey, user.geminiModelId);
+        }
+
+        const resolvedSessionId = session._id.toString();
+        socket.emit('ai:sessionId', { sessionId: resolvedSessionId });
+
+        let fullResponse = '';
+        await serviceToUse.chatStream(messages, (chunk) => {
+          fullResponse += chunk;
+          socket.emit('ai:chunk', { chunk, sessionId: resolvedSessionId });
+        });
+
+        // Persist messages
+        const userMsg = messages[messages.length - 1];
+        session.messages.push(
+          { role: userMsg.role, content: userMsg.content },
+          { role: 'assistant', content: fullResponse },
+        );
+        await session.save();
+
+        socket.emit('ai:done', { sessionId: resolvedSessionId, fullResponse });
+      } catch (err) {
+        console.error('ai:chat socket error:', err);
+        socket.emit('ai:error', { message: err.message || 'AI error' });
       }
     });
 

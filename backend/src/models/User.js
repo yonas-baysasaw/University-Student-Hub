@@ -32,6 +32,14 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    geminiApiKey: {
+      type: String,
+      default: '',
+    },
+    geminiModelId: {
+      type: String,
+      default: '',
+    },
   },
   { timestamps: true },
 );

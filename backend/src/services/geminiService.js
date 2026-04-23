@@ -106,7 +106,6 @@ class GeminiService {
       );
     }
 
-    // Gemini uses 'user' and 'model' roles; map 'assistant' → 'model'
     const history = messages.slice(0, -1).map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: m.content }],
@@ -119,6 +118,50 @@ class GeminiService {
     const result = await chatSession.sendMessage(lastMessage.content);
     const responseText = (await result.response).text();
     return responseText;
+  }
+
+  // ── Streaming chat ────────────────────────────────────────────────────────
+
+  async chatStream(messages, onChunk) {
+    await this.initialize();
+
+    if (!Array.isArray(messages) || messages.length === 0) {
+      throw new Error(
+        'messages must be a non-empty array of { role, content } objects',
+      );
+    }
+
+    const history = messages.slice(0, -1).map((m) => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }],
+    }));
+
+    const lastMessage = messages[messages.length - 1];
+
+    await this.enforceRateLimit();
+    const chatSession = this.chatModel.startChat({ history });
+    const result = await chatSession.sendMessageStream(lastMessage.content);
+
+    let full = '';
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      full += text;
+      onChunk(text);
+    }
+    return full;
+  }
+
+  // ── Per-user BYOK instance ────────────────────────────────────────────────
+
+  async forUser(apiKey, modelId) {
+    if (!apiKey) return this;
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const effectiveModel = modelId || ENV.GEMINI_MODEL_ID;
+    const instance = new GeminiService();
+    instance.model = genAI.getGenerativeModel({ model: effectiveModel });
+    instance.chatModel = genAI.getGenerativeModel({ model: effectiveModel });
+    instance._initialized = true;
+    return instance;
   }
 
   // ── Prompts (ported verbatim from did-exit) ───────────────────────────────

@@ -5,9 +5,12 @@ import {
   Routes,
   useLocation,
 } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import Nav from './components/Nav';
 import Navbar from './components/Navbar';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProcessingProvider } from './contexts/ProcessingContext';
+import { SocketProvider } from './contexts/SocketContext';
 import About from './pages/About';
 import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
@@ -124,7 +127,12 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <AppRoutes />
+        <SocketProvider>
+          <ProcessingProvider>
+            <Toaster position="top-right" richColors closeButton />
+            <AppRoutes />
+          </ProcessingProvider>
+        </SocketProvider>
       </BrowserRouter>
     </AuthProvider>
   );
