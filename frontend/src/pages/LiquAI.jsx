@@ -35,6 +35,16 @@ function LiquAI() {
   const [streamingContent, setStreamingContent] = useState('');
   const streamingRef = useRef('');
 
+  // Auto-resize textarea — grows with content, never collapses below initial rows height
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-runs when draft changes to resize the textarea
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const minHeight = 72; // ~3 rows at text-sm line-height
+    el.style.height = `${Math.min(Math.max(el.scrollHeight, minHeight), 200)}px`;
+  }, [draft]);
+
   // Prefill from navigation state (e.g. from ExamPractice "Explain further")
   useEffect(() => {
     const prefill = location.state?.prefill;
@@ -115,6 +125,8 @@ function LiquAI() {
     const userMsg = { id: Date.now().toString(), role: 'user', content: text };
     setMessages((prev) => [...prev, userMsg]);
     setDraft('');
+    // Reset textarea to minimum height after clearing
+    if (inputRef.current) inputRef.current.style.height = '72px';
     setError('');
     setLoading(true);
     streamingRef.current = '';
@@ -360,9 +372,10 @@ function LiquAI() {
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask Liqu AI anything… (Enter to send, Shift+Enter for newline)"
-              rows={2}
+              rows={3}
               disabled={loading}
-              className="input-field flex-1 resize-none py-2.5 text-sm leading-relaxed"
+              style={{ maxHeight: '200px' }}
+              className="input-field flex-1 resize-none overflow-y-auto py-2.5 text-sm leading-relaxed"
             />
             <button
               type="submit"
