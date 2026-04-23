@@ -13,8 +13,11 @@ import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
+import ExamPractice from './pages/ExamPractice';
+import Exams from './pages/Exams';
 import Home from './pages/Home';
 import Library from './pages/Library';
+import LiquAI from './pages/LiquAI';
 import Login from './pages/login';
 import NotFound from './pages/NotFound';
 import PasswordReset from './pages/PasswordReset';
@@ -60,6 +63,9 @@ function AppRoutes() {
               element={<ClassroomResources />}
             />
             <Route path="/library" element={<Library />} />
+            <Route path="/liqu-ai" element={<LiquAI />} />
+            <Route path="/exams" element={<Exams />} />
+            <Route path="/exams/:examId" element={<ExamPractice />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route
@@ -101,6 +107,12 @@ function AppRoutes() {
             element={<Navigate to="/login" replace />}
           />
           <Route path="/library" element={<Navigate to="/login" replace />} />
+          <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
+          <Route path="/exams" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/exams/:examId"
+            element={<Navigate to="/login" replace />}
+          />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

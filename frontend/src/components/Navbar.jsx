@@ -67,6 +67,34 @@ function Navbar({ children }) {
                     Library
                   </NavLink>
                 </li>
+                <li>
+                  <NavLink
+                    to="/exams"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Exams
+                  </NavLink>
+                </li>
+                <li>
+                  <NavLink
+                    to="/liqu-ai"
+                    className={({ isActive }) =>
+                      `rounded-full px-3 py-1.5 text-xs font-semibold transition sm:text-sm ${
+                        isActive
+                          ? 'bg-gradient-to-r from-slate-900 to-cyan-700 text-white'
+                          : 'text-slate-700 hover:bg-cyan-50 hover:text-cyan-800'
+                      }`
+                    }
+                  >
+                    Liqu AI
+                  </NavLink>
+                </li>
               </ul>
             </nav>
 
