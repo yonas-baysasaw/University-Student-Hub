@@ -33,7 +33,7 @@ const messageSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 messageSchema.index({ chat: 1, createdAt: -1 });

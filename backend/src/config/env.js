@@ -1,11 +1,11 @@
-import dotenv from "dotenv";
+import dotenv from 'dotenv';
 
 dotenv.config();
 
 export const ENV = {
   PORT: process.env.PORT,
   NODE_ENV: process.env.NODE_ENV,
-  isProduction: process.env.NODE_ENV === "production",
+  isProduction: process.env.NODE_ENV === 'production',
   SESSION_SECRET: process.env.SESSION_SECRET,
   MONGODB_URL: process.env.MONGODB_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -18,4 +18,6 @@ export const ENV = {
   AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || 'gemini-2.0-flash',
 };

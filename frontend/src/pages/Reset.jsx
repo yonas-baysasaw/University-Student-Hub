@@ -15,9 +15,12 @@ function Reset() {
   const { token } = useParams();
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
-  useEffect(() => () => {
-    if (successTimer.current) clearTimeout(successTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    },
+    [],
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -41,7 +44,7 @@ function Reset() {
       const res = await fetch(`/api/reset-password/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
+        body: JSON.stringify({ password }),
       });
 
       if (!res.ok) {
@@ -52,7 +55,10 @@ function Reset() {
       setSuccess('Password changed. Redirecting to sign in...');
       setPassword('');
       setConfirmPassword('');
-      successTimer.current = setTimeout(() => navigate('/login', { replace: true }), 1200);
+      successTimer.current = setTimeout(
+        () => navigate('/login', { replace: true }),
+        1200,
+      );
     } catch (submitError) {
       console.error(submitError);
       setError(submitError?.message || 'Something went wrong, try again.');
@@ -60,10 +66,15 @@ function Reset() {
   };
 
   return (
-    <AuthShell title="Set new password" subtitle="Create a strong password for your account">
+    <AuthShell
+      title="Set new password"
+      subtitle="Create a strong password for your account"
+    >
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         {(error || success) && (
-          <div className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          <div
+            className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
+          >
             {error || success}
           </div>
         )}
@@ -88,9 +99,14 @@ function Reset() {
 
         <div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div className={`h-full rounded-full transition-all ${strength.color}`} style={{ width: `${Math.max(8, strength.score * 20)}%` }} />
+            <div
+              className={`h-full rounded-full transition-all ${strength.color}`}
+              style={{ width: `${Math.max(8, strength.score * 20)}%` }}
+            />
           </div>
-          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>Password strength: {strength.label}</p>
+          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>
+            Password strength: {strength.label}
+          </p>
         </div>
 
         <div className="relative">

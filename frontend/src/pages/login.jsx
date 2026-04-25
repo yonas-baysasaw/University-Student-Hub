@@ -1,5 +1,5 @@
-import { FaGoogle } from 'react-icons/fa';
 import { useState } from 'react';
+import { FaGoogle } from 'react-icons/fa';
 import { Link } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 
@@ -27,7 +27,7 @@ function SignIn() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ identifier: trimmedIdentifier, password })
+        body: JSON.stringify({ identifier: trimmedIdentifier, password }),
       });
 
       const payload = await response.json().catch(() => ({}));
@@ -48,11 +48,20 @@ function SignIn() {
   };
 
   return (
-    <AuthShell title="Welcome back" subtitle="Sign in to continue to your workspace">
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to continue to your workspace"
+    >
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Username or email</label>
+          <label
+            htmlFor="login-identifier"
+            className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500"
+          >
+            Username or email
+          </label>
           <input
+            id="login-identifier"
             type="text"
             placeholder="example@university.edu"
             value={identifier}
@@ -62,8 +71,14 @@ function SignIn() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Password</label>
+          <label
+            htmlFor="login-password"
+            className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500"
+          >
+            Password
+          </label>
           <input
+            id="login-password"
             type="password"
             placeholder="Enter your password"
             value={password}
@@ -72,29 +87,43 @@ function SignIn() {
           />
         </div>
 
-        <button type="submit" disabled={loading} className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={loading}
+          className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
 
         {(error || status) && (
-          <p className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          <p
+            className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
+          >
             {error || status}
           </p>
         )}
       </form>
 
       <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-        <Link to="/password/reset" className="font-medium transition hover:text-slate-700 hover:underline">
+        <Link
+          to="/password/reset"
+          className="font-medium transition hover:text-slate-700 hover:underline"
+        >
           Forgot password?
         </Link>
-        <Link to="/signup" className="font-medium transition hover:text-slate-700 hover:underline">
+        <Link
+          to="/signup"
+          className="font-medium transition hover:text-slate-700 hover:underline"
+        >
           Create account
         </Link>
       </div>
 
       <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">or continue with</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+          or continue with
+        </span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 

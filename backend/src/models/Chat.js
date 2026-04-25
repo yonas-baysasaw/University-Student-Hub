@@ -45,7 +45,7 @@ const chatSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.Mixed,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 chatSchema.index({ members: 1, updatedAt: -1 });
