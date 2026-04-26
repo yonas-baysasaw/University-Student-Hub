@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import {
+  getBookRagStatus,
+  postIndexBookRag,
+} from '../controllers/bookRagController.js';
+import {
   createBook,
   deleteBook,
   getAllBooks,
@@ -14,6 +18,8 @@ import { isAuthenticated } from '../middlewares/authMiddleware.js';
 const router = Router();
 
 router.get('/', getAllBooks);
+router.get('/:bookId/rag/status', isAuthenticated, getBookRagStatus);
+router.post('/:bookId/rag/index', isAuthenticated, postIndexBookRag);
 router.get('/:bookId', getBookById);
 router.post('/:bookId/download', incrementBookDownload);
 

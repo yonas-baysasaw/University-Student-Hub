@@ -13,8 +13,8 @@
   "type": "module",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1021.0",
-    "@napi-rs/canvas": "^0.1.66",
     "@google/generative-ai": "^0.24.1",
+    "@napi-rs/canvas": "^0.1.66",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
@@ -32,6 +32,7 @@
     "passport-local": "^1.0.0",
     "pdfjs-dist": "^5.6.205",
     "socket.io": "^4.8.3",
+    "undici": "^7.25.0",
     "uuid": "^13.0.0"
   }
 }

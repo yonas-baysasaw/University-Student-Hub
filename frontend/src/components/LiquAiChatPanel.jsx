@@ -26,6 +26,8 @@ function makeWelcome(bookTitle) {
 function LiquAiChatPanel({
   className = '',
   bookTitle = '',
+  /** When set (e.g. Study buddy), server augments Liqu AI with RAG from this book if indexed. */
+  bookId = '',
   starterPrompts,
   onQuickPrompt,
   showQuickPromptsEmptyState = true,
@@ -47,6 +49,9 @@ function LiquAiChatPanel({
 
   const [streamingContent, setStreamingContent] = useState('');
   const streamingRef = useRef('');
+  const [ragStatus, setRagStatus] = useState(null);
+  const [ragPoll, setRagPoll] = useState(false);
+  const [ragError, setRagError] = useState('');
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-runs when draft changes
   useEffect(() => {
@@ -61,6 +66,151 @@ function LiquAiChatPanel({
     setMessages([makeWelcome(bookTitle)]);
     setActiveSessionId(null);
   }, [bookTitle]);
+
+  const fetchRagStatus = useCallback(async () => {
+    if (!bookId) return null;
+    const res = await fetch(
+      `/api/books/${encodeURIComponent(bookId)}/rag/status`,
+      { credentials: 'include' },
+    );
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.message || 'Could not load index status');
+    }
+    return data;
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!bookId) {
+      setRagStatus(null);
+      setRagError('');
+      setRagPoll(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchRagStatus();
+        if (!cancelled && data) {
+          setRagStatus(data);
+          setRagError('');
+          if (data.ragIndexStatus === 'indexing') {
+            setRagPoll(true);
+          }
+        }
+      } catch (e) {
+        if (!cancelled)
+          setRagError(e?.message || 'Could not load index status');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bookId, fetchRagStatus]);
+
+  useEffect(() => {
+    if (!bookId || !ragPoll) return;
+    const tick = async () => {
+      try {
+        const data = await fetchRagStatus();
+        if (data) {
+          setRagStatus(data);
+          if (data.ragIndexStatus !== 'indexing') {
+            setRagPoll(false);
+            if (data.ragIndexStatus === 'ready') {
+              toast.success(
+                `Book ready — ${data.chunkCount} passages for AI context`,
+              );
+            }
+            if (data.ragIndexStatus === 'failed' && data.ragIndexError) {
+              toast.error(data.ragIndexError);
+            }
+          }
+        }
+      } catch {
+        /* keep polling */
+      }
+    };
+    const id = setInterval(tick, 900);
+    tick();
+    return () => clearInterval(id);
+  }, [bookId, ragPoll, fetchRagStatus]);
+
+  async function indexBookForRag() {
+    if (!bookId) return;
+    setRagError('');
+    try {
+      const res = await fetch(
+        `/api/books/${encodeURIComponent(bookId)}/rag/index`,
+        { method: 'POST', credentials: 'include' },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409) {
+        setRagStatus((prev) => ({
+          ...prev,
+          title: data.title || prev?.title,
+          ragIndexStatus: 'indexing',
+          ragIndexPhase: data.ragIndexPhase,
+          ragIndexTotalChunks: data.ragIndexTotalChunks ?? 0,
+          ragIndexDoneChunks: data.ragIndexDoneChunks ?? 0,
+          ragIndexProgressPercent: data.ragIndexProgressPercent ?? 0,
+        }));
+        setRagPoll(true);
+        toast.info('Already indexing this book — showing progress');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || 'Index failed');
+      }
+      if (res.status === 202 && data.started) {
+        setRagStatus((prev) => ({
+          ...prev,
+          ragIndexStatus: 'indexing',
+          ragIndexPhase: 'downloading',
+          ragIndexTotalChunks: 0,
+          ragIndexDoneChunks: 0,
+          ragIndexProgressPercent: 0,
+        }));
+        setRagPoll(true);
+        toast.info('Indexing started — you can keep using the app');
+      }
+    } catch (e) {
+      setRagError(e?.message || 'Index failed');
+      toast.error(e?.message || 'Index failed');
+    }
+  }
+
+  const ragIsIndexing = ragStatus?.ragIndexStatus === 'indexing';
+  const phaseLabel = (() => {
+    const p = ragStatus?.ragIndexPhase || '';
+    if (p === 'downloading') return 'Downloading file…';
+    if (p === 'extracting') return 'Extracting text from the document…';
+    if (p === 'chunking') return 'Splitting into passages for search…';
+    if (p === 'embedding') {
+      const t = Number(ragStatus.ragIndexTotalChunks) || 0;
+      const d = Number(ragStatus.ragIndexDoneChunks) || 0;
+      if (t > 0) return `Embedding passages (${d} / ${t})…`;
+      return 'Embedding passages…';
+    }
+    if (ragIsIndexing) return 'Working…';
+    return '';
+  })();
+  const embTotal = Number(ragStatus?.ragIndexTotalChunks) || 0;
+  const embDone = Number(ragStatus?.ragIndexDoneChunks) || 0;
+  const serverPct = Number(ragStatus?.ragIndexProgressPercent);
+  const ragIndexOverallPct = Number.isFinite(serverPct)
+    ? Math.min(100, Math.max(0, serverPct))
+    : embTotal > 0
+      ? Math.min(100, Math.round((embDone / embTotal) * 100))
+      : 0;
+  const indexStepLabel = (() => {
+    const p = ragStatus?.ragIndexPhase || '';
+    if (p === 'downloading') return 'Step 1/4';
+    if (p === 'extracting') return 'Step 2/4';
+    if (p === 'chunking') return 'Step 3/4';
+    if (p === 'embedding') return 'Step 4/4';
+    return '';
+  })();
 
   useEffect(() => {
     const prefill = location.state?.prefill;
@@ -148,11 +298,13 @@ function LiquAiChatPanel({
       userMsg,
     ].map(({ role, content }) => ({ role, content }));
 
+    const bookPayload = bookId ? { bookId: String(bookId) } : {};
+
     try {
       if (socket?.connected) {
-        await sendViaSocket(history);
+        await sendViaSocket(history, bookPayload);
       } else {
-        await sendViaRest(history);
+        await sendViaRest(history, bookPayload);
       }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
@@ -164,9 +316,13 @@ function LiquAiChatPanel({
     }
   }
 
-  function sendViaSocket(history) {
+  function sendViaSocket(history, bookPayload) {
     return new Promise((resolve, reject) => {
-      socket.emit('ai:chat', { messages: history, sessionId: activeSessionId });
+      socket.emit('ai:chat', {
+        messages: history,
+        sessionId: activeSessionId,
+        ...bookPayload,
+      });
 
       const onSessionId = ({ sessionId }) => {
         setActiveSessionId(sessionId);
@@ -213,12 +369,16 @@ function LiquAiChatPanel({
     });
   }
 
-  async function sendViaRest(history) {
+  async function sendViaRest(history, bookPayload) {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messages: history, sessionId: activeSessionId }),
+      body: JSON.stringify({
+        messages: history,
+        sessionId: activeSessionId,
+        ...bookPayload,
+      }),
     });
 
     const data = await readJsonOrThrow(res, 'AI request failed');
@@ -306,6 +466,72 @@ function LiquAiChatPanel({
               New chat
             </button>
           </div>
+          {bookId ? (
+            <div className="mb-2 flex flex-col gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2 py-1.5 text-xs text-slate-600">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  {ragIsIndexing
+                    ? 'Indexing in progress for AI context.'
+                    : ragStatus?.ragIndexStatus === 'failed' &&
+                        ragStatus?.ragIndexError
+                      ? 'Last index failed — you can try again.'
+                      : ragStatus && (ragStatus.chunkCount ?? 0) > 0
+                        ? `Book indexed — ${ragStatus.chunkCount} passages (answers use this text).`
+                        : 'Ground answers in this book: index it once (text-based PDF or .txt).'}
+                </span>
+                <button
+                  type="button"
+                  onClick={indexBookForRag}
+                  disabled={ragIsIndexing}
+                  className="shrink-0 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-0.5 font-semibold text-cyan-800 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {ragIsIndexing
+                    ? 'Indexing…'
+                    : (ragStatus?.chunkCount ?? 0) > 0
+                      ? 'Re-index'
+                      : 'Index book'}
+                </button>
+              </div>
+              {ragIsIndexing && phaseLabel ? (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-[0.7rem] text-cyan-900">
+                    <p className="min-w-0 flex-1">{phaseLabel}</p>
+                    {indexStepLabel ? (
+                      <span className="shrink-0 text-slate-500">
+                        {indexStepLabel} · {ragIndexOverallPct}%
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-slate-500">
+                        {ragIndexOverallPct}%
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90"
+                    role="progressbar"
+                    aria-valuenow={ragIndexOverallPct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Indexing progress"
+                  >
+                    <div
+                      className="h-full rounded-full bg-cyan-600 transition-[width] duration-300"
+                      style={{ width: `${ragIndexOverallPct}%` }}
+                    />
+                  </div>
+                </div>
+              ) : null}
+              {ragStatus?.ragIndexStatus === 'failed' &&
+              ragStatus?.ragIndexError ? (
+                <p className="text-[0.7rem] text-rose-600">
+                  {ragStatus.ragIndexError}
+                </p>
+              ) : null}
+              {ragError ? (
+                <p className="text-[0.7rem] text-rose-600">{ragError}</p>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
             <div className="space-y-3">

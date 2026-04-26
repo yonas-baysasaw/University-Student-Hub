@@ -1,4 +1,5 @@
 import ChatSession from '../models/ChatSession.js';
+import { augmentMessagesWithBookRag } from '../services/bookRagService.js';
 import {
   geminiService,
   getGeminiServiceForUser,
@@ -8,7 +9,7 @@ import {
 
 async function chatController(req, res, next) {
   try {
-    const { messages, sessionId } = req.body;
+    const { messages, sessionId, bookId } = req.body;
     const userId = req.user._id;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -31,7 +32,17 @@ async function chatController(req, res, next) {
     }
 
     const service = await getGeminiServiceForUser(req.user);
-    const responseText = await service.chat(messages);
+    let messagesForLlm = messages;
+    if (bookId && String(bookId).trim()) {
+      const aug = await augmentMessagesWithBookRag(
+        messages,
+        String(bookId).trim(),
+        userId,
+        req.user,
+      );
+      messagesForLlm = aug.messages;
+    }
+    const responseText = await service.chat(messagesForLlm);
 
     // Persist to session (Liqu AI only, not support widget sessions)
     let session = sessionId

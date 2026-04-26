@@ -75,6 +75,39 @@ const bookSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    /** Liqu AI RAG: background indexing + progress (not the same as exam batching). */
+    ragIndexStatus: {
+      type: String,
+      enum: ['idle', 'indexing', 'ready', 'failed'],
+      default: 'idle',
+      index: true,
+    },
+    ragIndexPhase: {
+      type: String,
+      default: '',
+    },
+    ragIndexTotalChunks: {
+      type: Number,
+      default: 0,
+    },
+    ragIndexDoneChunks: {
+      type: Number,
+      default: 0,
+    },
+    ragIndexError: {
+      type: String,
+      default: '',
+    },
+    ragIndexedAt: {
+      type: Date,
+    },
+    /** Approximate 0–100% for UI while indexing. */
+    ragIndexProgressPercent: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
   },
   { timestamps: true },
 );

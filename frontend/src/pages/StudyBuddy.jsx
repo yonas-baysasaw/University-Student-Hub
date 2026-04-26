@@ -241,6 +241,7 @@ function StudyBuddy() {
                 <LiquAiChatPanel
                   key={selectedBookId || 'no-book'}
                   bookTitle={selectedBook?.title ?? ''}
+                  bookId={selectedBookId || ''}
                   starterPrompts={starterPrompts}
                   onQuickPrompt={onQuickPrompt}
                 />
