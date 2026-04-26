@@ -1,6 +1,6 @@
-import { uploadFileToS3 } from '../services/uploadService.js';
 import Book from '../models/Books.js';
 import { createPdfThumbnailBuffer } from '../services/pdfThumbnailService.js';
+import { uploadFileToS3 } from '../services/uploadService.js';
 
 function createErrorResponse(message) {
   return { message };
@@ -39,7 +39,9 @@ async function uploadController(req, res, next) {
       uploadedFile?.originalname?.toLowerCase()?.endsWith('.pdf');
 
     if (isPdfUpload) {
-      const thumbnailBuffer = await createPdfThumbnailBuffer(uploadedFile.buffer);
+      const thumbnailBuffer = await createPdfThumbnailBuffer(
+        uploadedFile.buffer,
+      );
       if (thumbnailBuffer) {
         const thumbnailFile = {
           originalname: `${uploadedFile.originalname || 'book'}-cover.png`,

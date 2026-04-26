@@ -7,6 +7,21 @@ import { ENV } from '../config/env.js';
 const RATE_LIMIT_MAX_REQUESTS = 12;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
+/**
+ * API key: user's DB value first, then server env. Model: user geminiModelId, then env.
+ * @param { { geminiApiKey?: string; geminiModelId?: string } | null | undefined } userLike
+ */
+function resolveGeminiCredentialsForUser(userLike) {
+  const fromUser =
+    userLike?.geminiApiKey && String(userLike.geminiApiKey).trim();
+  const apiKey =
+    fromUser || (ENV.GEMINI_API_KEY && String(ENV.GEMINI_API_KEY).trim()) || '';
+  const modelFromUser =
+    userLike?.geminiModelId && String(userLike.geminiModelId).trim();
+  const modelId = modelFromUser || ENV.GEMINI_MODEL_ID || 'gemini-2.0-flash';
+  return { apiKey, modelId };
+}
+
 class GeminiService {
   constructor() {
     this.model = null;
@@ -19,16 +34,17 @@ class GeminiService {
 
   async initialize() {
     if (this._initialized) return;
-    if (!ENV.GEMINI_API_KEY) {
+    const { apiKey, modelId } = resolveGeminiCredentialsForUser(null);
+    if (!apiKey) {
       throw new Error(
-        'GEMINI_API_KEY is not configured in environment variables.',
+        'Gemini is not configured. Set GEMINI_API_KEY on the server or add a key in Profile (Liqu AI Settings).',
       );
     }
-    const genAI = new GoogleGenerativeAI(ENV.GEMINI_API_KEY);
-    this.model = genAI.getGenerativeModel({ model: ENV.GEMINI_MODEL_ID });
-    this.chatModel = genAI.getGenerativeModel({ model: ENV.GEMINI_MODEL_ID });
+    const genAI = new GoogleGenerativeAI(apiKey);
+    this.model = genAI.getGenerativeModel({ model: modelId });
+    this.chatModel = genAI.getGenerativeModel({ model: modelId });
     this._initialized = true;
-    console.log(`✅ Gemini initialized with model: ${ENV.GEMINI_MODEL_ID}`);
+    console.log(`✅ Gemini initialized with model: ${modelId}`);
   }
 
   async enforceRateLimit() {
@@ -420,3 +436,18 @@ Important details:
 }
 
 export const geminiService = new GeminiService();
+
+export { resolveGeminiCredentialsForUser };
+
+/**
+ * Gemini client for a uploader: profile key first, then server GEMINI_API_KEY.
+ */
+export async function getGeminiServiceForUser(userLike) {
+  const { apiKey, modelId } = resolveGeminiCredentialsForUser(userLike);
+  if (!apiKey) {
+    throw new Error(
+      'No Gemini API key. Add your key in Profile (Liqu AI Settings) or set GEMINI_API_KEY on the server.',
+    );
+  }
+  return geminiService.forUser(apiKey, modelId);
+}

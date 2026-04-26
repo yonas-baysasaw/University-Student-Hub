@@ -1,7 +1,8 @@
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
+import User from '../models/User.js';
 import { getIo } from '../socket/index.js';
-import { geminiService } from './geminiService.js';
+import { getGeminiServiceForUser } from './geminiService.js';
 
 // Ported and adapted from did-exit/js/batch-processor.js
 // Key changes: MongoDB/Mongoose instead of IndexedDB, async background processing via Promise chain
@@ -156,12 +157,12 @@ ${chunk.content}`;
 
 // ── Core batch processing ─────────────────────────────────────────────────────
 
-async function processChunkWithAI(chunk) {
+async function processChunkWithAI(chunk, ai) {
   try {
     let questions;
     if (chunk.isImage) {
       console.log(`🤖 Processing image batch ${chunk.batchNumber} with AI`);
-      questions = await geminiService.generateQuestionsFromImage(
+      questions = await ai.generateQuestionsFromImage(
         chunk.content,
         chunk.mimeType,
       );
@@ -170,10 +171,7 @@ async function processChunkWithAI(chunk) {
         `🤖 Processing text batch ${chunk.batchNumber} (${chunk.wordsCount || '?'} words)`,
       );
       const prompt = createBatchPrompt(chunk);
-      questions = await geminiService.generateQuestionsFromText(
-        chunk.content,
-        prompt,
-      );
+      questions = await ai.generateQuestionsFromText(chunk.content, prompt);
     }
 
     console.log(
@@ -239,12 +237,13 @@ async function storeQuestions(examId, questions, batchNumber, totalBatches) {
  *
  * @param {string} examId  - MongoDB ObjectId string of the Exam document
  * @param {string|Array} content - Extracted text OR array of { base64, mimeType } image objects
+ * @param {import('mongoose').Types.ObjectId | string} [uploaderId] - exam uploader; used for Gemini key (DB then env)
  */
-async function processExamInBatches(examId, content) {
+async function processExamInBatches(examId, content, uploaderId) {
   try {
     console.log(`🚀 Starting batch processing for exam ${examId}`);
 
-    // Guard: reject empty or trivially short text content up front
+    // Guard: reject empty or trivially short text content up front (no Gemini load)
     if (typeof content === 'string' && content.trim().length < 50) {
       await Exam.findByIdAndUpdate(examId, {
         processingStatus: 'failed',
@@ -256,6 +255,9 @@ async function processExamInBatches(examId, content) {
       );
       return;
     }
+
+    const uploader = uploaderId ? await User.findById(uploaderId).lean() : null;
+    const ai = await getGeminiServiceForUser(uploader);
 
     await Exam.findByIdAndUpdate(examId, { processingStatus: 'processing' });
 
@@ -276,7 +278,7 @@ async function processExamInBatches(examId, content) {
 
     // Process first batch immediately
     const firstQuestions = await Promise.race([
-      processChunkWithAI(chunks[0]),
+      processChunkWithAI(chunks[0], ai),
       new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error('Batch 1 timeout')),
@@ -299,7 +301,7 @@ async function processExamInBatches(examId, content) {
 
     // Process remaining batches sequentially in the background
     if (chunks.length > 1) {
-      processRemainingBatches(examId, chunks.slice(1), totalBatches).catch(
+      processRemainingBatches(examId, chunks.slice(1), totalBatches, ai).catch(
         (err) => {
           console.error(
             `Background batch processing failed for exam ${examId}:`,
@@ -352,13 +354,13 @@ async function processExamInBatches(examId, content) {
   }
 }
 
-async function processRemainingBatches(examId, chunks, totalBatches) {
+async function processRemainingBatches(examId, chunks, totalBatches, ai) {
   for (const chunk of chunks) {
     // Rate limit between background batches
     await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));
 
     const questions = await Promise.race([
-      processChunkWithAI(chunk),
+      processChunkWithAI(chunk, ai),
       new Promise((_, reject) =>
         setTimeout(
           () => reject(new Error(`Batch ${chunk.batchNumber} timeout`)),

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import defaultProfile from '../assets/profile.png';
+import { useAuth } from '../contexts/AuthContext';
 
 function Profile() {
   const { user } = useAuth();
@@ -48,13 +48,15 @@ function Profile() {
         setSharedBooks(Array.isArray(data.sharedBooks) ? data.sharedBooks : []);
         setViewedBooks(Array.isArray(data.viewedBooks) ? data.viewedBooks : []);
         setLikedBooks(Array.isArray(data.likedBooks) ? data.likedBooks : []);
-        setSubscribedChannels(Array.isArray(data.subscribedChannels) ? data.subscribedChannels : []);
+        setSubscribedChannels(
+          Array.isArray(data.subscribedChannels) ? data.subscribedChannels : [],
+        );
         setStats(
           data.stats || {
             totalBooks: 0,
             totalChatsCreated: 0,
             totalMessages: 0,
-          }
+          },
         );
       } catch (err) {
         if (!active) return;
@@ -81,7 +83,7 @@ function Profile() {
     return date.toLocaleString();
   }, [user?.lastSeen]);
 
-  const formatDate = value => {
+  const formatDate = (value) => {
     if (!value) return 'Unknown date';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Unknown date';
@@ -98,7 +100,7 @@ function Profile() {
     });
   };
 
-  const handleUploadSubmit = async event => {
+  const handleUploadSubmit = async (event) => {
     event.preventDefault();
     setUploadError('');
     setUploadSuccess('');
@@ -136,8 +138,8 @@ function Profile() {
         _id: payload?._id || payload?.id || `${Date.now()}`,
       };
 
-      setSharedBooks(prev => [newBook, ...prev]);
-      setStats(prev => ({
+      setSharedBooks((prev) => [newBook, ...prev]);
+      setStats((prev) => ({
         ...prev,
         totalBooks: (prev?.totalBooks || 0) + 1,
       }));
@@ -155,13 +157,23 @@ function Profile() {
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
       <section className="mx-auto max-w-6xl space-y-5">
         <div className="panel-card rounded-3xl p-6 md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Profile</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            Profile
+          </p>
           <div className="mt-3 flex flex-wrap items-center gap-4">
-            <img src={avatar} alt={`${displayName} avatar`} className="h-20 w-20 rounded-2xl border border-slate-200 object-cover" />
+            <img
+              src={avatar}
+              alt={`${displayName} avatar`}
+              className="h-20 w-20 rounded-2xl border border-slate-200 object-cover"
+            />
             <div>
-              <h1 className="font-display text-3xl text-slate-900 md:text-4xl">{displayName}</h1>
+              <h1 className="font-display text-3xl text-slate-900 md:text-4xl">
+                {displayName}
+              </h1>
               <p className="text-sm text-slate-600">{email}</p>
-              <p className="mt-1 text-xs text-slate-500">Last seen: {formattedLastSeen}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Last seen: {formattedLastSeen}
+              </p>
             </div>
           </div>
         </div>
@@ -169,52 +181,94 @@ function Profile() {
         <div className="grid gap-5 lg:grid-cols-[300px_1fr]">
           <aside className="panel-card h-fit rounded-2xl p-4 lg:sticky lg:top-24">
             <h2 className="font-display text-xl text-slate-900">Side Nav</h2>
-            <p className="mt-1 text-sm text-slate-600">Your viewed books, subscriptions, and liked books.</p>
+            <p className="mt-1 text-sm text-slate-600">
+              Your viewed books, subscriptions, and liked books.
+            </p>
 
             <div className="mt-4 space-y-4">
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800">Books Viewed</h3>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{viewedBooks.length}</span>
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Books Viewed
+                  </h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    {viewedBooks.length}
+                  </span>
                 </div>
                 <div className="mt-2 space-y-1">
-                  {viewedBooks.slice(0, 6).map(book => (
-                    <Link key={`viewed-${book._id}`} to={`/library/${book._id}`} className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                  {viewedBooks.slice(0, 6).map((book) => (
+                    <Link
+                      key={`viewed-${book._id}`}
+                      to={`/library/${book._id}`}
+                      className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                    >
                       {book.title || 'Untitled'}
                     </Link>
                   ))}
-                  {viewedBooks.length === 0 ? <p className="px-2 text-xs text-slate-500">No viewed books yet.</p> : null}
+                  {viewedBooks.length === 0 ? (
+                    <p className="px-2 text-xs text-slate-500">
+                      No viewed books yet.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800">Channels Subscribed</h3>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{subscribedChannels.length}</span>
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Channels Subscribed
+                  </h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    {subscribedChannels.length}
+                  </span>
                 </div>
                 <div className="mt-2 space-y-1">
-                  {subscribedChannels.slice(0, 6).map(channel => (
-                    <Link key={`channel-${channel.id}`} to={`/users/${channel.id}`} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
-                      <img src={channel.avatar || defaultProfile} alt={`${channel.name} avatar`} className="h-6 w-6 rounded-full border border-slate-200 object-cover" />
+                  {subscribedChannels.slice(0, 6).map((channel) => (
+                    <Link
+                      key={`channel-${channel.id}`}
+                      to={`/users/${channel.id}`}
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                    >
+                      <img
+                        src={channel.avatar || defaultProfile}
+                        alt={`${channel.name} avatar`}
+                        className="h-6 w-6 rounded-full border border-slate-200 object-cover"
+                      />
                       <span>{channel.name}</span>
                     </Link>
                   ))}
-                  {subscribedChannels.length === 0 ? <p className="px-2 text-xs text-slate-500">No channel subscriptions yet.</p> : null}
+                  {subscribedChannels.length === 0 ? (
+                    <p className="px-2 text-xs text-slate-500">
+                      No channel subscriptions yet.
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <div>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800">Books Liked</h3>
-                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{likedBooks.length}</span>
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Books Liked
+                  </h3>
+                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    {likedBooks.length}
+                  </span>
                 </div>
                 <div className="mt-2 space-y-1">
-                  {likedBooks.slice(0, 6).map(book => (
-                    <Link key={`liked-${book._id}`} to={`/library/${book._id}`} className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100">
+                  {likedBooks.slice(0, 6).map((book) => (
+                    <Link
+                      key={`liked-${book._id}`}
+                      to={`/library/${book._id}`}
+                      className="block rounded-lg px-2 py-1.5 text-sm text-slate-700 hover:bg-slate-100"
+                    >
                       {book.title || 'Untitled'}
                     </Link>
                   ))}
-                  {likedBooks.length === 0 ? <p className="px-2 text-xs text-slate-500">No liked books yet.</p> : null}
+                  {likedBooks.length === 0 ? (
+                    <p className="px-2 text-xs text-slate-500">
+                      No liked books yet.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -223,16 +277,28 @@ function Profile() {
           <div className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
               <article className="panel-card rounded-2xl p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Books uploaded</p>
-                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalBooks}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Books uploaded
+                </p>
+                <p className="mt-2 font-display text-3xl text-slate-900">
+                  {stats.totalBooks}
+                </p>
               </article>
               <article className="panel-card rounded-2xl p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Classrooms created</p>
-                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalChatsCreated}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Classrooms created
+                </p>
+                <p className="mt-2 font-display text-3xl text-slate-900">
+                  {stats.totalChatsCreated}
+                </p>
               </article>
               <article className="panel-card rounded-2xl p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Messages sent</p>
-                <p className="mt-2 font-display text-3xl text-slate-900">{stats.totalMessages}</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Messages sent
+                </p>
+                <p className="mt-2 font-display text-3xl text-slate-900">
+                  {stats.totalMessages}
+                </p>
               </article>
             </div>
 
@@ -250,8 +316,12 @@ function Profile() {
                   Upload book
                 </button>
                 <div>
-                  <h2 className="font-display text-xl text-slate-900">Shared books</h2>
-                  <p className="mt-1 text-sm text-slate-600">All books you have shared publicly or unlisted.</p>
+                  <h2 className="font-display text-xl text-slate-900">
+                    Shared books
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    All books you have shared publicly or unlisted.
+                  </p>
                 </div>
               </div>
               {uploadSuccess ? (
@@ -262,19 +332,30 @@ function Profile() {
 
               <div className="mt-4 space-y-3">
                 {loading ? (
-                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">Loading shared books...</div>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
+                    Loading shared books...
+                  </div>
                 ) : error ? (
-                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</div>
+                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {error}
+                  </div>
                 ) : sharedBooks.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-slate-300 bg-white px-4 py-3 text-sm text-slate-500">
                     No shared books yet.
                   </div>
                 ) : (
-                  sharedBooks.map(book => (
-                    <article key={book._id} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                  sharedBooks.map((book) => (
+                    <article
+                      key={book._id}
+                      className="rounded-xl border border-slate-200 bg-white px-4 py-3"
+                    >
                       <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                         {book.thumbnailUrl ? (
-                          <img src={book.thumbnailUrl} alt={`${book.title || 'Book'} cover`} className="h-44 w-full object-cover" />
+                          <img
+                            src={book.thumbnailUrl}
+                            alt={`${book.title || 'Book'} cover`}
+                            className="h-44 w-full object-cover"
+                          />
                         ) : (
                           <div className="flex h-44 w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                             No cover
@@ -282,13 +363,22 @@ function Profile() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="text-sm font-semibold text-slate-900">{book.title || 'Untitled'}</h3>
-                        <span className="text-xs text-slate-500">{formatDate(book.createdAt)}</span>
+                        <h3 className="text-sm font-semibold text-slate-900">
+                          {book.title || 'Untitled'}
+                        </h3>
+                        <span className="text-xs text-slate-500">
+                          {formatDate(book.createdAt)}
+                        </span>
                       </div>
                       <p className="mt-1 text-sm text-slate-600">
-                        {(book.format || 'Unknown format').toString()} | {book.visibility || 'public'}
+                        {(book.format || 'Unknown format').toString()} |{' '}
+                        {book.visibility || 'public'}
                       </p>
-                      {book.description ? <p className="mt-1 text-sm text-slate-600">{book.description}</p> : null}
+                      {book.description ? (
+                        <p className="mt-1 text-sm text-slate-600">
+                          {book.description}
+                        </p>
+                      ) : null}
                       {book._id ? (
                         <Link
                           to={`/library/${book._id}`}
@@ -310,8 +400,12 @@ function Profile() {
             <div className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-2xl md:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h3 className="font-display text-2xl text-slate-900">Upload a book</h3>
-                  <p className="mt-1 text-sm text-slate-600">Choose a file and add optional details.</p>
+                  <h3 className="font-display text-2xl text-slate-900">
+                    Upload a book
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Choose a file and add optional details.
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -324,7 +418,10 @@ function Profile() {
 
               <form onSubmit={handleUploadSubmit} className="mt-4 space-y-3">
                 <div>
-                  <label htmlFor="book-title" className="mb-1 block text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="book-title"
+                    className="mb-1 block text-sm font-medium text-slate-700"
+                  >
                     Title (optional)
                   </label>
                   <input
@@ -333,12 +430,20 @@ function Profile() {
                     className="input-field text-sm"
                     placeholder="Computer Networks Notes"
                     value={uploadForm.title}
-                    onChange={e => setUploadForm(prev => ({ ...prev, title: e.target.value }))}
+                    onChange={(e) =>
+                      setUploadForm((prev) => ({
+                        ...prev,
+                        title: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="book-description" className="mb-1 block text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="book-description"
+                    className="mb-1 block text-sm font-medium text-slate-700"
+                  >
                     Description (optional)
                   </label>
                   <textarea
@@ -346,19 +451,32 @@ function Profile() {
                     className="input-field min-h-24 text-sm"
                     placeholder="Briefly describe this book."
                     value={uploadForm.description}
-                    onChange={e => setUploadForm(prev => ({ ...prev, description: e.target.value }))}
+                    onChange={(e) =>
+                      setUploadForm((prev) => ({
+                        ...prev,
+                        description: e.target.value,
+                      }))
+                    }
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="book-file" className="mb-1 block text-sm font-medium text-slate-700">
+                  <label
+                    htmlFor="book-file"
+                    className="mb-1 block text-sm font-medium text-slate-700"
+                  >
                     File
                   </label>
                   <input
                     id="book-file"
                     type="file"
                     className="input-field text-sm"
-                    onChange={e => setUploadForm(prev => ({ ...prev, file: e.target.files?.[0] || null }))}
+                    onChange={(e) =>
+                      setUploadForm((prev) => ({
+                        ...prev,
+                        file: e.target.files?.[0] || null,
+                      }))
+                    }
                     required
                   />
                 </div>

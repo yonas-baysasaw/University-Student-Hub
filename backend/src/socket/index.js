@@ -196,7 +196,9 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         }
 
         // Lazy import to avoid circular deps at module load time
-        const { geminiService } = await import('../services/geminiService.js');
+        const { getGeminiServiceForUser } = await import(
+          '../services/geminiService.js'
+        );
         const ChatSession = (await import('../models/ChatSession.js')).default;
 
         // Resolve or create a chat session
@@ -216,14 +218,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           });
         }
 
-        // Override Gemini key if user has BYOK
-        let serviceToUse = geminiService;
-        if (user.geminiApiKey) {
-          serviceToUse = await geminiService.forUser(
-            user.geminiApiKey,
-            user.geminiModelId,
-          );
-        }
+        const serviceToUse = await getGeminiServiceForUser(user);
 
         const resolvedSessionId = session._id.toString();
         socket.emit('ai:sessionId', { sessionId: resolvedSessionId });

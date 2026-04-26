@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 
@@ -17,11 +17,17 @@ function BookDetail() {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
 
-  const applyBookState = loadedBook => {
+  const applyBookState = useCallback((loadedBook) => {
     setBook(loadedBook);
-    setLikesCount(Number.isFinite(loadedBook?.likesCount) ? loadedBook.likesCount : 0);
-    setDislikesCount(Number.isFinite(loadedBook?.dislikesCount) ? loadedBook.dislikesCount : 0);
-    setDownloadsCount(Number.isFinite(loadedBook?.views) ? loadedBook.views : 0);
+    setLikesCount(
+      Number.isFinite(loadedBook?.likesCount) ? loadedBook.likesCount : 0,
+    );
+    setDislikesCount(
+      Number.isFinite(loadedBook?.dislikesCount) ? loadedBook.dislikesCount : 0,
+    );
+    setDownloadsCount(
+      Number.isFinite(loadedBook?.views) ? loadedBook.views : 0,
+    );
     if (loadedBook?.viewerState?.liked) {
       setUserReaction('like');
     } else if (loadedBook?.viewerState?.disliked) {
@@ -31,8 +37,12 @@ function BookDetail() {
     }
     setIsSaved(Boolean(loadedBook?.viewerState?.saved));
     setIsSubscribed(Boolean(loadedBook?.uploader?.viewerSubscribed));
-    setSubscribersCount(Number.isFinite(loadedBook?.uploader?.subscribersCount) ? loadedBook.uploader.subscribersCount : 0);
-  };
+    setSubscribersCount(
+      Number.isFinite(loadedBook?.uploader?.subscribersCount)
+        ? loadedBook.uploader.subscribersCount
+        : 0,
+    );
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -72,9 +82,9 @@ function BookDetail() {
     return () => {
       active = false;
     };
-  }, [bookId]);
+  }, [bookId, applyBookState]);
 
-  const formatDate = value => {
+  const formatDate = (value) => {
     if (!value) return 'Unknown date';
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'Unknown date';
@@ -91,7 +101,9 @@ function BookDetail() {
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setDownloadsCount(Number.isFinite(data?.views) ? data.views : downloadsCount + 1);
+        setDownloadsCount(
+          Number.isFinite(data?.views) ? data.views : downloadsCount + 1,
+        );
       }
     } catch {
       // Ignore tracking failures and continue with file download.
@@ -108,7 +120,7 @@ function BookDetail() {
     setActionMessage('Download started.');
   };
 
-  const handleReaction = async type => {
+  const handleReaction = async (type) => {
     if (!book?._id || actionLoading) return;
     setActionLoading(true);
     setActionMessage('');
@@ -132,7 +144,11 @@ function BookDetail() {
       }
 
       applyBookState(data?.data || book);
-      setActionMessage(nextReaction === 'none' ? 'Reaction removed.' : `Marked as ${nextReaction}.`);
+      setActionMessage(
+        nextReaction === 'none'
+          ? 'Reaction removed.'
+          : `Marked as ${nextReaction}.`,
+      );
     } catch (err) {
       setActionMessage(err?.message || 'Could not update reaction.');
     } finally {
@@ -185,7 +201,9 @@ function BookDetail() {
       }
 
       applyBookState(data?.data || book);
-      setActionMessage(data?.saved ? 'Book saved.' : 'Removed from saved books.');
+      setActionMessage(
+        data?.saved ? 'Book saved.' : 'Removed from saved books.',
+      );
     } catch (err) {
       setActionMessage(err?.message || 'Could not update saved books.');
     } finally {
@@ -215,10 +233,12 @@ function BookDetail() {
       }
 
       const subscribed = Boolean(data?.subscribed);
-      const nextCount = Number.isFinite(data?.profile?.subscribersCount) ? data.profile.subscribersCount : subscribersCount;
+      const nextCount = Number.isFinite(data?.profile?.subscribersCount)
+        ? data.profile.subscribersCount
+        : subscribersCount;
       setIsSubscribed(subscribed);
       setSubscribersCount(nextCount);
-      setBook(prev => {
+      setBook((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
@@ -229,7 +249,9 @@ function BookDetail() {
           },
         };
       });
-      setActionMessage(subscribed ? 'Subscribed to uploader.' : 'Unsubscribed from uploader.');
+      setActionMessage(
+        subscribed ? 'Subscribed to uploader.' : 'Unsubscribed from uploader.',
+      );
     } catch (err) {
       setActionMessage(err?.message || 'Could not update subscription.');
     } finally {
@@ -240,7 +262,10 @@ function BookDetail() {
   return (
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
       <section className="mx-auto max-w-4xl space-y-4">
-        <Link to="/library" className="inline-flex rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200">
+        <Link
+          to="/library"
+          className="inline-flex rounded-lg bg-slate-100 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-200"
+        >
           Back to library
         </Link>
 
@@ -248,37 +273,64 @@ function BookDetail() {
           {loading ? (
             <p className="text-sm text-slate-500">Loading book details...</p>
           ) : error ? (
-            <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
+            <p className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </p>
           ) : !book ? (
             <p className="text-sm text-slate-500">Book not found.</p>
           ) : (
             <>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Book detail</p>
-              <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">{book.title || 'Untitled'}</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Book detail
+              </p>
+              <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">
+                {book.title || 'Untitled'}
+              </h1>
               <div className="mt-4 space-y-2 text-sm text-slate-600">
                 <p>
-                  Format: <span className="font-semibold text-slate-800">{book.format || 'Unknown format'}</span>
+                  Format:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {book.format || 'Unknown format'}
+                  </span>
                 </p>
                 <p>
-                  Visibility: <span className="font-semibold text-slate-800">{book.visibility || 'public'}</span>
+                  Visibility:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {book.visibility || 'public'}
+                  </span>
                 </p>
                 <p>
-                  Likes: <span className="font-semibold text-slate-800">{likesCount}</span>
+                  Likes:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {likesCount}
+                  </span>
                 </p>
                 <p>
-                  Dislikes: <span className="font-semibold text-slate-800">{dislikesCount}</span>
+                  Dislikes:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {dislikesCount}
+                  </span>
                 </p>
                 <p>
-                  Downloads: <span className="font-semibold text-slate-800">{downloadsCount}</span>
+                  Downloads:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {downloadsCount}
+                  </span>
                 </p>
                 <p>
-                  Uploaded: <span className="font-semibold text-slate-800">{formatDate(book.createdAt)}</span>
+                  Uploaded:{' '}
+                  <span className="font-semibold text-slate-800">
+                    {formatDate(book.createdAt)}
+                  </span>
                 </p>
               </div>
               <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
                 {book?.uploader?.id ? (
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <Link to={`/users/${book.uploader.id}`} className="inline-flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-slate-100">
+                    <Link
+                      to={`/users/${book.uploader.id}`}
+                      className="inline-flex items-center gap-3 rounded-lg px-1 py-1 hover:bg-slate-100"
+                    >
                       <img
                         src={book?.uploader?.avatar || defaultProfile}
                         alt={`${book?.uploader?.name || 'Uploader'} avatar`}
@@ -288,13 +340,20 @@ function BookDetail() {
                         <p>
                           Uploaded by:{' '}
                           <span className="font-semibold text-cyan-700 hover:underline">
-                            {book?.uploader?.name || book?.uploader?.username || 'Unknown user'}
+                            {book?.uploader?.name ||
+                              book?.uploader?.username ||
+                              'Unknown user'}
                           </span>
                         </p>
                         {book?.uploader?.username ? (
-                          <p className="text-xs text-slate-500">@{book.uploader.username}</p>
+                          <p className="text-xs text-slate-500">
+                            @{book.uploader.username}
+                          </p>
                         ) : null}
-                        <p className="text-xs text-slate-500">{subscribersCount} subscriber{subscribersCount === 1 ? '' : 's'}</p>
+                        <p className="text-xs text-slate-500">
+                          {subscribersCount} subscriber
+                          {subscribersCount === 1 ? '' : 's'}
+                        </p>
                       </div>
                     </Link>
                     <button
@@ -302,7 +361,9 @@ function BookDetail() {
                       onClick={handleSubscribe}
                       disabled={actionLoading}
                       className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition ${
-                        isSubscribed ? 'bg-emerald-100 text-emerald-700' : 'bg-cyan-600 text-white hover:bg-cyan-700'
+                        isSubscribed
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-cyan-600 text-white hover:bg-cyan-700'
                       }`}
                     >
                       {isSubscribed ? 'Subscribed' : 'Subscribe'}
@@ -319,21 +380,31 @@ function BookDetail() {
                       <p>
                         Uploaded by:{' '}
                         <span className="font-semibold text-slate-800">
-                          {book?.uploader?.name || book?.uploader?.username || 'Unknown user'}
+                          {book?.uploader?.name ||
+                            book?.uploader?.username ||
+                            'Unknown user'}
                         </span>
                       </p>
                       {book?.uploader?.username ? (
-                        <p className="text-xs text-slate-500">@{book.uploader.username}</p>
+                        <p className="text-xs text-slate-500">
+                          @{book.uploader.username}
+                        </p>
                       ) : null}
                     </div>
                   </div>
                 )}
               </div>
-              <p className="mt-4 text-sm text-slate-700">{book.description || 'No description available.'}</p>
+              <p className="mt-4 text-sm text-slate-700">
+                {book.description || 'No description available.'}
+              </p>
 
               <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                 {book.thumbnailUrl ? (
-                  <img src={book.thumbnailUrl} alt={`${book.title || 'Book'} cover`} className="h-72 w-full object-cover" />
+                  <img
+                    src={book.thumbnailUrl}
+                    alt={`${book.title || 'Book'} cover`}
+                    className="h-72 w-full object-cover"
+                  />
                 ) : (
                   <div className="flex h-72 w-full items-center justify-center text-sm font-semibold uppercase tracking-[0.16em] text-slate-400">
                     No cover available
@@ -363,7 +434,9 @@ function BookDetail() {
                   onClick={() => handleReaction('like')}
                   disabled={actionLoading}
                   className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    userReaction === 'like' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    userReaction === 'like'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   Like
@@ -373,7 +446,9 @@ function BookDetail() {
                   onClick={() => handleReaction('dislike')}
                   disabled={actionLoading}
                   className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    userReaction === 'dislike' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    userReaction === 'dislike'
+                      ? 'bg-rose-100 text-rose-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   Dislike
@@ -391,13 +466,17 @@ function BookDetail() {
                   onClick={handleSave}
                   disabled={actionLoading}
                   className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-                    isSaved ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    isSaved
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
                   {isSaved ? 'Saved' : 'Save'}
                 </button>
               </div>
-              {actionMessage ? <p className="mt-3 text-sm text-slate-600">{actionMessage}</p> : null}
+              {actionMessage ? (
+                <p className="mt-3 text-sm text-slate-600">{actionMessage}</p>
+              ) : null}
             </>
           )}
         </div>

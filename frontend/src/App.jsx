@@ -12,24 +12,24 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
 import About from './pages/About';
-import Home from './pages/Home';
-import Library from './pages/Library';
 import BookDetail from './pages/BookDetail';
-import Profile from './pages/Profile';
-import PublicProfile from './pages/PublicProfile';
-import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
+import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
+import ExamPractice from './pages/ExamPractice';
+import Exams from './pages/Exams';
+import Home from './pages/Home';
+import Library from './pages/Library';
+import LiquAI from './pages/LiquAI';
 import Login from './pages/login';
 import NotFound from './pages/NotFound';
 import PasswordReset from './pages/PasswordReset';
+import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
 import Reset from './pages/Reset';
 import Signup from './pages/Signup';
-import LiquAI from './pages/LiquAI';
 import StudyBuddy from './pages/StudyBuddy';
-import Exams from './pages/Exams';
-import ExamPractice from './pages/ExamPractice';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -124,8 +124,14 @@ function AppRoutes() {
           <Route path="/library" element={<Navigate to="/login" replace />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
           <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
-          <Route path="/liqu-ai/study-buddy" element={<Navigate to="/login" replace />} />
-          <Route path="/liqu-ai/did-exit" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/liqu-ai/study-buddy"
+            element={<Navigate to="/login" replace />}
+          />
+          <Route
+            path="/liqu-ai/did-exit"
+            element={<Navigate to="/login" replace />}
+          />
           <Route path="/profile" element={<Navigate to="/login" replace />} />
           <Route path="/users/:userId" element={<PublicProfile />} />
           <Route path="/exams" element={<Navigate to="/login" replace />} />

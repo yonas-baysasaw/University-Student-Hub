@@ -235,7 +235,9 @@ function Library() {
                     </span>
                   </p>
                   {item.description ? (
-                    <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      {item.description}
+                    </p>
                   ) : null}
                   {item.bookUrl || item.bookId ? (
                     <div className="mt-3 flex flex-wrap gap-2">

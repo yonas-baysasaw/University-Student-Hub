@@ -150,7 +150,9 @@ function Navbar({ children }) {
             <span className="hidden font-display text-lg font-semibold text-slate-900 sm:inline sm:text-xl">
               University Student Hub
             </span>
-            <span className="font-display text-sm font-semibold text-slate-900 sm:hidden">USH</span>
+            <span className="font-display text-sm font-semibold text-slate-900 sm:hidden">
+              USH
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
@@ -160,7 +162,6 @@ function Navbar({ children }) {
                   { to: '/', label: 'Dashboard' },
                   { to: '/classroom', label: 'Classroom' },
                   { to: '/library', label: 'Library' },
-                  { to: '/exams', label: 'Exams' },
                   { to: '/liqu-ai', label: 'Liqu AI' },
                   { to: '/profile', label: 'Profile' },
                 ].map(({ to, label }) => (
@@ -217,7 +218,6 @@ function Navbar({ children }) {
               left: `${menuPosition.left}px`,
               width: `${menuWidth}px`,
             }}
-            role="menu"
           >
             <li>
               <div className="flex items-center gap-3 rounded-xl px-3 py-2">
@@ -295,7 +295,9 @@ function Navbar({ children }) {
           />
           <div className="relative z-10 panel-card w-full max-w-md rounded-3xl p-6 shadow-2xl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="font-display text-lg text-slate-900">Liqu AI Settings</h2>
+              <h2 className="font-display text-lg text-slate-900">
+                Liqu AI Settings
+              </h2>
               <button
                 type="button"
                 onClick={() => setByokOpen(false)}
@@ -306,8 +308,8 @@ function Navbar({ children }) {
             </div>
 
             <p className="mb-4 text-xs text-slate-500">
-              Provide your own Gemini API key (BYOK) to bypass the shared rate limits and choose a
-              model.
+              Provide your own Gemini API key (BYOK) to bypass the shared rate
+              limits and choose a model.
             </p>
 
             <label

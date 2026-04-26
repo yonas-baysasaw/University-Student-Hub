@@ -1,7 +1,12 @@
 import defaultProfile from '../assets/profile.png';
 import { getMemberName } from '../utils/classroom';
 
-function ClassroomMembersSidebar({ members, membersError, user, className = '' }) {
+function ClassroomMembersSidebar({
+  members,
+  membersError,
+  user,
+  className = '',
+}) {
   return (
     <aside
       className={`h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24 ${className}`}
@@ -16,7 +21,9 @@ function ClassroomMembersSidebar({ members, membersError, user, className = '' }
         </p>
       </div>
 
-      {membersError && <p className="mt-3 text-xs text-rose-600">{membersError}</p>}
+      {membersError && (
+        <p className="mt-3 text-xs text-rose-600">{membersError}</p>
+      )}
 
       <div className="mt-3 max-h-[52vh] space-y-2 overflow-y-auto pr-1">
         {members.length === 0 ? (

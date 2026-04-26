@@ -91,7 +91,9 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
         <ClassroomTabs />
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="font-display text-xl text-slate-900">Post announcement</h3>
+          <h3 className="font-display text-xl text-slate-900">
+            Post announcement
+          </h3>
           <p className="mt-1 text-sm text-slate-600">
             {instructor
               ? 'Only instructors can publish announcements to this classroom.'
@@ -136,13 +138,17 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
                 className="rounded-2xl border border-slate-200 bg-white p-4"
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="font-display text-xl text-slate-900">{item.title}</h4>
+                  <h4 className="font-display text-xl text-slate-900">
+                    {item.title}
+                  </h4>
                   <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800">
                     {new Date(item.createdAt).toLocaleDateString()}
                   </span>
                 </div>
                 <p className="mt-2 text-sm text-slate-700">{item.body}</p>
-                <p className="mt-2 text-xs text-slate-500">Posted by {item.author}</p>
+                <p className="mt-2 text-xs text-slate-500">
+                  Posted by {item.author}
+                </p>
               </article>
             ))
           )}

@@ -19,9 +19,17 @@ function makeWelcome(bookTitle) {
 
 /**
  * Gemini chat with sessions, socket streaming, and REST fallback — for Study buddy.
- * `remountKey` (e.g. selected book id) resets the chat; `bookTitle` tunes the welcome message.
+ * Parent should pass a React `key` (e.g. book id) so the panel remounts when the context
+ * changes. `bookTitle` tunes the welcome message.
+ * `starterPrompts` + `onQuickPrompt`: empty-state quick prompts below the welcome bubble.
  */
-function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '' }) {
+function LiquAiChatPanel({
+  className = '',
+  bookTitle = '',
+  starterPrompts,
+  onQuickPrompt,
+  showQuickPromptsEmptyState = true,
+}) {
   const { user } = useAuth();
   const socket = useSocket();
   const location = useLocation();
@@ -52,7 +60,7 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
   useEffect(() => {
     setMessages([makeWelcome(bookTitle)]);
     setActiveSessionId(null);
-  }, [remountKey, bookTitle]);
+  }, [bookTitle]);
 
   useEffect(() => {
     const prefill = location.state?.prefill;
@@ -135,9 +143,10 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
     streamingRef.current = '';
     setStreamingContent('');
 
-    const history = [...messages.filter((m) => m.id !== 'welcome'), userMsg].map(
-      ({ role, content }) => ({ role, content }),
-    );
+    const history = [
+      ...messages.filter((m) => m.id !== 'welcome'),
+      userMsg,
+    ].map(({ role, content }) => ({ role, content }));
 
     try {
       if (socket?.connected) {
@@ -232,28 +241,27 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
     }
   }
 
+  const hasQuickPrompts =
+    showQuickPromptsEmptyState &&
+    Array.isArray(starterPrompts) &&
+    starterPrompts.length > 0 &&
+    typeof onQuickPrompt === 'function';
+
+  const isStarterState =
+    !loading && messages.length === 1 && messages[0]?.id === 'welcome';
+
   return (
     <div
       className={`flex min-h-[22rem] flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white/80 ${className}`}
     >
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-48 shrink-0 flex-col border-r border-slate-200 bg-slate-50/80 md:flex lg:w-56">
-          <SessionSidebar
-            sessions={sessions}
-            activeSessionId={activeSessionId}
-            onNew={startNewChat}
-            onLoad={loadSession}
-            onDelete={deleteSession}
-          />
-        </aside>
-
         {sidebarOpen && (
-          <div className="fixed inset-0 z-[120] flex md:hidden">
+          <div className="fixed inset-0 z-[130] flex">
             <button
               type="button"
               className="absolute inset-0 cursor-default bg-black/40"
               onClick={() => setSidebarOpen(false)}
-              aria-label="Close sidebar"
+              aria-label="Close chat history"
             />
             <div className="relative z-10 flex h-full w-64 flex-col bg-white shadow-2xl">
               <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2">
@@ -277,13 +285,13 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
           </div>
         )}
 
-        <div className="flex min-h-[20rem] flex-1 flex-col p-3">
+        <div className="flex min-h-[20rem] w-full min-w-0 flex-1 flex-col p-3">
           <div className="mb-2 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setSidebarOpen(true)}
-                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 md:hidden"
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100"
                 aria-label="Chat history"
               >
                 ☰
@@ -301,9 +309,34 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
 
           <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
             <div className="space-y-3">
-              {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} />
-              ))}
+              {isStarterState && hasQuickPrompts ? (
+                <>
+                  {messages[0] ? (
+                    <MessageBubble key={messages[0].id} message={messages[0]} />
+                  ) : null}
+                  <div className="rounded-2xl border border-cyan-100 bg-cyan-50/90 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-800">
+                      Quick prompts
+                    </p>
+                    <div className="mt-3 flex flex-col gap-2">
+                      {starterPrompts.map((prompt) => (
+                        <button
+                          key={prompt}
+                          type="button"
+                          onClick={() => onQuickPrompt(prompt)}
+                          className="w-full rounded-full border border-cyan-200 bg-white px-4 py-2.5 text-left text-sm font-semibold text-cyan-800 transition hover:bg-cyan-100/80"
+                        >
+                          {prompt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                messages.map((msg) => (
+                  <MessageBubble key={msg.id} message={msg} />
+                ))
+              )}
 
               {loading && streamingContent && (
                 <div className="flex items-start gap-2">
@@ -372,7 +405,13 @@ function LiquAiChatPanel({ className = '', remountKey = 'default', bookTitle = '
   );
 }
 
-function SessionSidebar({ sessions, activeSessionId, onNew, onLoad, onDelete }) {
+function SessionSidebar({
+  sessions,
+  activeSessionId,
+  onNew,
+  onLoad,
+  onDelete,
+}) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div className="p-2">

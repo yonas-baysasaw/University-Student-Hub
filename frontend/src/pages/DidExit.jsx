@@ -27,7 +27,10 @@ function DidExit() {
   const [questions, setQuestions] = useState([]);
 
   const canGenerate = topic.trim().length > 0;
-  const title = mode === 'exit' ? 'Exit Exam Prep Generator' : 'Practice Question Generator';
+  const title =
+    mode === 'exit'
+      ? 'Exit Exam Prep Generator'
+      : 'Practice Question Generator';
 
   const tips = useMemo(
     () => [
@@ -35,7 +38,7 @@ function DidExit() {
       'Time yourself while answering to simulate exam pressure.',
       'Review weak topics and regenerate focused question sets.',
     ],
-    []
+    [],
   );
 
   const handleGenerate = () => {
@@ -43,7 +46,7 @@ function DidExit() {
     const trimmed = topic.trim();
     const normalizedCount = Math.min(Math.max(Number(count) || 5, 1), 20);
     const next = Array.from({ length: normalizedCount }, (_, index) =>
-      buildQuestion(trimmed, level, index, mode)
+      buildQuestion(trimmed, level, index, mode),
     );
     setQuestions(next);
     setGeneratedAt(new Date());
@@ -55,10 +58,15 @@ function DidExit() {
         <div className="panel-card rounded-3xl p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Liqu AI</p>
-              <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">did Exit</h1>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+                Liqu AI
+              </p>
+              <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">
+                did Exit
+              </h1>
               <p className="mt-2 text-sm text-slate-600">
-                Generate AI-style practice and exit-exam questions for fast preparation.
+                Generate AI-style practice and exit-exam questions for fast
+                preparation.
               </p>
             </div>
             <Link to="/liqu-ai" className="btn-secondary px-4 py-2 text-sm">
@@ -72,13 +80,17 @@ function DidExit() {
             <h2 className="font-display text-xl text-slate-900">{title}</h2>
             <div className="mt-3 space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Mode</label>
+                <p className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Mode
+                </p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setMode('practice')}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                      mode === 'practice' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      mode === 'practice'
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     Practice
@@ -87,7 +99,9 @@ function DidExit() {
                     type="button"
                     onClick={() => setMode('exit')}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold ${
-                      mode === 'exit' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      mode === 'exit'
+                        ? 'bg-cyan-600 text-white'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
                     Exit Exam
@@ -96,8 +110,14 @@ function DidExit() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Topic</label>
+                <label
+                  htmlFor="did-exit-topic"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Topic
+                </label>
                 <input
+                  id="did-exit-topic"
                   type="text"
                   value={topic}
                   onChange={(event) => setTopic(event.target.value)}
@@ -107,8 +127,18 @@ function DidExit() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Difficulty</label>
-                <select className="input-field text-sm" value={level} onChange={(event) => setLevel(event.target.value)}>
+                <label
+                  htmlFor="did-exit-difficulty"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Difficulty
+                </label>
+                <select
+                  id="did-exit-difficulty"
+                  className="input-field text-sm"
+                  value={level}
+                  onChange={(event) => setLevel(event.target.value)}
+                >
                   {levels.map((item) => (
                     <option key={item} value={item}>
                       {item}
@@ -118,8 +148,14 @@ function DidExit() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Question count</label>
+                <label
+                  htmlFor="did-exit-count"
+                  className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500"
+                >
+                  Question count
+                </label>
                 <input
+                  id="did-exit-count"
                   type="number"
                   min={1}
                   max={20}
@@ -140,7 +176,9 @@ function DidExit() {
             </div>
 
             <div className="mt-4 rounded-xl border border-cyan-100 bg-cyan-50 p-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700">Prep tips</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700">
+                Prep tips
+              </p>
               <ul className="mt-2 space-y-1 text-xs text-slate-600">
                 {tips.map((tip) => (
                   <li key={tip}>{tip}</li>
@@ -150,19 +188,27 @@ function DidExit() {
           </aside>
 
           <article className="panel-card rounded-2xl p-4">
-            <h3 className="font-display text-2xl text-slate-900">Generated questions</h3>
+            <h3 className="font-display text-2xl text-slate-900">
+              Generated questions
+            </h3>
             {generatedAt ? (
-              <p className="mt-1 text-xs text-slate-500">Generated: {generatedAt.toLocaleString()}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Generated: {generatedAt.toLocaleString()}
+              </p>
             ) : null}
 
             {questions.length === 0 ? (
               <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-white p-6 text-sm text-slate-500">
-                Enter a topic, choose settings, and generate your AI question set.
+                Enter a topic, choose settings, and generate your AI question
+                set.
               </div>
             ) : (
               <div className="mt-3 space-y-2">
                 {questions.map((question) => (
-                  <div key={question.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  <div
+                    key={question.id}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700"
+                  >
                     {question.prompt}
                   </div>
                 ))}

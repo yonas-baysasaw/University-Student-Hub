@@ -1,5 +1,8 @@
 import ChatSession from '../models/ChatSession.js';
-import { geminiService } from '../services/geminiService.js';
+import {
+  geminiService,
+  getGeminiServiceForUser,
+} from '../services/geminiService.js';
 
 // ── Chat (REST, non-streaming) ─────────────────────────────────────────────────
 
@@ -27,15 +30,7 @@ async function chatController(req, res, next) {
       }
     }
 
-    // Use BYOK if user has a key saved
-    let service = geminiService;
-    if (req.user.geminiApiKey) {
-      service = await geminiService.forUser(
-        req.user.geminiApiKey,
-        req.user.geminiModelId,
-      );
-    }
-
+    const service = await getGeminiServiceForUser(req.user);
     const responseText = await service.chat(messages);
 
     // Persist to session

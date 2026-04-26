@@ -20,7 +20,8 @@ export function mapBookToResource(book, index = 0) {
             ? book.views
             : 0,
     uploader: {
-      id: book?.uploader?.id || book?.uploader?._id || book?.userId?._id || null,
+      id:
+        book?.uploader?.id || book?.uploader?._id || book?.userId?._id || null,
       name:
         book?.uploader?.name ||
         book?.userId?.name ||
@@ -41,6 +42,10 @@ export async function fetchLibraryBooks(signal) {
   }
 
   const data = await res.json();
-  const books = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+  const books = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
   return books.map((book, index) => mapBookToResource(book, index));
 }

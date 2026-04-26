@@ -93,7 +93,9 @@ function ClassroomResourcesContent({ chatId, user }) {
         <ClassroomTabs />
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
-          <h3 className="font-display text-xl text-slate-900">Upload resource</h3>
+          <h3 className="font-display text-xl text-slate-900">
+            Upload resource
+          </h3>
           <p className="mt-1 text-sm text-slate-600">
             {instructor
               ? 'Only instructors can upload resources for this classroom.'
@@ -147,7 +149,9 @@ function ClassroomResourcesContent({ chatId, user }) {
                 key={item.id}
                 className="rounded-2xl border border-slate-200 bg-white p-4"
               >
-                <h4 className="font-display text-lg text-slate-900">{item.title}</h4>
+                <h4 className="font-display text-lg text-slate-900">
+                  {item.title}
+                </h4>
                 {item.link ? (
                   <a
                     href={item.link}
@@ -159,7 +163,9 @@ function ClassroomResourcesContent({ chatId, user }) {
                   </a>
                 ) : null}
                 {item.fileName ? (
-                  <p className="mt-1 text-sm text-slate-600">File: {item.fileName}</p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    File: {item.fileName}
+                  </p>
                 ) : null}
                 <p className="mt-2 text-xs text-slate-500">
                   Uploaded by {item.author} on{' '}

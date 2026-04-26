@@ -20,7 +20,10 @@ async function createPdfThumbnailBuffer(fileBuffer) {
     const scale = targetWidth / baseViewport.width;
     const viewport = page.getViewport({ scale });
 
-    const canvas = createCanvas(Math.round(viewport.width), Math.round(viewport.height));
+    const canvas = createCanvas(
+      Math.round(viewport.width),
+      Math.round(viewport.height),
+    );
     const context = canvas.getContext('2d');
 
     await page.render({
