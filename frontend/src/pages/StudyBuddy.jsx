@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
+import ReadAlongPanel from '../components/ReadAlongPanel';
 import { fetchLibraryBooks } from '../utils/books';
+
+const READ_ALONG_PIN_KEY = 'studyBuddy.readAlongPinned';
 
 const starterPrompts = [
   'Summarize this chapter in simple terms.',
@@ -10,6 +13,15 @@ const starterPrompts = [
   'Explain this as if I am preparing for an exam.',
 ];
 
+function readInitialPin() {
+  if (typeof window === 'undefined') return false;
+  try {
+    return window.localStorage.getItem(READ_ALONG_PIN_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
 function StudyBuddy() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -17,6 +29,8 @@ function StudyBuddy() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedBookId, setSelectedBookId] = useState('');
+  const [readAlongOpen, setReadAlongOpen] = useState(false);
+  const [readAlongPinned, setReadAlongPinned] = useState(readInitialPin);
 
   useEffect(() => {
     let active = true;
@@ -68,8 +82,95 @@ function StudyBuddy() {
     [navigate],
   );
 
+  const setPinned = useCallback((value) => {
+    setReadAlongPinned(value);
+    try {
+      if (value) {
+        window.localStorage.setItem(READ_ALONG_PIN_KEY, '1');
+      } else {
+        window.localStorage.removeItem(READ_ALONG_PIN_KEY);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const openReadAlong = useCallback(() => {
+    if (readAlongPinned) return;
+    setReadAlongOpen(true);
+  }, [readAlongPinned]);
+
+  const closeReadAlongOverlay = useCallback(() => {
+    setReadAlongOpen(false);
+  }, []);
+
+  const handlePin = useCallback(() => {
+    setPinned(true);
+    setReadAlongOpen(false);
+  }, [setPinned]);
+
+  const handleUnpin = useCallback(() => {
+    setPinned(false);
+  }, [setPinned]);
+
+  const readAlongPanelProps = {
+    books,
+    selectedBookId,
+    onBookIdChange: setSelectedBookId,
+    selectedBook,
+  };
+
   return (
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
+      {readAlongOpen && !readAlongPinned ? (
+        <div
+          className="fixed inset-0 z-[135] flex justify-end"
+          role="presentation"
+        >
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-black/40"
+            aria-label="Close read along"
+            onClick={closeReadAlongOverlay}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="read-along-dialog-title"
+            className="relative z-10 flex h-full w-full max-w-md flex-col bg-white shadow-2xl"
+          >
+            <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+              <h2
+                id="read-along-dialog-title"
+                className="font-display text-lg text-slate-900"
+              >
+                Read alongside AI
+              </h2>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={handlePin}
+                  className="rounded-full px-2.5 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-50"
+                >
+                  Pin
+                </button>
+                <button
+                  type="button"
+                  onClick={closeReadAlongOverlay}
+                  className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4">
+              <ReadAlongPanel {...readAlongPanelProps} showPageTitle={false} />
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <section className="mx-auto max-w-6xl space-y-5">
         <div className="panel-card rounded-3xl p-6 md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -99,11 +200,36 @@ function StudyBuddy() {
             {error}
           </div>
         ) : (
-          <div className="grid min-h-0 gap-4 lg:grid-cols-2">
+          <div
+            className={
+              readAlongPinned
+                ? 'grid min-h-0 gap-4 lg:grid-cols-2'
+                : 'grid min-h-0 grid-cols-1 gap-4'
+            }
+          >
             <article className="panel-card flex min-h-[28rem] flex-col rounded-2xl p-3">
-              <h3 className="mb-2 font-display text-xl text-slate-900">
-                AI study chat
-              </h3>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <h3 className="font-display text-xl text-slate-900">
+                  AI study chat
+                </h3>
+                {readAlongPinned ? (
+                  <button
+                    type="button"
+                    onClick={handleUnpin}
+                    className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    Unpin read along
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openReadAlong}
+                    className="shrink-0 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-semibold text-cyan-800 hover:bg-cyan-100"
+                  >
+                    Read along
+                  </button>
+                )}
+              </div>
               <div className="min-h-0 flex-1">
                 <LiquAiChatPanel
                   key={selectedBookId ?? 'no-book'}
@@ -114,79 +240,11 @@ function StudyBuddy() {
               </div>
             </article>
 
-            <article className="panel-card rounded-2xl p-4">
-              <h3 className="font-display text-xl text-slate-900">
-                Read alongside AI
-              </h3>
-
-              <div className="mt-3 border-b border-slate-100 pb-4">
-                <h4 className="font-display text-lg text-slate-900">
-                  Books from Library
-                </h4>
-                <p className="mt-1 text-xs text-slate-500">
-                  Choose a book to feed into Study buddy.
-                </p>
-                <select
-                  className="input-field mt-3 w-full text-sm"
-                  value={selectedBookId}
-                  onChange={(event) => setSelectedBookId(event.target.value)}
-                >
-                  {books.map((book) => {
-                    const value = String(book.bookId || book.id);
-                    return (
-                      <option key={value} value={value}>
-                        {book.title}
-                      </option>
-                    );
-                  })}
-                </select>
-
-                {selectedBook ? (
-                  <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-                    <p className="text-sm font-semibold text-slate-800">
-                      {selectedBook.title}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {selectedBook.description ||
-                        'No description for this book.'}
-                    </p>
-                    {selectedBook.bookId ? (
-                      <Link
-                        to={`/library/${selectedBook.bookId}`}
-                        className="mt-2 inline-block text-xs font-semibold text-cyan-700 hover:underline"
-                      >
-                        Open detail page
-                      </Link>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="pt-4">
-                {selectedBook?.bookUrl ? (
-                  <>
-                    <a
-                      href={selectedBook.bookUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-block text-xs font-semibold text-cyan-700 hover:underline"
-                    >
-                      Open book in new tab
-                    </a>
-                    <iframe
-                      src={selectedBook.bookUrl}
-                      title={`${selectedBook.title} reader`}
-                      className="mt-3 h-[24rem] w-full rounded-xl border border-slate-200 bg-white"
-                    />
-                  </>
-                ) : (
-                  <div className="flex h-[24rem] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white text-sm text-slate-500">
-                    This book has no attached file URL yet. Choose another book
-                    from Library.
-                  </div>
-                )}
-              </div>
-            </article>
+            {readAlongPinned ? (
+              <article className="panel-card flex min-h-[28rem] flex-col rounded-2xl p-4">
+                <ReadAlongPanel {...readAlongPanelProps} showPageTitle />
+              </article>
+            ) : null}
           </div>
         )}
       </section>

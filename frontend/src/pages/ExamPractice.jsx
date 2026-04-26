@@ -738,7 +738,7 @@ function ExplanationBlock({ question, navigate }) {
       <button
         type="button"
         onClick={() =>
-          navigate('/liqu-ai', {
+          navigate('/liqu-ai/study-buddy', {
             state: {
               prefill: `Explain this exam question in detail:\n\nQuestion: ${question.question}\n\nCorrect Answer: ${question.options[question.correctAnswer]}\n\nOriginal Explanation: ${question.explanation}\n\nPlease provide a deeper explanation with examples.`,
             },
