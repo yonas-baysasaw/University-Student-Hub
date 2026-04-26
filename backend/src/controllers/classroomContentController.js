@@ -5,6 +5,7 @@ import { s3Client } from '../config/s3Client.js';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import ClassroomAnnouncement from '../models/ClassroomAnnouncement.js';
 import ClassroomResource from '../models/ClassroomResource.js';
+import { notifyClassroomMembersOfAnnouncement } from '../services/announcementEmailService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 import {
   canManageClassroomContent,
@@ -94,6 +95,20 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
     body,
     createdBy: req.user._id,
     authorName: authorLabel(req.user),
+  });
+
+  void notifyClassroomMembersOfAnnouncement({
+    classroomName: chat.name,
+    chatId: String(chatId),
+    authorUserId: req.user._id,
+    memberIds: chat.members,
+    announcement: {
+      title: created.title,
+      body: created.body,
+      authorName: created.authorName,
+    },
+  }).catch((err) => {
+    console.error('[createAnnouncement] announcement email notify failed', err);
   });
 
   return res.status(201).json({
