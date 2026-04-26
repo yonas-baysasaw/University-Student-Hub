@@ -6,11 +6,19 @@ import { fetchLibraryBooks } from '../utils/books';
 
 const READ_ALONG_PIN_KEY = 'studyBuddy.readAlongPinned';
 
-const starterPrompts = [
+const starterPromptsWithBook = [
   'Summarize this chapter in simple terms.',
   'List the key definitions from this book.',
   'Give me 5 review questions from what I am reading.',
   'Explain this as if I am preparing for an exam.',
+];
+
+/** Shown when no library book is selected: campus hub / classroom context (max 4). */
+const starterPromptsNoBook = [
+  'Help me catch up: what to look for in new classroom announcements and what to do first.',
+  'A new file or resource was added in class—how should I skim it, take notes, and what should I ask?',
+  'Puzzle together announcements, new uploads, and due dates for my classes this week in one plan.',
+  'I might have missed an update: what should I double-check in announcements, resources, and assignments?',
 ];
 
 function readInitialPin() {
@@ -44,14 +52,15 @@ function StudyBuddy() {
         setBooks(loaded);
 
         const fromQuery = searchParams.get('bookId');
-        const matched = fromQuery
-          ? loaded.find(
-              (book) => String(book.bookId || book.id) === String(fromQuery),
-            )
-          : null;
-        const initialBook = matched || loaded[0];
-        if (initialBook) {
-          setSelectedBookId(String(initialBook.bookId || initialBook.id));
+        if (fromQuery) {
+          const matched = loaded.find(
+            (book) => String(book.bookId || book.id) === String(fromQuery),
+          );
+          setSelectedBookId(
+            matched ? String(matched.bookId || matched.id) : '',
+          );
+        } else {
+          setSelectedBookId('');
         }
       } catch (loadError) {
         if (!active) return;
@@ -73,6 +82,11 @@ function StudyBuddy() {
         (book) => String(book.bookId || book.id) === String(selectedBookId),
       ),
     [books, selectedBookId],
+  );
+
+  const starterPrompts = useMemo(
+    () => (selectedBookId ? starterPromptsWithBook : starterPromptsNoBook),
+    [selectedBookId],
   );
 
   const onQuickPrompt = useCallback(
@@ -232,7 +246,7 @@ function StudyBuddy() {
               </div>
               <div className="min-h-0 flex-1">
                 <LiquAiChatPanel
-                  key={selectedBookId ?? 'no-book'}
+                  key={selectedBookId || 'no-book'}
                   bookTitle={selectedBook?.title ?? ''}
                   starterPrompts={starterPrompts}
                   onQuickPrompt={onQuickPrompt}

@@ -38,6 +38,7 @@ function ReadAlongPanel({
           value={selectedBookId}
           onChange={(event) => onBookIdChange(event.target.value)}
         >
+          <option value="">No book (general chat)</option>
           {books.map((book) => {
             const value = String(book.bookId || book.id);
             return (
