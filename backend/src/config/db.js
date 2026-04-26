@@ -4,7 +4,9 @@ import { ENV } from './env.js';
 const connectDB = async () => {
   const mongoUri = ENV.MONGODB_URI || ENV.MONGODB_URL;
   if (!mongoUri) {
-    console.error('MongoDB connection string (MONGODB_URI or MONGODB_URL) is missing');
+    console.error(
+      'MongoDB connection string (MONGODB_URI or MONGODB_URL) is missing',
+    );
     process.exit(1);
   }
 

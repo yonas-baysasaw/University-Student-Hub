@@ -1,12 +1,12 @@
 import { ENV } from '../config/env.js';
 
-export const notFound = (req, res, next) => {
+export const notFound = (req, _res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   error.status = 404;
   next(error);
 };
 
-export const errorHandler = (err, req, res, next) => {
+export const errorHandler = (err, _req, res, _next) => {
   const status = err.status || 500;
   const response = {
     message: err.message || 'Internal server error',

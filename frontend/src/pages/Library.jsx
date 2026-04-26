@@ -1,5 +1,4 @@
-import { useMemo, useState } from 'react';
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { fetchLibraryBooks } from '../utils/books';
@@ -45,8 +44,11 @@ function Library() {
   const [favorites, setFavorites] = useState([]);
 
   const categories = useMemo(
-    () => ['All', ...Array.from(new Set(resources.map((item) => item.category)))],
-    [resources]
+    () => [
+      'All',
+      ...Array.from(new Set(resources.map((item) => item.category))),
+    ],
+    [resources],
   );
 
   const filteredResources = useMemo(() => {
@@ -63,7 +65,9 @@ function Library() {
   }, [filter, query, resources]);
 
   const toggleFavorite = (id) => {
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]));
+    setFavorites((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
   };
 
   const formatDate = (value) => {
@@ -77,10 +81,15 @@ function Library() {
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
       <section className="mx-auto max-w-6xl space-y-5">
         <div className="panel-card rounded-3xl p-6 md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">Library</p>
-          <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">Find learning resources faster</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+            Library
+          </p>
+          <h1 className="mt-2 font-display text-3xl text-slate-900 md:text-4xl">
+            Find learning resources faster
+          </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 md:text-base">
-            Search and filter resources instantly, and mark important materials as favorites for quick access.
+            Search and filter resources instantly, and mark important materials
+            as favorites for quick access.
           </p>
 
           <div className="mt-5 grid gap-3 md:grid-cols-[1fr_auto]">
@@ -91,7 +100,11 @@ function Library() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <select className="input-field text-sm md:w-56" value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <select
+              className="input-field text-sm md:w-56"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+            >
               {categories.map((category) => (
                 <option key={category} value={category}>
                   {category}
@@ -118,10 +131,17 @@ function Library() {
             filteredResources.map((item) => {
               const isFavorite = favorites.includes(item.id);
               return (
-                <article key={item.id} className="panel-card fade-in-up rounded-2xl p-5">
+                <article
+                  key={item.id}
+                  className="panel-card fade-in-up rounded-2xl p-5"
+                >
                   <div className="mb-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
                     {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt={`${item.title} cover`} className="h-44 w-full object-cover" />
+                      <img
+                        src={item.thumbnailUrl}
+                        alt={`${item.title} cover`}
+                        className="h-44 w-full object-cover"
+                      />
                     ) : (
                       <div className="flex h-44 w-full items-center justify-center text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                         No cover
@@ -129,11 +149,15 @@ function Library() {
                     )}
                   </div>
                   <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-display text-xl text-slate-900">{item.title}</h2>
+                    <h2 className="font-display text-xl text-slate-900">
+                      {item.title}
+                    </h2>
                     <button
                       type="button"
                       className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                        isFavorite ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                        isFavorite
+                          ? 'bg-amber-100 text-amber-700'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                       }`}
                       onClick={() => toggleFavorite(item.id)}
                     >
@@ -141,24 +165,39 @@ function Library() {
                     </button>
                   </div>
                   <p className="mt-3 text-sm text-slate-600">
-                    Category: <span className="font-semibold text-slate-700">{item.category}</span>
+                    Category:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.category}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Format: <span className="font-semibold text-slate-700">{item.type}</span>
+                    Format:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.type}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Visibility: <span className="font-semibold text-slate-700">{item.level}</span>
+                    Visibility:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.level}
+                    </span>
                   </p>
                   <div className="mt-2 flex items-center gap-2">
                     {item.uploader.id ? (
-                      <Link to={`/users/${item.uploader.id}`} className="inline-flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-100">
+                      <Link
+                        to={`/users/${item.uploader.id}`}
+                        className="inline-flex items-center gap-2 rounded-lg px-1 py-1 hover:bg-slate-100"
+                      >
                         <img
                           src={item.uploader.avatar || defaultProfile}
                           alt={`${item.uploader.name} avatar`}
                           className="h-8 w-8 rounded-full border border-slate-200 object-cover"
                         />
                         <p className="text-sm text-slate-600">
-                          Uploaded by: <span className="font-semibold text-cyan-700 hover:underline">{item.uploader.name}</span>
+                          Uploaded by:{' '}
+                          <span className="font-semibold text-cyan-700 hover:underline">
+                            {item.uploader.name}
+                          </span>
                         </p>
                       </Link>
                     ) : (
@@ -169,35 +208,63 @@ function Library() {
                           className="h-8 w-8 rounded-full border border-slate-200 object-cover"
                         />
                         <p className="text-sm text-slate-600">
-                          Uploaded by: <span className="font-semibold text-slate-700">{item.uploader.name}</span>
+                          Uploaded by:{' '}
+                          <span className="font-semibold text-slate-700">
+                            {item.uploader.name}
+                          </span>
                         </p>
                       </>
                     )}
                   </div>
                   <p className="text-sm text-slate-600">
-                    Likes: <span className="font-semibold text-slate-700">{item.likesCount}</span>
+                    Likes:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.likesCount}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Downloads: <span className="font-semibold text-slate-700">{item.downloadsCount}</span>
+                    Downloads:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {item.downloadsCount}
+                    </span>
                   </p>
                   <p className="text-sm text-slate-600">
-                    Uploaded: <span className="font-semibold text-slate-700">{formatDate(item.createdAt)}</span>
+                    Uploaded:{' '}
+                    <span className="font-semibold text-slate-700">
+                      {formatDate(item.createdAt)}
+                    </span>
                   </p>
-                  {item.description ? <p className="mt-2 text-sm text-slate-600">{item.description}</p> : null}
-                  {item.bookId ? (
+                  {item.description ? (
+                    <p className="mt-2 text-sm text-slate-600">{item.description}</p>
+                  ) : null}
+                  {item.bookUrl || item.bookId ? (
                     <div className="mt-3 flex flex-wrap gap-2">
-                      <Link
-                        to={`/library/${item.bookId}`}
-                        className="inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
-                      >
-                        See detail page
-                      </Link>
-                      <Link
-                        to={`/liqu-ai/study-buddy?bookId=${item.bookId}`}
-                        className="inline-block rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"
-                      >
-                        Study with Liqu AI
-                      </Link>
+                      {item.bookUrl ? (
+                        <a
+                          href={item.bookUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-block rounded-lg border border-cyan-200 bg-white px-3 py-1.5 text-sm font-semibold text-cyan-800 hover:bg-cyan-50"
+                        >
+                          Open file
+                        </a>
+                      ) : null}
+                      {item.bookId ? (
+                        <>
+                          <Link
+                            to={`/library/${item.bookId}`}
+                            className="inline-block rounded-lg bg-cyan-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-cyan-700"
+                          >
+                            See detail page
+                          </Link>
+                          <Link
+                            to={`/liqu-ai/study-buddy?bookId=${item.bookId}`}
+                            className="inline-block rounded-lg bg-slate-900 px-3 py-1.5 text-sm font-semibold text-white hover:bg-slate-800"
+                          >
+                            Study with Liqu AI
+                          </Link>
+                        </>
+                      ) : null}
                     </div>
                   ) : null}
                 </article>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import { fetchLibraryBooks } from '../utils/books';
 
 const starterPrompts = [
@@ -9,40 +10,13 @@ const starterPrompts = [
   'Explain this as if I am preparing for an exam.',
 ];
 
-function createAssistantReply(input, book) {
-  const normalized = input.trim().toLowerCase();
-  const title = book?.title || 'this book';
-  const description = book?.description || 'No description is available yet.';
-
-  if (normalized.includes('summary') || normalized.includes('summarize')) {
-    return `Summary for "${title}": ${description}`;
-  }
-
-  if (normalized.includes('question')) {
-    return `Practice questions for "${title}":\n1. What are the core ideas discussed?\n2. Which concept is most important for exams?\n3. How would you apply one key idea in a real scenario?`;
-  }
-
-  if (normalized.includes('key') || normalized.includes('point')) {
-    return `Key points from "${title}":\n- Identify the main theme.\n- Track important terms and examples.\n- Connect ideas to your class notes.`;
-  }
-
-  return `Let's study "${title}" together. Ask for a summary, key points, or quiz questions and I will guide you through it while you read.`;
-}
-
 function StudyBuddy() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedBookId, setSelectedBookId] = useState('');
-  const [draft, setDraft] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: 'Welcome to Study buddy. Pick a library book to start reading with AI support.',
-    },
-  ]);
 
   useEffect(() => {
     let active = true;
@@ -56,7 +30,9 @@ function StudyBuddy() {
         setBooks(loaded);
 
         const fromQuery = searchParams.get('bookId');
-        const matched = fromQuery ? loaded.find((book) => String(book.bookId || book.id) === String(fromQuery)) : null;
+        const matched = fromQuery
+          ? loaded.find((book) => String(book.bookId || book.id) === String(fromQuery))
+          : null;
         const initialBook = matched || loaded[0];
         if (initialBook) {
           setSelectedBookId(String(initialBook.bookId || initialBook.id));
@@ -77,24 +53,11 @@ function StudyBuddy() {
 
   const selectedBook = useMemo(
     () => books.find((book) => String(book.bookId || book.id) === String(selectedBookId)),
-    [books, selectedBookId]
+    [books, selectedBookId],
   );
 
-  const sendMessage = text => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-
-    setMessages((prev) => [
-      ...prev,
-      { id: `u-${Date.now()}`, role: 'user', text: trimmed },
-      { id: `a-${Date.now()}-${Math.random()}`, role: 'assistant', text: createAssistantReply(trimmed, selectedBook) },
-    ]);
-  };
-
-  const handleSubmit = event => {
-    event.preventDefault();
-    sendMessage(draft);
-    setDraft('');
+  const applyQuickPrompt = (prompt) => {
+    navigate('.', { state: { prefill: prompt }, replace: true });
   };
 
   return (
@@ -140,9 +103,14 @@ function StudyBuddy() {
               {selectedBook ? (
                 <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
                   <p className="text-sm font-semibold text-slate-800">{selectedBook.title}</p>
-                  <p className="mt-1 text-xs text-slate-500">{selectedBook.description || 'No description for this book.'}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {selectedBook.description || 'No description for this book.'}
+                  </p>
                   {selectedBook.bookId ? (
-                    <Link to={`/library/${selectedBook.bookId}`} className="mt-2 inline-block text-xs font-semibold text-cyan-700 hover:underline">
+                    <Link
+                      to={`/library/${selectedBook.bookId}`}
+                      className="mt-2 inline-block text-xs font-semibold text-cyan-700 hover:underline"
+                    >
                       Open detail page
                     </Link>
                   ) : null}
@@ -156,7 +124,7 @@ function StudyBuddy() {
                     <button
                       key={prompt}
                       type="button"
-                      onClick={() => sendMessage(prompt)}
+                      onClick={() => applyQuickPrompt(prompt)}
                       className="rounded-full border border-cyan-200 bg-white px-3 py-1 text-xs font-semibold text-cyan-700 hover:bg-cyan-100"
                     >
                       {prompt}
@@ -166,37 +134,15 @@ function StudyBuddy() {
               </div>
             </aside>
 
-            <div className="grid gap-4 xl:grid-cols-2">
-              <article className="panel-card rounded-2xl p-4">
-                <h3 className="font-display text-xl text-slate-900">AI study chat</h3>
-                <div className="mt-3 h-[24rem] overflow-y-auto rounded-xl border border-slate-200 bg-white p-3">
-                  <div className="space-y-2">
-                    {messages.map((message) => (
-                      <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <p
-                          className={`max-w-[90%] whitespace-pre-line rounded-xl px-3 py-2 text-sm ${
-                            message.role === 'user' ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {message.text}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <form onSubmit={handleSubmit} className="mt-3 flex gap-2">
-                  <input
-                    type="text"
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    placeholder="Ask Study buddy about this book..."
-                    className="input-field text-sm"
+            <div className="grid min-h-0 gap-4 xl:grid-cols-2">
+              <article className="panel-card flex min-h-[28rem] flex-col rounded-2xl p-3">
+                <h3 className="mb-2 font-display text-xl text-slate-900">AI study chat</h3>
+                <div className="min-h-0 flex-1">
+                  <LiquAiChatPanel
+                    remountKey={selectedBookId}
+                    bookTitle={selectedBook?.title ?? ''}
                   />
-                  <button type="submit" className="btn-primary px-4 py-2 text-sm">
-                    Send
-                  </button>
-                </form>
+                </div>
               </article>
 
               <article className="panel-card rounded-2xl p-4">

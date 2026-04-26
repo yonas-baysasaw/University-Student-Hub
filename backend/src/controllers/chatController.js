@@ -1,15 +1,18 @@
+import { customAlphabet } from 'nanoid';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
-import asyncHandler from '../middlewares/asyncHandler.js';
-import { customAlphabet } from 'nanoid';
 
-const forbidden = message => {
+const forbidden = (message) => {
   const err = new Error(message);
   err.status = 403;
   return err;
 };
 
-const invitationGenerator = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789', 8);
+const invitationGenerator = customAlphabet(
+  'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
+  8,
+);
 
 const ensureInvitationCode = async () => {
   for (let i = 0; i < 5; i += 1) {
@@ -28,7 +31,7 @@ export const createChat = asyncHandler(async (req, res) => {
   }
 
   const { name } = req.body;
-  console.log("hi")
+  console.log('hi');
   if (!name?.trim()) {
     const error = new Error('Chat name is required');
     error.status = 400;
@@ -49,7 +52,7 @@ export const createChat = asyncHandler(async (req, res) => {
 });
 
 export const joinChatByCode = asyncHandler(async (req, res) => {
-  console.log(req.body)
+  console.log(req.body);
   if (!req.body) {
     const error = new Error('Request body is missing');
     error.status = 400;
@@ -70,7 +73,7 @@ export const joinChatByCode = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  if (chat.members.some(member => member.equals(req.user._id))) {
+  if (chat.members.some((member) => member.equals(req.user._id))) {
     return res.json(chat);
   }
 
@@ -86,7 +89,10 @@ export const getUserChats = asyncHandler(async (req, res) => {
   const parsedLimit = Math.min(Math.max(Number(limit) || 20, 5), 100);
   const skip = (parsedPage - 1) * parsedLimit;
 
-  const baseFilter = createdByMe === 'true' ? { creator: req.user._id } : { members: req.user._id };
+  const baseFilter =
+    createdByMe === 'true'
+      ? { creator: req.user._id }
+      : { members: req.user._id };
   const [total, chats] = await Promise.all([
     Chat.countDocuments(baseFilter),
     Chat.find(baseFilter)
@@ -122,7 +128,7 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     throw new Error('Chat not found');
   }
 
-  const isMember = chat.members.some(member => member.equals(req.user._id));
+  const isMember = chat.members.some((member) => member.equals(req.user._id));
   if (!isMember) {
     throw forbidden('You are not part of this chat');
   }
@@ -168,7 +174,7 @@ export const sendMessage = asyncHandler(async (req, res) => {
     throw error;
   }
 
-  const isMember = chat.members.some(member => member.equals(req.user._id));
+  const isMember = chat.members.some((member) => member.equals(req.user._id));
   if (!isMember) {
     throw forbidden('You are not part of this chat');
   }
@@ -185,7 +191,10 @@ export const sendMessage = asyncHandler(async (req, res) => {
   chat.lastMessage = message._id;
   await chat.save();
 
-  const populated = await message.populate('sender', 'username email avatar photo');
+  const populated = await message.populate(
+    'sender',
+    'username email avatar photo',
+  );
 
   res.status(201).json({ message: populated });
 });

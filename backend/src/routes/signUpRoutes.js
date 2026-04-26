@@ -11,7 +11,7 @@ router.post(
     const { username, email, password } = req.body;
     const user = await createLocalUser({ username, email, password });
     res.status(201).json({ user: toPublicUser(user) });
-  })
+  }),
 );
 
 export default router;

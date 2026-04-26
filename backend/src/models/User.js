@@ -7,8 +7,8 @@ const userSchema = new mongoose.Schema(
       trim: true,
       index: true,
     },
-    name:{
-      type:String,
+    name: {
+      type: String,
     },
     email: {
       type: String,
@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema(
     avatar: {
       type: String,
     },
-    email_verified:{
+    email_verified: {
       type: Boolean,
       default: false,
     },
@@ -44,8 +44,16 @@ const userSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    geminiApiKey: {
+      type: String,
+      default: '',
+    },
+    geminiModelId: {
+      type: String,
+      default: '',
+    },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 userSchema.methods.toJSON = function () {

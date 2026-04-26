@@ -1,10 +1,15 @@
-import { getMemberName } from '../utils/classroom';
 import defaultProfile from '../assets/profile.png';
+import { getMemberName } from '../utils/classroom';
+
 function ClassroomMembersSidebar({ members, membersError, user, className = '' }) {
   return (
-    <aside className={`h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24 ${className}`}>
+    <aside
+      className={`h-fit rounded-2xl border border-cyan-100 bg-white p-4 shadow-sm lg:sticky lg:top-24 ${className}`}
+    >
       <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-        <p className="text-[11px] uppercase tracking-[0.16em] text-cyan-200">Class Members</p>
+        <p className="text-[11px] uppercase tracking-[0.16em] text-cyan-200">
+          Class Members
+        </p>
         <h3 className="mt-1 font-display text-xl">Participants</h3>
         <p className="mt-1 text-xs text-slate-200">
           {members.length} {members.length === 1 ? 'member' : 'members'}
@@ -23,12 +28,13 @@ function ClassroomMembersSidebar({ members, membersError, user, className = '' }
             const name = getMemberName(member);
             const id = member?._id ?? member?.id ?? name;
             const isYou = id && (id === user?._id || id === user?.id);
-            const avatar =
-              member?.avatar ||
-              member?.photo || defaultProfile
+            const avatar = member?.avatar || member?.photo || defaultProfile;
 
             return (
-              <article key={id} className="rounded-xl border border-slate-200 bg-white p-2.5">
+              <article
+                key={id}
+                className="rounded-xl border border-slate-200 bg-white p-2.5"
+              >
                 <div className="flex items-center gap-2">
                   <img
                     src={avatar}

@@ -1,5 +1,5 @@
-import { FaGoogle } from 'react-icons/fa';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { FaGoogle } from 'react-icons/fa';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import { getPasswordStrength } from '../utils/passwordStrength';
@@ -17,9 +17,12 @@ function Signup() {
   const successTimer = useRef();
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
-  useEffect(() => () => {
-    if (successTimer.current) clearTimeout(successTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (successTimer.current) clearTimeout(successTimer.current);
+    },
+    [],
+  );
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -43,7 +46,7 @@ function Signup() {
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, email, password })
+        body: JSON.stringify({ username, email, password }),
       });
 
       if (!res.ok) {
@@ -56,7 +59,10 @@ function Signup() {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
-      successTimer.current = setTimeout(() => navigate('/login', { replace: true }), 1200);
+      successTimer.current = setTimeout(
+        () => navigate('/login', { replace: true }),
+        1200,
+      );
     } catch (submitError) {
       console.error(submitError);
       setError(submitError?.message || 'Something went wrong, try again.');
@@ -67,13 +73,27 @@ function Signup() {
     <AuthShell title="Create account" subtitle="Set up your student workspace">
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         {(error || success) && (
-          <div className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}>
+          <div
+            className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
+          >
             {error || success}
           </div>
         )}
 
-        <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} className="input-field text-sm" />
-        <input type="email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} className="input-field text-sm" />
+        <input
+          type="text"
+          placeholder="Username"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          className="input-field text-sm"
+        />
+        <input
+          type="email"
+          placeholder="Email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="input-field text-sm"
+        />
 
         <div className="relative">
           <input
@@ -95,9 +115,14 @@ function Signup() {
 
         <div>
           <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div className={`h-full rounded-full transition-all ${strength.color}`} style={{ width: `${Math.max(8, strength.score * 20)}%` }} />
+            <div
+              className={`h-full rounded-full transition-all ${strength.color}`}
+              style={{ width: `${Math.max(8, strength.score * 20)}%` }}
+            />
           </div>
-          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>Password strength: {strength.label}</p>
+          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>
+            Password strength: {strength.label}
+          </p>
         </div>
 
         <div className="relative">
@@ -125,14 +150,19 @@ function Signup() {
 
       <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
         <span>Already have an account?</span>
-        <Link to="/login" className="font-medium transition hover:text-slate-700 hover:underline">
+        <Link
+          to="/login"
+          className="font-medium transition hover:text-slate-700 hover:underline"
+        >
           Sign in
         </Link>
       </div>
 
       <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-slate-200" />
-        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">or continue with</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+          or continue with
+        </span>
         <div className="h-px flex-1 bg-slate-200" />
       </div>
 

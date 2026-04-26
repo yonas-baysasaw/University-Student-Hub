@@ -8,7 +8,7 @@ function ClassroomTabs() {
   const tabs = [
     { label: 'Discussion Room', to: basePath, end: true },
     { label: 'Announcements', to: `${basePath}/announcements` },
-    { label: 'Resources', to: `${basePath}/resources` }
+    { label: 'Resources', to: `${basePath}/resources` },
   ];
 
   return (

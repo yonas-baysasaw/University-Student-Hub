@@ -1,23 +1,29 @@
 import { Server } from 'socket.io';
+import { ENV } from '../config/env.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import {
+  getOnlineUsers,
+  markOffline,
+  markOnline,
+} from '../services/presenceService.js';
 import { authenticateSocket } from './middleware/jwt.js';
-import { markOnline, markOffline, getOnlineUsers } from '../services/presenceService.js';
-import { ENV } from '../config/env.js';
 
-const getMemberIds = chat => chat.members.map(member => member.toString());
+const _getMemberIds = (chat) => chat.members.map((member) => member.toString());
 
 const shouldJoinChat = (chat, userId) => {
-  return chat?.members?.some(member => member.toString() === userId);
+  return chat?.members?.some((member) => member.toString() === userId);
 };
 
-const sanitizeMessage = message => ({
+const sanitizeMessage = (message) => ({
   ...message.toObject(),
   id: message._id,
 });
 
 let io;
+
+export const getIo = () => io;
 
 export const initSocketServer = async (server, sessionMiddleware) => {
   io = new Server(server, {
@@ -31,19 +37,18 @@ export const initSocketServer = async (server, sessionMiddleware) => {
   if (sessionMiddleware) {
     io.use((socket, next) => {
       const req = socket.request;
-      const res =
-        req.res || {
-          getHeader: () => undefined,
-          setHeader: () => undefined,
-          writeHead: () => undefined,
-        };
+      const res = req.res || {
+        getHeader: () => undefined,
+        setHeader: () => undefined,
+        writeHead: () => undefined,
+      };
       sessionMiddleware(req, res, next);
     });
   }
 
   io.use(authenticateSocket);
 
-  io.on('connection', socket => {
+  io.on('connection', (socket) => {
     const { user } = socket;
 
     (async () => {
@@ -63,8 +68,13 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           return;
         }
 
-        const chats = await Chat.find({ _id: { $in: chatIds }, members: user._id }, '_id');
-        chats.forEach(chat => socket.join(chat.id));
+        const chats = await Chat.find(
+          { _id: { $in: chatIds }, members: user._id },
+          '_id',
+        );
+        for (const chat of chats) {
+          socket.join(chat.id);
+        }
       } catch (error) {
         socket.emit('error', { message: error.message });
       }
@@ -89,35 +99,41 @@ export const initSocketServer = async (server, sessionMiddleware) => {
       }
     });
 
-    socket.on('sendMessage', async ({ chatId, content, messageType = 'text', fileUrl }) => {
-      try {
-        if (!chatId) {
-          throw new Error('Chat id is required');
+    socket.on(
+      'sendMessage',
+      async ({ chatId, content, messageType = 'text', fileUrl }) => {
+        try {
+          if (!chatId) {
+            throw new Error('Chat id is required');
+          }
+
+          const chat = await Chat.findById(chatId).select('members');
+          if (!shouldJoinChat(chat, user.id)) {
+            throw new Error('You are not a member of this chat');
+          }
+
+          const message = await Message.create({
+            chat: chatId,
+            sender: user._id,
+            content,
+            messageType,
+            fileUrl,
+            readBy: [user._id],
+          });
+
+          chat.lastMessage = message._id;
+          await chat.save();
+
+          const populated = await message.populate(
+            'sender',
+            'username email avatar photo',
+          );
+          io.to(chatId).emit('message', sanitizeMessage(populated));
+        } catch (error) {
+          socket.emit('error', { message: error.message });
         }
-
-        const chat = await Chat.findById(chatId).select('members');
-        if (!shouldJoinChat(chat, user.id)) {
-          throw new Error('You are not a member of this chat');
-        }
-
-        const message = await Message.create({
-          chat: chatId,
-          sender: user._id,
-          content,
-          messageType,
-          fileUrl,
-          readBy: [user._id],
-        });
-
-        chat.lastMessage = message._id;
-        await chat.save();
-
-        const populated = await message.populate('sender', 'username email avatar photo');
-        io.to(chatId).emit('message', sanitizeMessage(populated));
-      } catch (error) {
-        socket.emit('error', { message: error.message });
-      }
-    });
+      },
+    );
 
     socket.on('typing', ({ chatId }) => {
       if (!chatId) {
@@ -149,7 +165,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
 
         await Message.updateMany(
           { chat: chatId, readBy: { $ne: user._id } },
-          { $addToSet: { readBy: user._id } }
+          { $addToSet: { readBy: user._id } },
         );
 
         io.to(chatId).emit('readReceipt', {
@@ -159,6 +175,77 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         });
       } catch (error) {
         socket.emit('error', { message: error.message });
+      }
+    });
+
+    // ── Exam rooms (for real-time batch processing updates) ──────────────────
+    socket.on('joinExamRoom', ({ examId }) => {
+      if (examId) socket.join(`exam:${examId}`);
+    });
+
+    socket.on('leaveExamRoom', ({ examId }) => {
+      if (examId) socket.leave(`exam:${examId}`);
+    });
+
+    // ── AI streaming chat ────────────────────────────────────────────────────
+    socket.on('ai:chat', async ({ messages, sessionId }) => {
+      try {
+        if (!Array.isArray(messages) || messages.length === 0) {
+          socket.emit('ai:error', { message: 'messages array is required' });
+          return;
+        }
+
+        // Lazy import to avoid circular deps at module load time
+        const { geminiService } = await import('../services/geminiService.js');
+        const ChatSession = (await import('../models/ChatSession.js')).default;
+
+        // Resolve or create a chat session
+        let session = sessionId
+          ? await ChatSession.findOne({ _id: sessionId, userId: user._id })
+          : null;
+
+        if (!session) {
+          const firstUserMsg = messages.find((m) => m.role === 'user');
+          const title = firstUserMsg
+            ? firstUserMsg.content.slice(0, 60)
+            : 'New chat';
+          session = await ChatSession.create({
+            userId: user._id,
+            title,
+            messages: [],
+          });
+        }
+
+        // Override Gemini key if user has BYOK
+        let serviceToUse = geminiService;
+        if (user.geminiApiKey) {
+          serviceToUse = await geminiService.forUser(
+            user.geminiApiKey,
+            user.geminiModelId,
+          );
+        }
+
+        const resolvedSessionId = session._id.toString();
+        socket.emit('ai:sessionId', { sessionId: resolvedSessionId });
+
+        let fullResponse = '';
+        await serviceToUse.chatStream(messages, (chunk) => {
+          fullResponse += chunk;
+          socket.emit('ai:chunk', { chunk, sessionId: resolvedSessionId });
+        });
+
+        // Persist messages
+        const userMsg = messages[messages.length - 1];
+        session.messages.push(
+          { role: userMsg.role, content: userMsg.content },
+          { role: 'assistant', content: fullResponse },
+        );
+        await session.save();
+
+        socket.emit('ai:done', { sessionId: resolvedSessionId, fullResponse });
+      } catch (err) {
+        console.error('ai:chat socket error:', err);
+        socket.emit('ai:error', { message: err.message || 'AI error' });
       }
     });
 

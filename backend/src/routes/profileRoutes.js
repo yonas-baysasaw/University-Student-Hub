@@ -10,7 +10,7 @@ const router = express.Router();
 
 /* ===== Middleware: Ensure Authenticated ===== */
 function ensureAuth(req, res, next) {
-  if (req.isAuthenticated && req.isAuthenticated()) {
+  if (req.isAuthenticated?.()) {
     return next();
   }
   return res.status(401).json({ message: 'Unauthorized' });
@@ -248,10 +248,10 @@ router.put(
         id: req.user._id,
         username: req.user.username,
         displayName: req.user.displayName,
-        avatar: req.user.avatar || null
-      }
+        avatar: req.user.avatar || null,
+      },
     });
-  })
+  }),
 );
 
 /* ===== Delete Account ===== */
@@ -261,11 +261,36 @@ router.delete(
   asyncHandler(async (req, res, next) => {
     await req.user.deleteOne();
 
-    req.logout(err => {
+    req.logout((err) => {
       if (err) return next(err);
       res.json({ message: 'Account deleted' });
     });
-  })
+  }),
+);
+
+/* ===== Save BYOK API Key + Model ===== */
+router.post(
+  '/api-key',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const { geminiApiKey = '', geminiModelId = '' } = req.body;
+    req.user.geminiApiKey = geminiApiKey.trim();
+    req.user.geminiModelId = geminiModelId.trim();
+    await req.user.save();
+    res.json({ message: 'API key saved' });
+  }),
+);
+
+/* ===== Clear BYOK API Key ===== */
+router.delete(
+  '/api-key',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    req.user.geminiApiKey = '';
+    req.user.geminiModelId = '';
+    await req.user.save();
+    res.json({ message: 'API key cleared' });
+  }),
 );
 
 export default router;

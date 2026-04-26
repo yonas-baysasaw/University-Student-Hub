@@ -1,18 +1,25 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
 const AuthContext = createContext({
   user: null,
   checkingAuth: true,
   refreshAuth: () => Promise.resolve(),
   setUser: () => {},
-  logout: () => Promise.resolve()
+  logout: () => Promise.resolve(),
 });
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const refreshAuth = async () => {
+  const refreshAuth = useCallback(async () => {
     setCheckingAuth(true);
     try {
       const res = await fetch('/api/profile', { credentials: 'include' });
@@ -28,24 +35,24 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setCheckingAuth(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshAuth();
-  }, []);
+  }, [refreshAuth]);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await fetch('/api/auth/logout', {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
       });
     } catch (error) {
       console.error('logout failed', error);
     } finally {
       setUser(null);
     }
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -53,13 +60,12 @@ export const AuthProvider = ({ children }) => {
       checkingAuth,
       refreshAuth,
       setUser,
-      logout
+      logout,
     }),
-    [user, checkingAuth]
+    [user, checkingAuth, logout, refreshAuth],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
-// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);

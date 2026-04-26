@@ -3,13 +3,18 @@ function looksLikeHtml(text) {
   return sample.startsWith('<!doctype') || sample.startsWith('<html');
 }
 
-export async function readJsonOrThrow(response, fallbackMessage = 'Request failed') {
+export async function readJsonOrThrow(
+  response,
+  fallbackMessage = 'Request failed',
+) {
   const contentType = response.headers.get('content-type') || '';
   const raw = await response.text();
 
   if (!contentType.includes('application/json')) {
     if (looksLikeHtml(raw)) {
-      throw new Error('API returned HTML instead of JSON. Start backend and ensure Vite /api proxy is enabled.');
+      throw new Error(
+        'API returned HTML instead of JSON. Start backend and ensure Vite /api proxy is enabled.',
+      );
     }
     throw new Error(`${fallbackMessage} (${response.status})`);
   }
@@ -22,7 +27,9 @@ export async function readJsonOrThrow(response, fallbackMessage = 'Request faile
   }
 
   if (!response.ok) {
-    throw new Error(payload?.message || `${fallbackMessage} (${response.status})`);
+    throw new Error(
+      payload?.message || `${fallbackMessage} (${response.status})`,
+    );
   }
 
   return payload;

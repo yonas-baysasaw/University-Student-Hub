@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import {
   createChat,
-  joinChatByCode,
-  getUserChats,
   getChatMessages,
+  getUserChats,
+  joinChatByCode,
   sendMessage,
 } from '../controllers/chatController.js';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
