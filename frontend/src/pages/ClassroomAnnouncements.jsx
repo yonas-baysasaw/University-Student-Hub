@@ -1,35 +1,46 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ClassroomTabs from '../components/ClassroomTabs';
-import { useAuth } from '../contexts/AuthContext';
-import { fetchClassroomMeta, isInstructor } from '../utils/classroom';
+import { fetchClassroomMeta } from '../utils/classroom';
+import { readJsonOrThrow } from '../utils/http';
 
-function ClassroomAnnouncementsContent({ chatId, user }) {
+function ClassroomAnnouncementsContent({ chatId }) {
   const [chatName, setChatName] = useState('Class Announcements');
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [announcements, setAnnouncements] = useState(() => {
-    const key = `ush_announcements_${chatId}`;
+  const [announcements, setAnnouncements] = useState([]);
+  const [canManage, setCanManage] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [loadError, setLoadError] = useState('');
+
+  const load = useCallback(async () => {
+    if (!chatId) return;
+    setLoading(true);
+    setLoadError('');
     try {
-      const raw = localStorage.getItem(key);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (error) {
-      console.error('Failed to load announcements', error);
+      const res = await fetch(
+        `/api/chats/${encodeURIComponent(chatId)}/announcements`,
+        {
+          credentials: 'include',
+        },
+      );
+      const data = await readJsonOrThrow(res, 'Failed to load announcements');
+      setAnnouncements(
+        Array.isArray(data.announcements) ? data.announcements : [],
+      );
+      setCanManage(Boolean(data.canManage));
+    } catch (e) {
+      setLoadError(e?.message || 'Failed to load announcements');
+      setAnnouncements([]);
+    } finally {
+      setLoading(false);
     }
-    return [];
-  });
-  const instructor = useMemo(() => isInstructor(user), [user]);
+  }, [chatId]);
 
   useEffect(() => {
-    if (!chatId) return;
-    localStorage.setItem(
-      `ush_announcements_${chatId}`,
-      JSON.stringify(announcements),
-    );
-  }, [announcements, chatId]);
+    load();
+  }, [load]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -46,26 +57,52 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
     return () => controller.abort();
   }, [chatId]);
 
-  const submitAnnouncement = (event) => {
+  const submitAnnouncement = async (event) => {
     event.preventDefault();
-    if (!instructor) return;
+    if (!canManage) return;
     const trimmedTitle = title.trim();
     const trimmedBody = body.trim();
     if (!trimmedTitle || !trimmedBody) return;
 
-    const author = user?.displayName ?? user?.username ?? 'Instructor';
-    setAnnouncements((prev) => [
-      {
-        id: `${Date.now()}`,
-        title: trimmedTitle,
-        body: trimmedBody,
-        author,
-        createdAt: new Date().toISOString(),
-      },
-      ...prev,
-    ]);
-    setTitle('');
-    setBody('');
+    setSaving(true);
+    try {
+      const res = await fetch(
+        `/api/chats/${encodeURIComponent(chatId)}/announcements`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: trimmedTitle, body: trimmedBody }),
+        },
+      );
+      const data = await readJsonOrThrow(res, 'Failed to publish');
+      if (data.announcement) {
+        setAnnouncements((prev) => [data.announcement, ...prev]);
+      } else {
+        await load();
+      }
+      setTitle('');
+      setBody('');
+    } catch (e) {
+      setLoadError(e?.message || 'Could not publish announcement');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteOne = async (id) => {
+    if (!canManage) return;
+    if (!window.confirm('Delete this announcement?')) return;
+    try {
+      const res = await fetch(
+        `/api/chats/${encodeURIComponent(chatId)}/announcements/${encodeURIComponent(id)}`,
+        { method: 'DELETE', credentials: 'include' },
+      );
+      await readJsonOrThrow(res, 'Failed to delete');
+      setAnnouncements((prev) => prev.filter((a) => a.id !== id));
+    } catch (e) {
+      setLoadError(e?.message || 'Delete failed');
+    }
   };
 
   return (
@@ -90,14 +127,20 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
 
         <ClassroomTabs />
 
+        {loadError ? (
+          <p className="mb-3 text-sm text-rose-600" role="alert">
+            {loadError}
+          </p>
+        ) : null}
+
         <section className="rounded-2xl border border-slate-200 bg-white p-4">
           <h3 className="font-display text-xl text-slate-900">
             Post announcement
           </h3>
           <p className="mt-1 text-sm text-slate-600">
-            {instructor
-              ? 'Only instructors can publish announcements to this classroom.'
-              : 'Announcements are posted by the instructor only.'}
+            {canManage
+              ? 'You can publish announcements to this classroom.'
+              : 'Only classroom admins (creator and admins) can publish announcements.'}
           </p>
           <form onSubmit={submitAnnouncement} className="mt-4 space-y-2">
             <input
@@ -106,7 +149,7 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="input-field text-sm"
-              disabled={!instructor}
+              disabled={!canManage || saving}
             />
             <textarea
               placeholder="Announcement details"
@@ -114,20 +157,22 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
               onChange={(e) => setBody(e.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-slate-50 p-3 text-sm text-slate-700 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-200"
               rows={4}
-              disabled={!instructor}
+              disabled={!canManage || saving}
             />
             <button
               type="submit"
-              disabled={!instructor}
+              disabled={!canManage || saving}
               className="btn-primary px-5 py-2 text-sm disabled:opacity-50"
             >
-              Publish
+              {saving ? 'Publishing…' : 'Publish'}
             </button>
           </form>
         </section>
 
         <section className="mt-4 space-y-3">
-          {announcements.length === 0 ? (
+          {loading ? (
+            <p className="text-sm text-slate-500">Loading announcements…</p>
+          ) : announcements.length === 0 ? (
             <p className="rounded-2xl border border-dashed border-slate-300 bg-white p-5 text-sm text-slate-500">
               No announcements yet.
             </p>
@@ -137,13 +182,24 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
                 key={item.id}
                 className="rounded-2xl border border-slate-200 bg-white p-4"
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h4 className="font-display text-xl text-slate-900">
-                    {item.title}
-                  </h4>
-                  <span className="rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800">
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </span>
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-display text-xl text-slate-900">
+                      {item.title}
+                    </h4>
+                    <span className="mt-1 inline-block rounded-full bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800">
+                      {new Date(item.createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                  {canManage ? (
+                    <button
+                      type="button"
+                      onClick={() => deleteOne(item.id)}
+                      className="text-xs font-semibold text-rose-600 hover:underline"
+                    >
+                      Delete
+                    </button>
+                  ) : null}
                 </div>
                 <p className="mt-2 text-sm text-slate-700">{item.body}</p>
                 <p className="mt-2 text-xs text-slate-500">
@@ -160,7 +216,6 @@ function ClassroomAnnouncementsContent({ chatId, user }) {
 
 function ClassroomAnnouncements() {
   const { chatId } = useParams();
-  const { user } = useAuth();
 
   if (!chatId) {
     return (
@@ -178,9 +233,7 @@ function ClassroomAnnouncements() {
     );
   }
 
-  return (
-    <ClassroomAnnouncementsContent key={chatId} chatId={chatId} user={user} />
-  );
+  return <ClassroomAnnouncementsContent key={chatId} chatId={chatId} />;
 }
 
 export default ClassroomAnnouncements;
