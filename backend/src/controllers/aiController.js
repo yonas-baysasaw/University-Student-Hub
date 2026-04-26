@@ -33,9 +33,13 @@ async function chatController(req, res, next) {
     const service = await getGeminiServiceForUser(req.user);
     const responseText = await service.chat(messages);
 
-    // Persist to session
+    // Persist to session (Liqu AI only, not support widget sessions)
     let session = sessionId
-      ? await ChatSession.findOne({ _id: sessionId, userId })
+      ? await ChatSession.findOne({
+          _id: sessionId,
+          userId,
+          $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
+        })
       : null;
 
     if (!session) {
@@ -73,7 +77,10 @@ async function chatController(req, res, next) {
 
 async function listSessionsController(req, res, next) {
   try {
-    const sessions = await ChatSession.find({ userId: req.user._id })
+    const sessions = await ChatSession.find({
+      userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
+    })
       .sort({ updatedAt: -1 })
       .select('_id title updatedAt createdAt')
       .limit(50);
@@ -89,6 +96,7 @@ async function getSessionController(req, res, next) {
     const session = await ChatSession.findOne({
       _id: req.params.sessionId,
       userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
     });
 
     if (!session)
@@ -104,6 +112,7 @@ async function deleteSessionController(req, res, next) {
     const result = await ChatSession.findOneAndDelete({
       _id: req.params.sessionId,
       userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
     });
 
     if (!result) return res.status(404).json({ message: 'Session not found.' });

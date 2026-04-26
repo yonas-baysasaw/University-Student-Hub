@@ -16,6 +16,13 @@ const chatSessionSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /** 'liqu' = Study buddy / Liqu AI; 'support' = help widget (excluded from Liqu session list). */
+    kind: {
+      type: String,
+      enum: ['liqu', 'support'],
+      default: 'liqu',
+      index: true,
+    },
     title: { type: String, default: 'New chat' },
     messages: [messageSchema],
   },

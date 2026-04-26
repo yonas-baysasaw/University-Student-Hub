@@ -8,6 +8,7 @@ import {
 import { Toaster } from 'sonner';
 import Nav from './components/Nav';
 import Navbar from './components/Navbar';
+import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
@@ -56,6 +57,7 @@ function AppRoutes() {
   if (user) {
     return (
       <Navbar>
+        <SupportChatWidget />
         <div key={location.pathname} className="route-fade">
           <Routes>
             <Route path="/" element={<Home />} />

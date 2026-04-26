@@ -22,6 +22,7 @@ import presenceRoutes from './routes/presenceRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
 import signUpRouter from './routes/signUpRoutes.js';
+import supportRoutes from './routes/supportRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import { initSocketServer } from './socket/index.js';
 
@@ -86,6 +87,7 @@ app.use('/api/chats', chatRoutes);
 app.use('/api/presence', presenceRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/support', supportRoutes);
 app.use('/api/exams', examRoutes);
 app.get('/api/books', getAllBooks);
 app.get('/api/books/:bookId', getBookById);

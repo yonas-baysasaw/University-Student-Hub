@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { FunctionCallingMode, GoogleGenerativeAI } from '@google/generative-ai';
 import { ENV } from '../config/env.js';
 
 // Ported and adapted from did-exit/js/ai-integration.js
@@ -438,6 +438,146 @@ Important details:
 export const geminiService = new GeminiService();
 
 export { resolveGeminiCredentialsForUser };
+
+const MAX_SUPPORT_TOOL_ROUNDS = 5;
+
+/**
+ * REST API expects `Content` (parts with text), not a bare string, for
+ * `system_instruction` — a raw string can yield 400 on newer models.
+ * @param { string | { parts: Array<{ text: string }> } | undefined } value
+ * @returns { { parts: Array<{ text: string }> } | undefined }
+ */
+function normalizeSystemInstruction(value) {
+  if (value == null || value === '') return undefined;
+  if (typeof value === 'object' && value.parts && Array.isArray(value.parts)) {
+    return value;
+  }
+  const t = String(value).trim();
+  if (!t) return undefined;
+  return { parts: [{ text: t }] };
+}
+
+/**
+ * Gemini startChat requires history to start with role `user`, not `model`.
+ * The client may include a leading assistant “welcome” bubble — drop those.
+ * @param { Array<{ role: string, content: string }> } messages
+ */
+function stripLeadingAssistantMessages(messages) {
+  let i = 0;
+  while (i < messages.length && messages[i].role === 'assistant') {
+    i += 1;
+  }
+  return messages.slice(i);
+}
+
+/**
+ * Support chat: multi-round Gemini with function calling. `executeTool(name, args)` must return a JSON object.
+ * @param { { geminiApiKey?: string; geminiModelId?: string } | null } userLike
+ * @param { Array<{ role: string, content: string }> } messages
+ * @param { object } options
+ * @param { import('@google/generative-ai').FunctionDeclaration[] } options.functionDeclarations
+ * @param { string | { parts: Array<{ text: string }> } } [options.systemInstruction]
+ * @param { (name: string, args: object) => Promise<Record<string, unknown>> } options.executeTool
+ */
+export async function runSupportWithTools(userLike, messages, options) {
+  const { functionDeclarations, systemInstruction, executeTool } = options;
+  if (
+    !Array.isArray(functionDeclarations) ||
+    functionDeclarations.length === 0
+  ) {
+    throw new Error('functionDeclarations required');
+  }
+  if (typeof executeTool !== 'function') {
+    throw new Error('executeTool required');
+  }
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error('messages must be a non-empty array');
+  }
+  for (const msg of messages) {
+    if (!msg.role || typeof msg.content !== 'string') {
+      throw new Error('Each message must have role and string content');
+    }
+    if (!['user', 'assistant'].includes(msg.role)) {
+      throw new Error('Message role must be user or assistant');
+    }
+  }
+
+  const normalized = stripLeadingAssistantMessages(messages);
+  if (normalized.length === 0) {
+    throw new Error('No user message to send');
+  }
+
+  const { apiKey, modelId } = resolveGeminiCredentialsForUser(userLike);
+  if (!apiKey) {
+    throw new Error(
+      'No Gemini API key. Add your key in Profile (Liqu AI Settings) or set GEMINI_API_KEY on the server.',
+    );
+  }
+
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: modelId,
+    tools: [{ functionDeclarations }],
+    toolConfig: {
+      functionCallingConfig: { mode: FunctionCallingMode.AUTO },
+    },
+  });
+
+  const last = normalized.at(-1);
+  if (!last || last.role !== 'user') {
+    throw new Error('Last message must be from the user');
+  }
+
+  const history = normalized.slice(0, -1).map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
+  await geminiService.enforceRateLimit();
+  const chat = model.startChat({
+    systemInstruction: normalizeSystemInstruction(systemInstruction),
+    history,
+  });
+
+  let result = await chat.sendMessage(last.content);
+  let round = 0;
+
+  while (round < MAX_SUPPORT_TOOL_ROUNDS) {
+    const response = result.response;
+    const calls = response.functionCalls?.() ?? [];
+    if (calls.length === 0) {
+      try {
+        return response.text();
+      } catch {
+        return 'I could not read a text reply. Please try again.';
+      }
+    }
+    const parts = [];
+    for (const call of calls) {
+      const args =
+        call.args && typeof call.args === 'object' ? { ...call.args } : {};
+      const out = await executeTool(call.name, args);
+      const safe = out && typeof out === 'object' ? out : { result: out };
+      parts.push({
+        functionResponse: {
+          name: call.name,
+          response: safe,
+        },
+      });
+    }
+    await geminiService.enforceRateLimit();
+    result = await chat.sendMessage(parts);
+    round += 1;
+  }
+  try {
+    return (
+      result.response.text() ||
+      'Could not finish—please ask something simpler or name one classroom.'
+    );
+  } catch {
+    return 'Could not finish after several tool steps—try a simpler question.';
+  }
+}
 
 /**
  * Gemini client for a uploader: profile key first, then server GEMINI_API_KEY.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import ReadAlongPanel from '../components/ReadAlongPanel';
+import { HUB_QUICK_PROMPTS } from '../constants/supportPrompts';
 import { fetchLibraryBooks } from '../utils/books';
 
 const READ_ALONG_PIN_KEY = 'studyBuddy.readAlongPinned';
@@ -11,14 +12,6 @@ const starterPromptsWithBook = [
   'List the key definitions from this book.',
   'Give me 5 review questions from what I am reading.',
   'Explain this as if I am preparing for an exam.',
-];
-
-/** Shown when no library book is selected: campus hub / classroom context (max 4). */
-const starterPromptsNoBook = [
-  'Help me catch up: what to look for in new classroom announcements and what to do first.',
-  'A new file or resource was added in class—how should I skim it, take notes, and what should I ask?',
-  'Puzzle together announcements, new uploads, and due dates for my classes this week in one plan.',
-  'I might have missed an update: what should I double-check in announcements, resources, and assignments?',
 ];
 
 function readInitialPin() {
@@ -85,7 +78,7 @@ function StudyBuddy() {
   );
 
   const starterPrompts = useMemo(
-    () => (selectedBookId ? starterPromptsWithBook : starterPromptsNoBook),
+    () => (selectedBookId ? starterPromptsWithBook : HUB_QUICK_PROMPTS),
     [selectedBookId],
   );
 
