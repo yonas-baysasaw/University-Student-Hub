@@ -49,7 +49,7 @@ router.get(
     })
       .sort({ createdAt: -1 })
       .select(
-        'title description bookUrl thumbnailUrl format visibility createdAt updatedAt likesCount dislikesCount views',
+        'title description bookUrl thumbnailUrl format visibility createdAt updatedAt likesCount dislikesCount views academicTrack department publishYear courseSubject',
       )
       .lean();
 
@@ -201,7 +201,7 @@ router.get(
       })
         .sort({ createdAt: -1 })
         .select(
-          'title description bookUrl thumbnailUrl format visibility createdAt updatedAt',
+          'title description bookUrl thumbnailUrl format visibility createdAt updatedAt academicTrack department publishYear courseSubject',
         )
         .lean(),
       Chat.find({ creator: req.user._id })

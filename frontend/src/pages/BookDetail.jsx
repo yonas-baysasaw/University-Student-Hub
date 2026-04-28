@@ -390,6 +390,21 @@ function BookDetail() {
                       <h1 className="font-display text-balance text-3xl font-bold tracking-tight text-slate-900 md:text-4xl xl:text-[2.65rem] dark:text-white">
                         {book.title || 'Untitled'}
                       </h1>
+                      {book.department ||
+                      book.courseSubject ||
+                      Number.isFinite(book.publishYear) ? (
+                        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+                          {[
+                            book.department,
+                            book.courseSubject,
+                            Number.isFinite(book.publishYear)
+                              ? book.publishYear
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </p>
+                      ) : null}
                       {topicFromBook ? (
                         <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
                           Topic · {topicFromBook}

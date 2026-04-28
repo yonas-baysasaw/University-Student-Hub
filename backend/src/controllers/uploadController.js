@@ -18,6 +18,55 @@ function getUploadedFile(req) {
   return null;
 }
 
+function parseUploadMeta(req) {
+  const academicTrack = String(req.body?.academicTrack || '').trim();
+  const department = String(req.body?.department || '').trim();
+  const title = String(req.body?.title || '').trim();
+  const publishYearRaw = req.body?.publishYear;
+  const publishYear =
+    publishYearRaw === '' || publishYearRaw === undefined || publishYearRaw === null
+      ? NaN
+      : Number.parseInt(String(publishYearRaw).trim(), 10);
+  const courseSubject = String(req.body?.courseSubject || '').trim();
+  const description = String(req.body?.description || '').trim();
+
+  return {
+    academicTrack,
+    department,
+    title,
+    publishYear,
+    courseSubject,
+    description,
+  };
+}
+
+function validateUploadMeta(meta) {
+  const tracks = ['engineering', 'social', 'natural'];
+  if (!tracks.includes(meta.academicTrack)) {
+    return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
+  }
+  if (!meta.department || meta.department.length > 160) {
+    return 'Department or discipline is required.';
+  }
+  if (meta.department === 'Other') {
+    return 'Specify your department when selecting Other.';
+  }
+  if (!meta.title || meta.title.length > 120) {
+    return 'Book name is required (max 120 characters).';
+  }
+  if (
+    !Number.isFinite(meta.publishYear) ||
+    meta.publishYear < 1950 ||
+    meta.publishYear > 2035
+  ) {
+    return 'Enter a valid publish year (1950–2035).';
+  }
+  if (!meta.courseSubject) {
+    return 'Course or subject is required (e.g. Operating Systems, Java).';
+  }
+  return null;
+}
+
 async function uploadController(req, res, next) {
   try {
     const id = req.user?._id;
@@ -29,6 +78,12 @@ async function uploadController(req, res, next) {
 
     if (!uploadedFile) {
       return res.status(400).json(createErrorResponse('No file uploaded.'));
+    }
+
+    const meta = parseUploadMeta(req);
+    const metaError = validateUploadMeta(meta);
+    if (metaError) {
+      return res.status(400).json(createErrorResponse(metaError));
     }
 
     const uploadResult = await uploadFileToS3(uploadedFile, `${id}/Library`);
@@ -58,8 +113,12 @@ async function uploadController(req, res, next) {
 
     const book = await Book.create({
       userId: id,
-      title: req.body?.title?.trim() || uploadedFile.originalname,
-      description: req.body?.description || '',
+      title: meta.title,
+      description: meta.description,
+      academicTrack: meta.academicTrack,
+      department: meta.department,
+      publishYear: meta.publishYear,
+      courseSubject: meta.courseSubject,
       bookUrl: uploadResult.location,
       thumbnailUrl,
       format: uploadedFile.mimetype,
@@ -69,6 +128,10 @@ async function uploadController(req, res, next) {
       id: book._id,
       title: book.title,
       description: book.description,
+      academicTrack: book.academicTrack,
+      department: book.department,
+      publishYear: book.publishYear,
+      courseSubject: book.courseSubject,
       bookUrl: book.bookUrl,
       thumbnailUrl: book.thumbnailUrl,
       format: book.format,

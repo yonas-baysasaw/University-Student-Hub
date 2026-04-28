@@ -39,6 +39,30 @@ const bookSchema = new mongoose.Schema(
       index: true,
     },
 
+    /** Library catalog metadata (required on new uploads via upload controller) */
+    academicTrack: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true,
+    },
+    department: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: '',
+    },
+    publishYear: {
+      type: Number,
+      default: null,
+    },
+    courseSubject: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: '',
+    },
+
     views: {
       type: Number,
       default: 0,

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import UploadBookModal from '../components/UploadBookModal.jsx';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -28,18 +29,10 @@ import {
   visibilityLabel,
   visibilityTone,
 } from '../utils/formatLabels';
-
-function formatBytes(n) {
-  if (n == null || Number.isNaN(n)) return '';
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let v = n;
-  let i = 0;
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024;
-    i += 1;
-  }
-  return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${units[i]}`;
-}
+import {
+  resolveDepartmentForSubmit,
+  validateWizardStep,
+} from '../utils/bookUploadMeta';
 
 function formatRelativeShort(iso) {
   if (!iso) return '';
@@ -163,6 +156,7 @@ function Profile() {
   const [sidebarTab, setSidebarTab] = useState('viewed');
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadStep, setUploadStep] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState('');
@@ -170,11 +164,16 @@ function Profile() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [copyNotice, setCopyNotice] = useState('');
 
-  const [uploadForm, setUploadForm] = useState({
+  const [uploadForm, setUploadForm] = useState(() => ({
     title: '',
     description: '',
     file: null,
-  });
+    academicTrack: '',
+    department: '',
+    departmentOther: '',
+    publishYear: new Date().getFullYear(),
+    courseSubject: '',
+  }));
 
   useEffect(() => {
     let active = true;
@@ -225,6 +224,15 @@ function Profile() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isUploadModalOpen) return undefined;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isUploadModalOpen]);
+
   const displayName = user?.displayName ?? user?.username ?? 'Student';
   const email = user?.email ?? 'No email available';
   const avatar = user?.photo || defaultProfile;
@@ -262,14 +270,35 @@ function Profile() {
 
   const closeUploadModal = () => {
     setIsUploadModalOpen(false);
+    setUploadStep(1);
     setUploadError('');
     setDragActive(false);
     setUploadForm({
       title: '',
       description: '',
       file: null,
+      academicTrack: '',
+      department: '',
+      departmentOther: '',
+      publishYear: new Date().getFullYear(),
+      courseSubject: '',
     });
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const goUploadNext = () => {
+    const err = validateWizardStep(uploadStep, uploadForm);
+    if (err) {
+      setUploadError(err);
+      return;
+    }
+    setUploadError('');
+    setUploadStep((s) => Math.min(3, s + 1));
+  };
+
+  const goUploadPrev = () => {
+    setUploadError('');
+    setUploadStep((s) => Math.max(1, s - 1));
   };
 
   const handleUploadSubmit = async (event) => {
@@ -277,8 +306,16 @@ function Profile() {
     setUploadError('');
     setUploadSuccess('');
 
-    if (!uploadForm.file) {
-      setUploadError('Choose a file or drop one into the upload area.');
+    const stepErr = validateWizardStep(3, uploadForm);
+    if (stepErr) {
+      setUploadError(stepErr);
+      return;
+    }
+
+    const dept = resolveDepartmentForSubmit(uploadForm);
+    if (!dept || dept === 'Other') {
+      setUploadError('Complete department details.');
+      setUploadStep(1);
       return;
     }
 
@@ -286,9 +323,11 @@ function Profile() {
       setUploading(true);
 
       const formData = new FormData();
-      if (uploadForm.title.trim()) {
-        formData.append('title', uploadForm.title.trim());
-      }
+      formData.append('academicTrack', uploadForm.academicTrack);
+      formData.append('department', dept);
+      formData.append('title', uploadForm.title.trim());
+      formData.append('publishYear', String(Number(uploadForm.publishYear)));
+      formData.append('courseSubject', uploadForm.courseSubject.trim());
       if (uploadForm.description.trim()) {
         formData.append('description', uploadForm.description.trim());
       }
@@ -316,7 +355,12 @@ function Profile() {
           id: `book-${newBook._id}`,
           type: 'book_upload',
           title: `Uploaded "${payload?.title || uploadForm.title || 'your book'}"`,
-          subtitle: humanizeFormat(uploadForm.file?.type),
+          subtitle: [
+            payload?.department || dept,
+            payload?.courseSubject || uploadForm.courseSubject,
+          ]
+            .filter(Boolean)
+            .join(' · '),
           at: new Date().toISOString(),
         },
         ...prev,
@@ -438,6 +482,13 @@ function Profile() {
     [viewedBooks, subscribedChannels, likedBooks],
   );
 
+  const openUploadModal = useCallback(() => {
+    setUploadSuccess('');
+    setUploadError('');
+    setUploadStep(1);
+    setIsUploadModalOpen(true);
+  }, []);
+
   return (
     <div className="library-ambient page-surface px-4 pb-14 pt-8 md:px-6">
       <section className="relative z-[1] mx-auto max-w-6xl space-y-8">
@@ -496,11 +547,7 @@ function Profile() {
                 <div className="flex flex-wrap gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => {
-                      setUploadSuccess('');
-                      setUploadError('');
-                      setIsUploadModalOpen(true);
-                    }}
+                    onClick={openUploadModal}
                     className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm"
                   >
                     <Upload className="h-4 w-4" aria-hidden />
@@ -735,7 +782,7 @@ function Profile() {
                         </p>
                         <button
                           type="button"
-                          onClick={() => setIsUploadModalOpen(true)}
+                          onClick={openUploadModal}
                           className="btn-primary mt-5 inline-flex items-center gap-2 px-5 py-2 text-sm"
                         >
                           <Upload className="h-4 w-4" />
@@ -806,11 +853,7 @@ function Profile() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setUploadSuccess('');
-                    setUploadError('');
-                    setIsUploadModalOpen(true);
-                  }}
+                  onClick={openUploadModal}
                   className="btn-primary inline-flex shrink-0 items-center justify-center gap-2 self-start px-5 py-2.5 text-sm"
                 >
                   <Upload className="h-4 w-4" />
@@ -846,7 +889,7 @@ function Profile() {
                     </p>
                     <button
                       type="button"
-                      onClick={() => setIsUploadModalOpen(true)}
+                      onClick={openUploadModal}
                       className="btn-primary mt-6 inline-flex items-center gap-2 px-6 py-2.5 text-sm"
                     >
                       <Upload className="h-4 w-4" />
@@ -890,6 +933,21 @@ function Profile() {
                             {visibilityLabel(book.visibility)}
                           </span>
                         </div>
+                        {book.department ||
+                        book.courseSubject ||
+                        Number.isFinite(book.publishYear) ? (
+                          <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+                            {[
+                              book.department,
+                              book.courseSubject,
+                              Number.isFinite(book.publishYear)
+                                ? book.publishYear
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </p>
+                        ) : null}
                         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                           {humanizeFormat(book.format)} ·{' '}
                           {formatLibraryDate(book.createdAt) ||
@@ -919,218 +977,24 @@ function Profile() {
         </div>
       </section>
 
-      {/* Upload modal */}
-      {isUploadModalOpen ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="profile-upload-title"
-        >
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-950/55 backdrop-blur-[2px]"
-            aria-label="Close dialog"
-            onClick={closeUploadModal}
-          />
-          <div className="relative z-[1] flex max-h-[min(92vh,880px)] w-full max-w-xl flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl dark:border-slate-600 dark:bg-slate-900">
-            <div className="relative overflow-hidden border-b border-slate-200/90 bg-gradient-to-br from-cyan-50 via-white to-indigo-50/50 px-6 py-6 dark:border-slate-600 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/95">
-              <div className="workspace-hero-mesh pointer-events-none absolute inset-0 opacity-50" />
-              <div className="relative flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-400">
-                    Library upload
-                  </p>
-                  <h3
-                    id="profile-upload-title"
-                    className="font-display text-2xl text-slate-900 dark:text-white"
-                  >
-                    Add a book to the shelf
-                  </h3>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    PDFs work best—we generate a cover when we can.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeUploadModal}
-                  className="rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
-                >
-                  Close
-                </button>
-              </div>
-
-              <ol className="relative mt-6 flex gap-3">
-                <li className="flex flex-1 items-center gap-2 rounded-xl bg-white/90 px-3 py-2 text-xs font-semibold text-cyan-800 shadow-sm ring-1 ring-cyan-500/25 dark:bg-slate-800 dark:text-cyan-200 dark:ring-cyan-400/30">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-cyan-600 text-[11px] text-white dark:bg-cyan-500">
-                    1
-                  </span>
-                  File
-                </li>
-                <li className="flex flex-1 items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                  <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-[11px] text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                    2
-                  </span>
-                  Details
-                </li>
-              </ol>
-            </div>
-
-            <form
-              onSubmit={handleUploadSubmit}
-              className="flex flex-1 flex-col overflow-y-auto"
-            >
-              <div className="space-y-5 p-6">
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  onDragEnter={onDropZoneDrag}
-                  onDragLeave={onDropZoneDrag}
-                  onDragOver={onDropZoneDrag}
-                  onDrop={onDropFile}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`profile-upload-dropzone cursor-pointer rounded-2xl border-2 border-dashed px-5 py-10 text-center transition ${
-                    dragActive
-                      ? 'border-cyan-500 bg-cyan-50/90 ring-4 ring-cyan-500/15 dark:border-cyan-400 dark:bg-cyan-950/40 dark:ring-cyan-400/20'
-                      : uploadForm.file
-                        ? 'border-emerald-400/70 bg-emerald-50/50 dark:border-emerald-600/60 dark:bg-emerald-950/25'
-                        : 'border-slate-300 bg-slate-50/80 hover:border-cyan-400/70 hover:bg-cyan-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-cyan-500/50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    id="profile-book-file"
-                    type="file"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setUploadForm((prev) => ({ ...prev, file }));
-                      setUploadError('');
-                    }}
-                  />
-                  <Upload className="mx-auto h-10 w-10 text-cyan-600 dark:text-cyan-400" />
-                  <p className="mt-3 font-display text-lg text-slate-900 dark:text-white">
-                    {uploadForm.file
-                      ? 'File selected'
-                      : 'Drop a file here or browse'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    PDF, EPUB, and common documents · max size follows server limits
-                  </p>
-                  {uploadForm.file ? (
-                    <div className="mt-4 inline-flex flex-wrap items-center justify-center gap-2 rounded-xl bg-white/95 px-4 py-2 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-600">
-                      <span className="max-w-[240px] truncate font-medium text-slate-900 dark:text-white">
-                        {uploadForm.file.name}
-                      </span>
-                      <span className="text-slate-500 dark:text-slate-400">
-                        {formatBytes(uploadForm.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setUploadForm((prev) => ({ ...prev, file: null }));
-                          if (fileInputRef.current)
-                            fileInputRef.current.value = '';
-                        }}
-                        className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="profile-book-title"
-                    className="mb-1.5 block text-sm font-semibold text-slate-800 dark:text-slate-200"
-                  >
-                    Title{' '}
-                    <span className="font-normal text-slate-500">(optional)</span>
-                  </label>
-                  <input
-                    id="profile-book-title"
-                    type="text"
-                    className="input-field text-sm"
-                    placeholder="e.g. Operating Systems — midterm notes"
-                    value={uploadForm.title}
-                    onChange={(e) =>
-                      setUploadForm((prev) => ({
-                        ...prev,
-                        title: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="profile-book-description"
-                    className="mb-1.5 block text-sm font-semibold text-slate-800 dark:text-slate-200"
-                  >
-                    Description{' '}
-                    <span className="font-normal text-slate-500">(optional)</span>
-                  </label>
-                  <textarea
-                    id="profile-book-description"
-                    className="input-field min-h-[108px] resize-y py-3 text-sm leading-relaxed"
-                    placeholder="What’s inside? Who is it for?"
-                    value={uploadForm.description}
-                    onChange={(e) =>
-                      setUploadForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-
-                {uploadError ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
-                    {uploadError}
-                  </div>
-                ) : null}
-
-                {uploading ? (
-                  <div className="space-y-2 rounded-2xl border border-cyan-200/90 bg-cyan-50/80 px-4 py-3 dark:border-cyan-900/40 dark:bg-cyan-950/30">
-                    <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">
-                      Uploading…
-                    </p>
-                    <div className="profile-upload-progress-indeterminate h-2 overflow-hidden rounded-full bg-cyan-200/80 dark:bg-cyan-900/60">
-                      <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-500" />
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-
-              <div className="mt-auto flex flex-wrap items-center justify-end gap-3 border-t border-slate-200/90 bg-slate-50/90 px-6 py-4 dark:border-slate-600 dark:bg-slate-900/90">
-                <button
-                  type="button"
-                  onClick={closeUploadModal}
-                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={uploading}
-                  className="btn-primary px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {uploading ? 'Uploading…' : 'Publish to library'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      {/* Upload modal — portaled above layout/nav stacking contexts */}
+      <UploadBookModal
+        open={isUploadModalOpen}
+        uploadStep={uploadStep}
+        uploadForm={uploadForm}
+        setUploadForm={setUploadForm}
+        uploading={uploading}
+        uploadError={uploadError}
+        setUploadError={setUploadError}
+        dragActive={dragActive}
+        fileInputRef={fileInputRef}
+        onClose={closeUploadModal}
+        onNext={goUploadNext}
+        onPrev={goUploadPrev}
+        onSubmit={handleUploadSubmit}
+        onDropZoneDrag={onDropZoneDrag}
+        onDropFile={onDropFile}
+      />
     </div>
   );
 }
