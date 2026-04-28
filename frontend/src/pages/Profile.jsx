@@ -12,6 +12,7 @@ import {
   LayoutGrid,
   Library,
   MessageSquare,
+  Plus,
   Settings,
   Sparkles,
   Upload,
@@ -19,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import UploadBookModal from '../components/UploadBookModal.jsx';
 import defaultProfile from '../assets/profile.png';
@@ -137,7 +139,7 @@ function StatInteractiveCard({
 }
 
 function Profile() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const fileInputRef = useRef(null);
 
   const [sharedBooks, setSharedBooks] = useState([]);
@@ -163,6 +165,14 @@ function Profile() {
   const [dragActive, setDragActive] = useState(false);
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [copyNotice, setCopyNotice] = useState('');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [uploadingProfileImage, setUploadingProfileImage] = useState(false);
+  const [editProfileError, setEditProfileError] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editUsername, setEditUsername] = useState('');
+  const [editAvatar, setEditAvatar] = useState('');
+  const editImageInputRef = useRef(null);
 
   const [uploadForm, setUploadForm] = useState(() => ({
     title: '',
@@ -225,13 +235,13 @@ function Profile() {
   }, []);
 
   useEffect(() => {
-    if (!isUploadModalOpen) return undefined;
+    if (!isUploadModalOpen && !isEditModalOpen) return undefined;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.body.style.overflow = prevOverflow;
     };
-  }, [isUploadModalOpen]);
+  }, [isUploadModalOpen, isEditModalOpen]);
 
   const displayName = user?.displayName ?? user?.username ?? 'Student';
   const email = user?.email ?? 'No email available';
@@ -489,6 +499,104 @@ function Profile() {
     setIsUploadModalOpen(true);
   }, []);
 
+  const openEditModal = useCallback(() => {
+    setEditProfileError('');
+    setEditName(user?.name || user?.displayName || '');
+    setEditUsername(user?.username || '');
+    setEditAvatar(user?.avatar || user?.photo || '');
+    setIsEditModalOpen(true);
+  }, [user]);
+
+  const closeEditModal = useCallback(() => {
+    if (savingProfile) return;
+    setIsEditModalOpen(false);
+    setEditProfileError('');
+  }, [savingProfile]);
+
+  const handleEditProfileSubmit = useCallback(
+    async (event) => {
+      event.preventDefault();
+      setEditProfileError('');
+
+      const payload = {
+        name: editName.trim(),
+        username: editUsername.trim(),
+        avatar: editAvatar.trim(),
+      };
+
+      if (!payload.name || !payload.username) {
+        setEditProfileError('Name and username are required.');
+        return;
+      }
+
+      try {
+        setSavingProfile(true);
+        const res = await fetch('/api/profile', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || 'Could not update profile');
+        }
+        if (data?.profile) {
+          setUser(data.profile);
+        }
+        setIsEditModalOpen(false);
+      } catch (submitError) {
+        setEditProfileError(
+          submitError?.message || 'Could not update profile',
+        );
+      } finally {
+        setSavingProfile(false);
+      }
+    },
+    [editName, editUsername, editAvatar, setUser],
+  );
+
+  const handlePickProfileImage = useCallback(() => {
+    editImageInputRef.current?.click();
+  }, []);
+
+  const handleProfileImageChange = useCallback(
+    async (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      setEditProfileError('');
+      try {
+        setUploadingProfileImage(true);
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const res = await fetch('/api/upload/profile', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || 'Could not upload profile image');
+        }
+
+        const nextAvatar = data?.location || data?.user?.avatar || '';
+        setEditAvatar(nextAvatar);
+        setUser((prev) => (prev ? { ...prev, avatar: nextAvatar, photo: nextAvatar } : prev));
+      } catch (uploadError) {
+        setEditProfileError(
+          uploadError?.message || 'Could not upload profile image',
+        );
+      } finally {
+        setUploadingProfileImage(false);
+        event.target.value = '';
+      }
+    },
+    [setUser],
+  );
+
   return (
     <div className="library-ambient page-surface px-4 pb-14 pt-8 md:px-6">
       <section className="relative z-[1] mx-auto max-w-6xl space-y-8">
@@ -567,6 +675,13 @@ function Profile() {
                     <Settings className="h-4 w-4" aria-hidden />
                     Settings
                   </Link>
+                  <button
+                    type="button"
+                    onClick={openEditModal}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/90 px-5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-cyan-400/40 hover:bg-white dark:border-slate-600 dark:bg-slate-800/80 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Edit profile
+                  </button>
                 </div>
               </div>
             </div>
@@ -995,6 +1110,117 @@ function Profile() {
         onDropZoneDrag={onDropZoneDrag}
         onDropFile={onDropFile}
       />
+
+      {isEditModalOpen
+        ? createPortal(
+            <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
+              <button
+                type="button"
+                aria-label="Close edit profile"
+                onClick={closeEditModal}
+                className="absolute inset-0 bg-slate-950/35 backdrop-blur-md"
+              />
+              <div className="relative z-[1] w-full max-w-xl rounded-3xl border border-slate-200/90 bg-white p-6 shadow-2xl dark:border-slate-600/80 dark:bg-slate-900 md:p-7">
+                <div className="mb-5 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-300">
+                      Profile
+                    </p>
+                    <h2 className="mt-2 font-display text-2xl text-slate-900 dark:text-white">
+                      Edit your profile
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="rounded-xl border border-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                <form className="space-y-4" onSubmit={handleEditProfileSubmit}>
+                  {editProfileError ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200">
+                      {editProfileError}
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <p className="mb-2 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      Profile image
+                    </p>
+                    <div className="flex items-center gap-4">
+                      <img
+                        src={editAvatar || avatar}
+                        alt=""
+                        className="h-20 w-20 rounded-2xl border border-slate-200 object-cover dark:border-slate-600"
+                      />
+                      <button
+                        type="button"
+                        onClick={handlePickProfileImage}
+                        disabled={uploadingProfileImage}
+                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                      >
+                        <Plus className="h-4 w-4" />
+                        {uploadingProfileImage ? 'Uploading...' : 'Add new image'}
+                      </button>
+                      <input
+                        ref={editImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProfileImageChange}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      Username
+                    </label>
+                    <input
+                      type="text"
+                      value={editUsername}
+                      onChange={(e) => setEditUsername(e.target.value)}
+                      className="input-field text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="input-field text-sm"
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={closeEditModal}
+                      className="btn-secondary px-4 py-2 text-sm"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={savingProfile}
+                      className="btn-primary px-5 py-2 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {savingProfile ? 'Saving...' : 'Save changes'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }

@@ -148,13 +148,14 @@ router.post(
 router.get('/', ensureAuth, (req, res) => {
   const photo = req.user.avatar;
   const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
+  const displayName = req.user.name || req.user.username || '';
 
   res.json({
     id: req.user._id,
     username: req.user.username,
     name: req.user.name,
     email: req.user.email,
-    displayName: req.user.displayName,
+    displayName,
     provider: req.user.provider,
     photo,
     avatar: req.user.avatar || null,
@@ -334,20 +335,71 @@ router.put(
   '/',
   ensureAuth,
   asyncHandler(async (req, res) => {
-    const { username, displayName } = req.body;
+    const { username, name, displayName, avatar } = req.body || {};
 
-    if (username !== undefined) req.user.username = username;
-    if (displayName !== undefined) req.user.displayName = displayName;
+    if (username !== undefined) {
+      const nextUsername = String(username).trim();
+      if (!nextUsername) {
+        return res.status(400).json({ message: 'Username cannot be empty' });
+      }
+      if (nextUsername.length < 3 || nextUsername.length > 32) {
+        return res
+          .status(400)
+          .json({ message: 'Username must be between 3 and 32 characters' });
+      }
+      const taken = await User.findOne({
+        username: nextUsername,
+        _id: { $ne: req.user._id },
+      })
+        .select('_id')
+        .lean();
+      if (taken) {
+        return res.status(409).json({ message: 'Username is already taken' });
+      }
+      req.user.username = nextUsername;
+    }
+
+    if (name !== undefined || displayName !== undefined) {
+      const rawName = name ?? displayName;
+      const nextName = String(rawName).trim();
+      if (!nextName) {
+        return res.status(400).json({ message: 'Name cannot be empty' });
+      }
+      if (nextName.length > 80) {
+        return res
+          .status(400)
+          .json({ message: 'Name must be 80 characters or fewer' });
+      }
+      req.user.name = nextName;
+    }
+
+    if (avatar !== undefined) {
+      const nextAvatar = String(avatar || '').trim();
+      if (nextAvatar.length > 2048) {
+        return res
+          .status(400)
+          .json({ message: 'Avatar URL is too long (max 2048 chars)' });
+      }
+      req.user.avatar = nextAvatar || '';
+    }
 
     await req.user.save();
 
     res.json({
       message: 'Profile updated',
-      user: {
+      profile: {
         id: req.user._id,
         username: req.user.username,
-        displayName: req.user.displayName,
+        name: req.user.name,
+        email: req.user.email,
+        displayName: req.user.name || req.user.username || '',
+        provider: req.user.provider,
+        photo: req.user.avatar || null,
         avatar: req.user.avatar || null,
+        lastSeen: req.user.lastSeen || null,
+        geminiConfigured: !!String(req.user.geminiApiKey || '').trim(),
+        geminiModelId: req.user.geminiModelId || '',
+        hasLocalPassword: !!req.user.password,
       },
     });
   }),

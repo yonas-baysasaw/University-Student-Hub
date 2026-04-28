@@ -10,7 +10,9 @@ const router = express.Router();
 router.post(
   '/',
   asyncHandler(async (req, res) => {
-    const { email } = req.body;
+    const email = String(req.body?.email || '')
+      .trim()
+      .toLowerCase();
     const user = await User.findOne({ email });
     if (!user) {
       const error = new Error('User not found');
