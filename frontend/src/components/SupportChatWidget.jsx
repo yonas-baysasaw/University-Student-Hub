@@ -199,7 +199,10 @@ function SupportChatWidget() {
             }
           >
             {open ? (
-              <span className="text-2xl font-light leading-none" aria-hidden>
+              <span
+                className="text-2xl font-light leading-none text-white"
+                aria-hidden
+              >
                 ×
               </span>
             ) : (
@@ -276,7 +279,10 @@ function SupportChatWidget() {
                     className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
                     aria-label="Close"
                   >
-                    <span className="text-xl leading-none" aria-hidden>
+                    <span
+                      className="text-xl leading-none text-slate-700 dark:text-slate-200"
+                      aria-hidden
+                    >
                       ×
                     </span>
                   </button>
@@ -321,7 +327,7 @@ function SupportChatWidget() {
                           {m.content}
                         </p>
                       ) : (
-                        <div className="prose prose-sm max-w-none text-slate-800 dark:text-slate-100 prose-p:my-1.5 prose-p:text-slate-800 dark:prose-p:text-slate-100 prose-li:text-slate-800 dark:prose-li:text-slate-100 prose-ul:my-1.5 prose-ol:my-1.5 prose-pre:rounded-xl prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:rounded prose-code:bg-slate-200 prose-code:text-slate-900 dark:prose-code:bg-slate-700 dark:prose-code:text-slate-100 prose-strong:text-slate-900 dark:prose-strong:text-slate-50 prose-headings:my-2 prose-headings:text-slate-900 dark:prose-headings:text-slate-50 prose-a:text-cyan-700 dark:prose-a:text-cyan-300 dark:prose-pre:bg-slate-950">
+                        <div className="prose prose-sm max-w-none text-slate-800 dark:text-slate-100 prose-p:my-1.5 prose-p:text-slate-800 dark:prose-p:text-slate-100 prose-li:text-slate-800 dark:prose-li:text-slate-100 prose-ul:my-1.5 prose-ol:my-1.5 prose-blockquote:border-slate-300 prose-blockquote:text-slate-700 dark:prose-blockquote:border-slate-600 dark:prose-blockquote:text-slate-300 prose-hr:border-slate-200 dark:prose-hr:border-slate-600 prose-th:text-slate-900 dark:prose-th:text-slate-100 prose-td:text-slate-800 dark:prose-td:text-slate-200 prose-pre:rounded-xl prose-pre:bg-slate-900 prose-pre:text-slate-100 prose-code:rounded prose-code:bg-slate-200 prose-code:px-1 prose-code:text-slate-900 dark:prose-code:bg-slate-700 dark:prose-code:text-slate-100 prose-strong:text-slate-900 dark:prose-strong:text-slate-50 prose-headings:my-2 prose-headings:text-slate-900 dark:prose-headings:text-slate-50 prose-a:text-cyan-700 dark:prose-a:text-cyan-300 dark:prose-pre:bg-slate-950">
                           <ReactMarkdown
                             remarkPlugins={[remarkGfm]}
                             components={markdownComponents}

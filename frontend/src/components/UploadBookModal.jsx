@@ -4,17 +4,22 @@ import {
   BookOpen,
   Check,
   Cpu,
+  FileText,
+  ImageIcon,
   Leaf,
   Lock,
   ShieldCheck,
   Upload,
   Users,
 } from 'lucide-react';
+import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   ACADEMIC_TRACKS,
+  academicTrackLabel,
   COURSE_SUBJECT_SUGGESTIONS,
   DEPARTMENTS_BY_TRACK,
+  resolveDepartmentForSubmit,
 } from '../utils/bookUploadMeta';
 
 function formatBytes(n) {
@@ -58,13 +63,24 @@ export default function UploadBookModal({
   onDropZoneDrag,
   onDropFile,
 }) {
-  if (!open || typeof document === 'undefined') return null;
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
 
   const deptList =
-    uploadForm.academicTrack &&
-    DEPARTMENTS_BY_TRACK[uploadForm.academicTrack]
+    uploadForm.academicTrack && DEPARTMENTS_BY_TRACK[uploadForm.academicTrack]
       ? DEPARTMENTS_BY_TRACK[uploadForm.academicTrack]
       : [];
+
+  const deptResolved = resolveDepartmentForSubmit(uploadForm);
+  const trackLabel = academicTrackLabel(uploadForm.academicTrack);
+
+  if (!open || typeof document === 'undefined') return null;
 
   return createPortal(
     <div
@@ -79,7 +95,7 @@ export default function UploadBookModal({
         aria-label="Close dialog"
         onClick={onClose}
       />
-      <div className="relative z-[1] flex max-h-[min(94vh,920px)] w-full max-w-[34rem] flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_25px_80px_-12px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900 sm:max-w-[36rem]">
+      <div className="relative z-[1] flex max-h-[min(94vh,960px)] w-full max-w-[min(100%,36rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-[0_25px_80px_-12px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900 lg:max-w-[52rem] xl:max-w-[56rem]">
         <div className="relative shrink-0 overflow-hidden border-b border-slate-200/90 bg-gradient-to-br from-cyan-50 via-white to-indigo-50/60 px-5 py-5 dark:border-slate-600 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/95 md:px-7 md:py-6">
           <div className="workspace-hero-mesh pointer-events-none absolute inset-0 opacity-45 dark:opacity-35" />
           <div className="relative flex items-start justify-between gap-3">
@@ -105,6 +121,13 @@ export default function UploadBookModal({
               Close
             </button>
           </div>
+          <p className="mt-3 text-right text-[11px] text-slate-500 dark:text-slate-500">
+            Press{' '}
+            <kbd className="rounded border border-slate-300 bg-white px-1.5 py-0.5 font-mono text-[10px] font-semibold text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              Esc
+            </kbd>{' '}
+            to close
+          </p>
 
           <nav
             className="relative mt-6 flex items-center gap-2"
@@ -133,7 +156,11 @@ export default function UploadBookModal({
                             : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
                       }`}
                     >
-                      {done ? <Check className="h-4 w-4" aria-hidden /> : step.n}
+                      {done ? (
+                        <Check className="h-4 w-4" aria-hidden />
+                      ) : (
+                        step.n
+                      )}
                     </span>
                     <div className="min-w-0 pt-1 md:pt-0">
                       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
@@ -150,7 +177,9 @@ export default function UploadBookModal({
                   {idx < STEP_META.length - 1 ? (
                     <div
                       className={`mx-1 hidden h-px w-6 shrink-0 md:block ${
-                        uploadStep > step.n ? 'bg-emerald-400/70' : 'bg-slate-200 dark:bg-slate-600'
+                        uploadStep > step.n
+                          ? 'bg-emerald-400/70'
+                          : 'bg-slate-200 dark:bg-slate-600'
                       }`}
                       aria-hidden
                     />
@@ -159,6 +188,17 @@ export default function UploadBookModal({
               );
             })}
           </nav>
+
+          <div
+            className="relative mt-5 h-1.5 overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700"
+            aria-hidden
+          >
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-cyan-600 via-teal-500 to-indigo-500 transition-[width] duration-300 ease-out dark:from-cyan-500 dark:via-teal-500 dark:to-indigo-400"
+              style={{ width: `${(uploadStep / 3) * 100}%` }}
+            />
+          </div>
+          <p className="sr-only">Step {uploadStep} of 3 complete</p>
         </div>
 
         <form
@@ -169,355 +209,454 @@ export default function UploadBookModal({
             else onSubmit(e);
           }}
         >
-          <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5 md:px-7 md:py-6">
-            {uploadStep === 1 ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                    Academic field{' '}
-                    <span className="text-rose-500">*</span>
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Choose Engineering, Social sciences, or Natural sciences.
-                  </p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    {ACADEMIC_TRACKS.map((t) => {
-                      const Icon = TRACK_ICONS[t.id];
-                      const sel = uploadForm.academicTrack === t.id;
-                      return (
-                        <button
-                          key={t.id}
-                          type="button"
-                          onClick={() =>
-                            setUploadForm((prev) => ({
-                              ...prev,
-                              academicTrack: t.id,
-                              department: '',
-                              departmentOther: '',
-                            }))
-                          }
-                          className={`group flex flex-col rounded-2xl border p-4 text-left transition focus-visible:outline focus-visible:ring-2 focus-visible:ring-cyan-500 ${
-                            sel
-                              ? 'border-cyan-500 bg-cyan-50/90 shadow-lg shadow-cyan-600/10 ring-2 ring-cyan-500/40 dark:border-cyan-500 dark:bg-cyan-950/40 dark:ring-cyan-400/35'
-                              : 'border-slate-200 bg-white/90 hover:border-cyan-300/80 hover:shadow-md dark:border-slate-600 dark:bg-slate-800/60 dark:hover:border-cyan-500/40'
-                          }`}
-                        >
-                          <Icon
-                            className={`h-9 w-9 shrink-0 ${sel ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-400 group-hover:text-cyan-600 dark:text-slate-500'}`}
-                            aria-hidden
-                          />
-                          <span className="mt-3 font-display text-sm font-semibold leading-snug text-slate-900 dark:text-white">
-                            {t.label}
-                          </span>
-                          <span className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                            {t.hint}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {uploadForm.academicTrack ? (
+          <div className="flex min-h-0 flex-1 flex-col lg:flex-row lg:overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-5 md:px-7 md:py-6 lg:max-h-[min(62vh,640px)]">
+              {uploadStep === 1 ? (
+                <>
                   <div>
                     <p className="text-sm font-semibold text-slate-900 dark:text-white">
-                      Department / discipline{' '}
-                      <span className="text-rose-500">*</span>
+                      Academic field <span className="text-rose-500">*</span>
                     </p>
                     <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                      Tap one option — pick Other if yours is not listed.
+                      Choose Engineering, Social sciences, or Natural sciences.
                     </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {deptList.map((d) => {
-                        const sel = uploadForm.department === d;
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      {ACADEMIC_TRACKS.map((t) => {
+                        const Icon = TRACK_ICONS[t.id];
+                        const sel = uploadForm.academicTrack === t.id;
                         return (
                           <button
-                            key={d}
+                            key={t.id}
                             type="button"
                             onClick={() =>
                               setUploadForm((prev) => ({
                                 ...prev,
-                                department: d,
+                                academicTrack: t.id,
+                                department: '',
                                 departmentOther: '',
                               }))
                             }
-                            className={`rounded-full px-4 py-2 text-sm font-medium ring-1 transition ${
+                            className={`group flex flex-col rounded-2xl border p-4 text-left transition focus-visible:outline focus-visible:ring-2 focus-visible:ring-cyan-500 ${
                               sel
-                                ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/25 ring-transparent'
-                                : 'bg-white text-slate-700 ring-slate-200 hover:ring-cyan-400/60 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600 dark:hover:ring-cyan-500/50'
+                                ? 'border-cyan-500 bg-cyan-50/90 shadow-lg shadow-cyan-600/10 ring-2 ring-cyan-500/40 dark:border-cyan-500 dark:bg-cyan-950/40 dark:ring-cyan-400/35'
+                                : 'border-slate-200 bg-white/90 hover:border-cyan-300/80 hover:shadow-md dark:border-slate-600 dark:bg-slate-800/60 dark:hover:border-cyan-500/40'
                             }`}
                           >
-                            {d}
+                            <Icon
+                              className={`h-9 w-9 shrink-0 ${sel ? 'text-cyan-700 dark:text-cyan-300' : 'text-slate-400 group-hover:text-cyan-600 dark:text-slate-500'}`}
+                              aria-hidden
+                            />
+                            <span className="mt-3 font-display text-sm font-semibold leading-snug text-slate-900 dark:text-white">
+                              {t.label}
+                            </span>
+                            <span className="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                              {t.hint}
+                            </span>
                           </button>
                         );
                       })}
                     </div>
-                    {uploadForm.department === 'Other' ? (
-                      <label className="mt-4 block">
-                        <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                          Specify department
-                        </span>
-                        <input
-                          type="text"
-                          className="input-field text-sm"
-                          placeholder="e.g. Robotics & automation"
-                          value={uploadForm.departmentOther}
-                          onChange={(e) =>
-                            setUploadForm((prev) => ({
-                              ...prev,
-                              departmentOther: e.target.value,
-                            }))
-                          }
-                          autoComplete="off"
-                        />
-                      </label>
-                    ) : null}
                   </div>
-                ) : null}
-              </>
-            ) : null}
 
-            {uploadStep === 2 ? (
-              <>
-                <div>
-                  <label
-                    htmlFor="upload-book-name"
-                    className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
-                  >
-                    Book name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    id="upload-book-name"
-                    type="text"
-                    maxLength={120}
-                    required
-                    className="input-field text-sm"
-                    placeholder="Title as it appears on the cover or syllabus"
-                    value={uploadForm.title}
-                    onChange={(e) =>
-                      setUploadForm((prev) => ({
-                        ...prev,
-                        title: e.target.value,
-                      }))
-                    }
-                  />
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    {uploadForm.title.trim().length}/120 characters
-                  </p>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label
-                      htmlFor="upload-publish-year"
-                      className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
-                    >
-                      Publish year <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      id="upload-publish-year"
-                      type="number"
-                      min={1950}
-                      max={2035}
-                      required
-                      className="input-field text-sm tabular-nums"
-                      value={uploadForm.publishYear}
-                      onChange={(e) => {
-                        const raw = e.target.value;
-                        const v = Number.parseInt(raw, 10);
-                        setUploadForm((prev) => ({
-                          ...prev,
-                          publishYear: Number.isFinite(v)
-                            ? v
-                            : prev.publishYear,
-                        }));
-                      }}
-                    />
-                  </div>
-                  <div className="flex flex-col justify-end">
-                    <p className="mb-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                      Use the edition year when known — estimates are OK for class
-                      packs.
-                    </p>
-                  </div>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="upload-course-subject"
-                    className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
-                  >
-                    Course / subject <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    id="upload-course-subject"
-                    type="text"
-                    required
-                    maxLength={200}
-                    className="input-field text-sm"
-                    placeholder="e.g. Operating Systems, Java, Artificial Intelligence"
-                    value={uploadForm.courseSubject}
-                    onChange={(e) =>
-                      setUploadForm((prev) => ({
-                        ...prev,
-                        courseSubject: e.target.value,
-                      }))
-                    }
-                  />
-                  <div className="mt-3">
-                    <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      Quick picks
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {COURSE_SUBJECT_SUGGESTIONS.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() =>
-                            setUploadForm((prev) => ({
-                              ...prev,
-                              courseSubject: s,
-                            }))
-                          }
-                          className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-cyan-100 hover:text-cyan-900 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-cyan-950 dark:hover:text-cyan-100"
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : null}
-
-            {uploadStep === 3 ? (
-              <>
-                <div
-                  role="presentation"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      fileInputRef.current?.click();
-                    }
-                  }}
-                  onDragEnter={onDropZoneDrag}
-                  onDragLeave={onDropZoneDrag}
-                  onDragOver={onDropZoneDrag}
-                  onDrop={onDropFile}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`cursor-pointer rounded-2xl border-2 border-dashed px-5 py-10 text-center transition ${
-                    dragActive
-                      ? 'border-cyan-500 bg-cyan-50/90 ring-4 ring-cyan-500/15 dark:border-cyan-400 dark:bg-cyan-950/40 dark:ring-cyan-400/20'
-                      : uploadForm.file
-                        ? 'border-emerald-400/70 bg-emerald-50/50 dark:border-emerald-600/60 dark:bg-emerald-950/25'
-                        : 'border-slate-300 bg-slate-50/80 hover:border-cyan-400/70 hover:bg-cyan-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-cyan-500/50 dark:hover:bg-slate-800'
-                  }`}
-                >
-                  <input
-                    ref={fileInputRef}
-                    id="upload-book-file"
-                    type="file"
-                    className="sr-only"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
-                      setUploadForm((prev) => ({ ...prev, file }));
-                      setUploadError('');
-                    }}
-                  />
-                  <Upload className="mx-auto h-10 w-10 text-cyan-600 dark:text-cyan-400" />
-                  <p className="mt-3 font-display text-lg text-slate-900 dark:text-white">
-                    {uploadForm.file ? 'File ready' : 'Drop your file here'}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    PDF recommended · server applies size limits
-                  </p>
-                  {uploadForm.file ? (
-                    <div className="mt-4 inline-flex max-w-full flex-wrap items-center justify-center gap-2 rounded-xl bg-white/95 px-4 py-2 text-sm shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-600">
-                      <BookOpen className="h-4 w-4 shrink-0 text-cyan-600" />
-                      <span className="max-w-[220px] truncate font-medium text-slate-900 dark:text-white sm:max-w-xs">
-                        {uploadForm.file.name}
-                      </span>
-                      <span className="text-slate-500 dark:text-slate-400">
-                        {formatBytes(uploadForm.file.size)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setUploadForm((prev) => ({ ...prev, file: null }));
-                          if (fileInputRef.current)
-                            fileInputRef.current.value = '';
-                        }}
-                        className="rounded-lg bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
-                      >
-                        Remove
-                      </button>
+                  {uploadForm.academicTrack ? (
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                        Department / discipline{' '}
+                        <span className="text-rose-500">*</span>
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Tap one option — pick Other if yours is not listed.
+                      </p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {deptList.map((d) => {
+                          const sel = uploadForm.department === d;
+                          return (
+                            <button
+                              key={d}
+                              type="button"
+                              onClick={() =>
+                                setUploadForm((prev) => ({
+                                  ...prev,
+                                  department: d,
+                                  departmentOther: '',
+                                }))
+                              }
+                              className={`rounded-full px-4 py-2 text-sm font-medium ring-1 transition ${
+                                sel
+                                  ? 'bg-gradient-to-r from-cyan-600 to-cyan-500 text-white shadow-md shadow-cyan-600/25 ring-transparent'
+                                  : 'bg-white text-slate-700 ring-slate-200 hover:ring-cyan-400/60 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600 dark:hover:ring-cyan-500/50'
+                              }`}
+                            >
+                              {d}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {uploadForm.department === 'Other' ? (
+                        <label className="mt-4 block">
+                          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Specify department
+                          </span>
+                          <input
+                            type="text"
+                            className="input-field text-sm"
+                            placeholder="e.g. Robotics & automation"
+                            value={uploadForm.departmentOther}
+                            onChange={(e) =>
+                              setUploadForm((prev) => ({
+                                ...prev,
+                                departmentOther: e.target.value,
+                              }))
+                            }
+                            autoComplete="off"
+                          />
+                        </label>
+                      ) : null}
                     </div>
                   ) : null}
+                </>
+              ) : null}
+
+              {uploadStep === 2 ? (
+                <>
+                  <div>
+                    <label
+                      htmlFor="upload-book-name"
+                      className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
+                    >
+                      Book name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      id="upload-book-name"
+                      type="text"
+                      maxLength={120}
+                      required
+                      className="input-field text-sm"
+                      placeholder="Title as it appears on the cover or syllabus"
+                      value={uploadForm.title}
+                      onChange={(e) =>
+                        setUploadForm((prev) => ({
+                          ...prev,
+                          title: e.target.value,
+                        }))
+                      }
+                    />
+                    <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                      {uploadForm.title.trim().length}/120 characters
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="upload-publish-year"
+                        className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
+                      >
+                        Publish year <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="upload-publish-year"
+                        type="number"
+                        min={1950}
+                        max={2035}
+                        required
+                        className="input-field text-sm tabular-nums"
+                        value={uploadForm.publishYear}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          const v = Number.parseInt(raw, 10);
+                          setUploadForm((prev) => ({
+                            ...prev,
+                            publishYear: Number.isFinite(v)
+                              ? v
+                              : prev.publishYear,
+                          }));
+                        }}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-end">
+                      <p className="mb-3 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                        Use the edition year when known — estimates are OK for
+                        class packs.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="upload-course-subject"
+                      className="mb-1.5 block text-sm font-semibold text-slate-900 dark:text-white"
+                    >
+                      Course / subject <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      id="upload-course-subject"
+                      type="text"
+                      required
+                      maxLength={200}
+                      className="input-field text-sm"
+                      placeholder="e.g. Operating Systems, Java, Artificial Intelligence"
+                      value={uploadForm.courseSubject}
+                      onChange={(e) =>
+                        setUploadForm((prev) => ({
+                          ...prev,
+                          courseSubject: e.target.value,
+                        }))
+                      }
+                    />
+                    <div className="mt-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Quick picks
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {COURSE_SUBJECT_SUGGESTIONS.map((s) => (
+                          <button
+                            key={s}
+                            type="button"
+                            onClick={() =>
+                              setUploadForm((prev) => ({
+                                ...prev,
+                                courseSubject: s,
+                              }))
+                            }
+                            className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-cyan-100 hover:text-cyan-900 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-cyan-950 dark:hover:text-cyan-100"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : null}
+
+              {uploadStep === 3 ? (
+                <>
+                  <div className="space-y-4">
+                    <label
+                      htmlFor="upload-book-file"
+                      onDragEnter={onDropZoneDrag}
+                      onDragLeave={onDropZoneDrag}
+                      onDragOver={onDropZoneDrag}
+                      onDrop={onDropFile}
+                      className={`block cursor-pointer rounded-2xl border-2 border-dashed px-5 py-10 text-center transition ${
+                        dragActive
+                          ? 'border-cyan-500 bg-cyan-50/90 ring-4 ring-cyan-500/15 dark:border-cyan-400 dark:bg-cyan-950/40 dark:ring-cyan-400/20'
+                          : uploadForm.file
+                            ? 'border-emerald-400/70 bg-emerald-50/50 dark:border-emerald-600/60 dark:bg-emerald-950/25'
+                            : 'border-slate-300 bg-slate-50/80 hover:border-cyan-400/70 hover:bg-cyan-50/40 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-cyan-500/50 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        id="upload-book-file"
+                        type="file"
+                        className="sr-only"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          setUploadForm((prev) => ({ ...prev, file }));
+                          setUploadError('');
+                        }}
+                      />
+                      <Upload className="mx-auto h-10 w-10 text-cyan-600 dark:text-cyan-400" />
+                      <p className="mt-3 font-display text-lg text-slate-900 dark:text-white">
+                        {uploadForm.file ? 'File ready' : 'Drop your file here'}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                        PDF recommended · server applies size limits
+                      </p>
+                      {!uploadForm.file ? (
+                        <div className="mt-4 flex flex-wrap justify-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600">
+                            <FileText
+                              className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400"
+                              aria-hidden
+                            />
+                            PDF
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600">
+                            <FileText
+                              className="h-3.5 w-3.5 text-violet-600 dark:text-violet-400"
+                              aria-hidden
+                            />
+                            DOCX
+                          </span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11px] font-bold uppercase tracking-wide text-slate-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-600">
+                            <ImageIcon
+                              className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400"
+                              aria-hidden
+                            />
+                            Images
+                          </span>
+                        </div>
+                      ) : null}
+                    </label>
+
+                    {uploadForm.file ? (
+                      <div className="flex flex-wrap items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-900/80">
+                        <BookOpen className="h-4 w-4 shrink-0 text-cyan-600" />
+                        <span className="max-w-[min(100%,280px)] truncate font-medium text-slate-900 dark:text-white sm:max-w-md">
+                          {uploadForm.file.name}
+                        </span>
+                        <span className="text-slate-500 dark:text-slate-400">
+                          {formatBytes(uploadForm.file.size)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUploadForm((prev) => ({ ...prev, file: null }));
+                            if (fileInputRef.current)
+                              fileInputRef.current.value = '';
+                            setUploadError('');
+                          }}
+                          className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
+                        >
+                          Remove file
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="upload-book-description"
+                      className="mb-1.5 block text-sm font-semibold text-slate-800 dark:text-slate-200"
+                    >
+                      Notes{' '}
+                      <span className="font-normal text-slate-500">
+                        (optional)
+                      </span>
+                    </label>
+                    <textarea
+                      id="upload-book-description"
+                      className="input-field min-h-[96px] resize-y py-3 text-sm leading-relaxed"
+                      placeholder="Edition, instructor, chapter range — helps classmates decide faster."
+                      value={uploadForm.description}
+                      onChange={(e) =>
+                        setUploadForm((prev) => ({
+                          ...prev,
+                          description: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </>
+              ) : null}
+
+              {uploadError ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
+                  {uploadError}
                 </div>
+              ) : null}
 
-                <div>
-                  <label
-                    htmlFor="upload-book-description"
-                    className="mb-1.5 block text-sm font-semibold text-slate-800 dark:text-slate-200"
-                  >
-                    Notes <span className="font-normal text-slate-500">(optional)</span>
-                  </label>
-                  <textarea
-                    id="upload-book-description"
-                    className="input-field min-h-[96px] resize-y py-3 text-sm leading-relaxed"
-                    placeholder="Edition, instructor, chapter range — helps classmates decide faster."
-                    value={uploadForm.description}
-                    onChange={(e) =>
-                      setUploadForm((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                  />
-                </div>
-              </>
-            ) : null}
-
-            {uploadError ? (
-              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200">
-                {uploadError}
-              </div>
-            ) : null}
-
-            {uploading ? (
-              <div className="space-y-2 rounded-2xl border border-cyan-200/90 bg-cyan-50/80 px-4 py-3 dark:border-cyan-900/40 dark:bg-cyan-950/30">
-                <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">
-                  Publishing to library…
-                </p>
-                <div className="profile-upload-progress-indeterminate h-2 overflow-hidden rounded-full bg-cyan-200/80 dark:bg-cyan-900/60">
-                  <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-500" />
-                </div>
-              </div>
-            ) : null}
-
-            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50/95 via-white to-cyan-50/40 px-4 py-3 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95">
-              <div className="flex flex-wrap items-start gap-3">
-                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">
-                    Publishing standards
+              {uploading ? (
+                <div className="space-y-2 rounded-2xl border border-cyan-200/90 bg-cyan-50/80 px-4 py-3 dark:border-cyan-900/40 dark:bg-cyan-950/30">
+                  <p className="text-sm font-semibold text-cyan-900 dark:text-cyan-100">
+                    Publishing to library…
                   </p>
-                  <ul className="space-y-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-                    <li className="flex gap-2">
-                      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                      Files upload over HTTPS and stay scoped to your library permissions—never shared publicly unless visibility allows it.
-                    </li>
-                    <li className="flex gap-2">
-                      <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
-                      PDFs keep richer previews; readers can jump into Liqu AI Study Buddy after publishing.
-                    </li>
-                  </ul>
+                  <div className="profile-upload-progress-indeterminate h-2 overflow-hidden rounded-full bg-cyan-200/80 dark:bg-cyan-900/60">
+                    <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-cyan-500 via-teal-400 to-cyan-500" />
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50/95 via-white to-cyan-50/40 px-4 py-3 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95">
+                <div className="flex flex-wrap items-start gap-3">
+                  <ShieldCheck
+                    className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">
+                      Publishing standards
+                    </p>
+                    <ul className="space-y-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                      <li className="flex gap-2">
+                        <Lock
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                          aria-hidden
+                        />
+                        Files upload over HTTPS and stay scoped to your library
+                        permissions—never shared publicly unless visibility
+                        allows it.
+                      </li>
+                      <li className="flex gap-2">
+                        <BookOpen
+                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400"
+                          aria-hidden
+                        />
+                        PDFs keep richer previews; readers can jump into Liqu AI
+                        Study Buddy after publishing.
+                      </li>
+                    </ul>
+                  </div>
                 </div>
               </div>
             </div>
+
+            {uploadStep >= 2 ? (
+              <aside className="hidden shrink-0 border-t border-slate-200/90 bg-gradient-to-b from-slate-50/98 via-white to-cyan-50/30 px-5 py-5 dark:border-slate-700 dark:from-slate-950/90 dark:via-slate-900 dark:to-slate-950/95 lg:block lg:w-[min(100%,300px)] lg:border-l lg:border-t-0 lg:py-6 xl:w-[min(100%,320px)]">
+                <div className="sticky top-0 space-y-5">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                      Submission recap
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                      Values carry through each step so classmates see
+                      consistent catalog data.
+                    </p>
+                  </div>
+                  <dl className="space-y-4 text-sm">
+                    <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                      <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Academic field
+                      </dt>
+                      <dd className="mt-1 font-semibold text-slate-900 dark:text-white">
+                        {trackLabel || '—'}
+                      </dd>
+                    </div>
+                    <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                      <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                        Department
+                      </dt>
+                      <dd className="mt-1 font-semibold leading-snug text-slate-900 dark:text-white">
+                        {deptResolved || '—'}
+                      </dd>
+                    </div>
+                    {uploadStep >= 3 ? (
+                      <>
+                        <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                          <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                            Title
+                          </dt>
+                          <dd className="mt-1 font-semibold leading-snug text-slate-900 dark:text-white">
+                            {uploadForm.title.trim() || '—'}
+                          </dd>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                            <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                              Year
+                            </dt>
+                            <dd className="mt-1 font-mono font-semibold tabular-nums text-slate-900 dark:text-white">
+                              {uploadForm.publishYear || '—'}
+                            </dd>
+                          </div>
+                          <div className="rounded-xl border border-slate-200/90 bg-white/95 px-3 py-2.5 shadow-sm dark:border-slate-600 dark:bg-slate-900/60">
+                            <dt className="text-[10px] font-bold uppercase tracking-wide text-slate-400 dark:text-slate-500">
+                              Course
+                            </dt>
+                            <dd className="mt-1 line-clamp-2 font-semibold leading-snug text-slate-900 dark:text-white">
+                              {uploadForm.courseSubject.trim() || '—'}
+                            </dd>
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+                  </dl>
+                </div>
+              </aside>
+            ) : null}
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200/90 bg-slate-50/95 px-5 py-4 dark:border-slate-600 dark:bg-slate-900/95 md:px-7">
