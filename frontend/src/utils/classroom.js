@@ -18,6 +18,20 @@ export function getMemberName(member) {
   return 'Participant';
 }
 
+/**
+ * Creator or listed admins can manage classroom schedule / announcements.
+ * @param {{ id?: string } | null} user
+ * @param {{ creator?: unknown, admins?: unknown[] } | null | undefined} chat
+ */
+export function canManageClassroom(user, chat) {
+  if (!user?.id || !chat) return false;
+  const uid = String(user.id);
+  const creatorId = chat.creator?._id ?? chat.creator;
+  if (creatorId != null && String(creatorId) === uid) return true;
+  const admins = Array.isArray(chat.admins) ? chat.admins : [];
+  return admins.some((a) => String(a?._id ?? a) === uid);
+}
+
 export async function fetchClassroomMeta(chatId, signal) {
   const response = await fetch('/api/chats?limit=100', {
     credentials: 'include',

@@ -1,7 +1,43 @@
+import mongoose from 'mongoose';
 import { customAlphabet } from 'nanoid';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
+import { canManageClassroomContent } from '../utils/classroomContentAuth.js';
+
+const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+function validateClassScheduleSlots(slots) {
+  const fail = (msg) => {
+    const e = new Error(msg);
+    e.status = 400;
+    throw e;
+  };
+  if (!Array.isArray(slots)) {
+    fail('classSchedule.slots must be an array');
+  }
+  if (slots.length > 48) {
+    fail('Too many weekly slots');
+  }
+  for (const s of slots) {
+    if (!s || typeof s !== 'object') {
+      fail('Invalid slot');
+    }
+    const wd = Number(s.weekday);
+    if (!Number.isInteger(wd) || wd < 0 || wd > 6) {
+      fail('Each slot needs weekday 0–6 (Sunday=0)');
+    }
+    if (!HH_MM.test(String(s.start ?? ''))) {
+      fail('Invalid start time (use 24h HH:mm)');
+    }
+    if (!HH_MM.test(String(s.end ?? ''))) {
+      fail('Invalid end time (use 24h HH:mm)');
+    }
+    if (s.label != null && String(s.label).length > 120) {
+      fail('Label too long');
+    }
+  }
+}
 
 const forbidden = (message) => {
   const err = new Error(message);
@@ -114,6 +150,44 @@ export const getUserChats = asyncHandler(async (req, res) => {
     total,
     hasMore: parsedPage * parsedLimit < total,
     chats,
+  });
+});
+
+export const patchChatSchedule = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const e = new Error('Invalid classroom id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select(
+    'members admins creator metadata name',
+  );
+  if (!chat) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+
+  if (!canManageClassroomContent(chat, req.user._id)) {
+    throw forbidden('Only classroom admins can update the weekly schedule');
+  }
+
+  const raw = req.body?.classSchedule ?? req.body;
+  const slots = raw?.slots;
+  validateClassScheduleSlots(slots);
+
+  if (!chat.metadata || typeof chat.metadata !== 'object') {
+    chat.metadata = {};
+  }
+  chat.metadata.classSchedule = { slots };
+  await chat.save();
+
+  res.json({
+    message: 'Schedule updated',
+    classSchedule: chat.metadata.classSchedule,
   });
 });
 

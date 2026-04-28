@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
+import { useAuth } from '../contexts/AuthContext';
+import { canManageClassroom } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
 
 function ClassRoom() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -164,18 +168,18 @@ function ClassRoom() {
               {classrooms.map((classroom) => (
                 <article
                   key={classroom._id}
-                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                  className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-600 dark:bg-slate-900/25"
                 >
-                  <h3 className="font-display text-xl text-slate-900">
+                  <h3 className="font-display text-xl text-slate-900 dark:text-slate-50">
                     {classroom.name}
                   </h3>
-                  <p className="mt-1 text-sm text-slate-600">
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                     Code:{' '}
                     <span className="break-all font-mono">
                       {classroom.invitationCode}
                     </span>
                   </p>
-                  <p className="mt-2 text-sm text-slate-600">
+                  <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
                     Members: {classroom.members?.length ?? 0}
                   </p>
                   <Link
@@ -184,6 +188,13 @@ function ClassRoom() {
                   >
                     Enter classroom
                   </Link>
+                  {canManageClassroom(user, classroom) ? (
+                    <ClassroomScheduleEditor
+                      chatId={String(classroom._id)}
+                      initialSlots={classroom.metadata?.classSchedule?.slots}
+                      onSaved={fetchChats}
+                    />
+                  ) : null}
                 </article>
               ))}
             </div>

@@ -4,6 +4,7 @@ import {
   getChatMessages,
   getUserChats,
   joinChatByCode,
+  patchChatSchedule,
   sendMessage,
 } from '../controllers/chatController.js';
 import {
@@ -24,6 +25,8 @@ router.use(isAuthenticated);
 router.post('/', createChat);
 router.post('/join', joinChatByCode);
 router.get('/', getUserChats);
+
+router.patch('/:chatId/schedule', patchChatSchedule);
 
 router.get('/:chatId/announcements', listAnnouncements);
 router.post('/:chatId/announcements', createAnnouncement);

@@ -15,6 +15,7 @@ import { errorHandler, notFound } from './middlewares/errorHandler.js';
 import aiRoutes from './routes/aiRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
+import dashboardRoutes from './routes/dashboardRoutes.js';
 import examRoutes from './routes/examRoutes.js';
 import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
 import booksRoutes from './routes/libraryRoutes.js';
@@ -81,6 +82,7 @@ if (ENV.NODE_ENV === 'development') {
 app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
 app.use('/api/profile', profileRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
