@@ -1,3 +1,4 @@
+import { Settings } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
@@ -157,21 +158,33 @@ function Profile() {
     <div className="page-surface px-4 pb-10 pt-8 md:px-6">
       <section className="mx-auto max-w-6xl space-y-5">
         <div className="panel-card rounded-3xl p-6 md:p-8">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
-            Profile
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
+              Profile
+            </p>
+            <Link
+              to="/settings"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings className="h-5 w-5" aria-hidden />
+            </Link>
+          </div>
           <div className="mt-3 flex flex-wrap items-center gap-4">
             <img
               src={avatar}
               alt={`${displayName} avatar`}
-              className="h-20 w-20 rounded-2xl border border-slate-200 object-cover"
+              className="h-20 w-20 rounded-2xl border border-slate-200 object-cover dark:border-slate-600"
             />
             <div>
-              <h1 className="font-display text-3xl text-slate-900 md:text-4xl">
+              <h1 className="font-display text-3xl text-slate-900 dark:text-slate-100 md:text-4xl">
                 {displayName}
               </h1>
-              <p className="text-sm text-slate-600">{email}</p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                {email}
+              </p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Last seen: {formattedLastSeen}
               </p>
             </div>

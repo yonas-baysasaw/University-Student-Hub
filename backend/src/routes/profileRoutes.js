@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import express from 'express';
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
@@ -146,6 +147,7 @@ router.post(
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
   const photo = req.user.avatar;
+  const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
 
   res.json({
     id: req.user._id,
@@ -157,6 +159,9 @@ router.get('/', ensureAuth, (req, res) => {
     photo,
     avatar: req.user.avatar || null,
     lastSeen: req.user.lastSeen || null,
+    geminiConfigured,
+    geminiModelId: req.user.geminiModelId || '',
+    hasLocalPassword: !!req.user.password,
   });
 });
 
@@ -280,6 +285,47 @@ router.get(
         avatar: channel.avatar || '',
       })),
     });
+  }),
+);
+
+/* ===== Change password (local accounts) ===== */
+router.put(
+  '/password',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!req.user.password) {
+      return res.status(400).json({
+        message:
+          'This account has no password set. Sign in with Google or use password reset.',
+      });
+    }
+
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string'
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Current and new password required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: 'New password must be at least 8 characters' });
+    }
+
+    const match = await bcrypt.compare(currentPassword, req.user.password);
+    if (!match) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    req.user.password = await bcrypt.hash(newPassword, 10);
+    await req.user.save();
+
+    res.json({ message: 'Password updated' });
   }),
 );
 

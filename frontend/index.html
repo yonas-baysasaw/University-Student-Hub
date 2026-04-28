@@ -5,6 +5,26 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>University-Student-Hub</title>
+    <script>
+      (() => {
+        var k = 'ush-theme';
+        var v;
+        var d = document.documentElement;
+        try {
+          v = localStorage.getItem(k) || 'system';
+        } catch {
+          v = 'system';
+        }
+        if (v === 'dark') {
+          d.classList.add('dark');
+        } else if (
+          v === 'system' &&
+          window.matchMedia('(prefers-color-scheme: dark)').matches
+        ) {
+          d.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

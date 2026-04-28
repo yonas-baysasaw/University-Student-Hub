@@ -29,6 +29,7 @@ import PasswordReset from './pages/PasswordReset';
 import Profile from './pages/Profile';
 import PublicProfile from './pages/PublicProfile';
 import Reset from './pages/Reset';
+import Settings from './pages/Settings';
 import Signup from './pages/Signup';
 import StudyBuddy from './pages/StudyBuddy';
 
@@ -82,13 +83,11 @@ function AppRoutes() {
             <Route path="/exams" element={<Exams />} />
             <Route path="/exams/:examId" element={<ExamPractice />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
-            <Route
-              path="/password/reset"
-              element={<Navigate to="/" replace />}
-            />
+            <Route path="/password/reset" element={<PasswordReset />} />
             <Route
               path="/reset-password/:token"
               element={<Navigate to="/" replace />}

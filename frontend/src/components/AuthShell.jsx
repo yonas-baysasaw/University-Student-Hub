@@ -6,8 +6,12 @@ function AuthShell({ title, subtitle, children }) {
           <div className="mx-auto mb-3 inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-700 to-slate-900 text-sm font-bold text-cyan-100 shadow-md">
             USH
           </div>
-          <h1 className="font-display text-2xl text-slate-900">{title}</h1>
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          <h1 className="font-display text-2xl text-slate-900 dark:text-slate-100">
+            {title}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+            {subtitle}
+          </p>
         </div>
         <div className="mt-6">{children}</div>
       </div>
