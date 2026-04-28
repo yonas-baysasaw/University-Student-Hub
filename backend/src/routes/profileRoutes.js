@@ -1,10 +1,11 @@
+import bcrypt from 'bcrypt';
 import express from 'express';
+import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
-import mongoose from 'mongoose';
 
 const router = express.Router();
 
@@ -22,24 +23,34 @@ router.get(
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: 'Invalid user id' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid user id' });
     }
 
-    const user = await User.findById(userId).select('username name avatar createdAt subscribers').lean();
+    const user = await User.findById(userId)
+      .select('username name avatar createdAt subscribers')
+      .lean();
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'User not found' });
     }
 
     const viewerId = req.user?._id ? String(req.user._id) : null;
     const subscribers = Array.isArray(user.subscribers) ? user.subscribers : [];
-    const viewerSubscribed = viewerId ? subscribers.some(id => String(id) === viewerId) : false;
+    const viewerSubscribed = viewerId
+      ? subscribers.some((id) => String(id) === viewerId)
+      : false;
 
     const sharedBooks = await Book.find({
       userId,
       visibility: { $in: ['public', 'unlisted'] },
     })
       .sort({ createdAt: -1 })
-      .select('title description bookUrl thumbnailUrl format visibility createdAt updatedAt likesCount dislikesCount views')
+      .select(
+        'title description bookUrl thumbnailUrl format visibility createdAt updatedAt likesCount dislikesCount views academicTrack department publishYear courseSubject',
+      )
       .lean();
 
     return res.status(200).json({
@@ -60,7 +71,7 @@ router.get(
       },
       sharedBooks,
     });
-  })
+  }),
 );
 
 router.post(
@@ -70,32 +81,49 @@ router.post(
     const { userId } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ success: false, message: 'Invalid user id' });
+      return res
+        .status(400)
+        .json({ success: false, message: 'Invalid user id' });
     }
 
     const currentUserId = String(req.user._id);
     if (currentUserId === userId) {
-      return res.status(400).json({ success: false, message: 'You cannot subscribe to your own profile' });
+      return res.status(400).json({
+        success: false,
+        message: 'You cannot subscribe to your own profile',
+      });
     }
 
     const targetUser = await User.findById(userId);
     if (!targetUser) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'User not found' });
     }
 
     const currentUser = await User.findById(req.user._id);
     if (!currentUser) {
-      return res.status(404).json({ success: false, message: 'Current user not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: 'Current user not found' });
     }
 
-    const subscriptions = Array.isArray(currentUser.subscriptions) ? currentUser.subscriptions : [];
-    const subscribers = Array.isArray(targetUser.subscribers) ? targetUser.subscribers : [];
+    const subscriptions = Array.isArray(currentUser.subscriptions)
+      ? currentUser.subscriptions
+      : [];
+    const subscribers = Array.isArray(targetUser.subscribers)
+      ? targetUser.subscribers
+      : [];
 
-    const isSubscribed = subscriptions.some(id => String(id) === userId);
+    const isSubscribed = subscriptions.some((id) => String(id) === userId);
 
     if (isSubscribed) {
-      currentUser.subscriptions = subscriptions.filter(id => String(id) !== userId);
-      targetUser.subscribers = subscribers.filter(id => String(id) !== currentUserId);
+      currentUser.subscriptions = subscriptions.filter(
+        (id) => String(id) !== userId,
+      );
+      targetUser.subscribers = subscribers.filter(
+        (id) => String(id) !== currentUserId,
+      );
     } else {
       currentUser.subscriptions = [...subscriptions, targetUser._id];
       targetUser.subscribers = [...subscribers, currentUser._id];
@@ -108,28 +136,33 @@ router.post(
       subscribed: !isSubscribed,
       profile: {
         id: String(targetUser._id),
-        subscribersCount: Array.isArray(targetUser.subscribers) ? targetUser.subscribers.length : 0,
+        subscribersCount: Array.isArray(targetUser.subscribers)
+          ? targetUser.subscribers.length
+          : 0,
       },
     });
-  })
+  }),
 );
 
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
-  const photo =
-    req.user.avatar
-   
+  const photo = req.user.avatar;
+  const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
+  const displayName = req.user.name || req.user.username || '';
 
   res.json({
     id: req.user._id,
     username: req.user.username,
     name: req.user.name,
     email: req.user.email,
-    displayName: req.user.displayName,
+    displayName,
     provider: req.user.provider,
     photo,
     avatar: req.user.avatar || null,
     lastSeen: req.user.lastSeen || null,
+    geminiConfigured,
+    geminiModelId: req.user.geminiModelId || '',
+    hasLocalPassword: !!req.user.password,
   });
 });
 
@@ -139,18 +172,38 @@ router.get(
   ensureAuth,
   asyncHandler(async (req, res) => {
     const limit = Math.min(Math.max(Number(req.query.limit) || 20, 1), 50);
-    const currentUser = await User.findById(req.user._id).select('subscriptions').lean();
-    const subscribedIds = Array.isArray(currentUser?.subscriptions) ? currentUser.subscriptions : [];
+    const currentUser = await User.findById(req.user._id)
+      .select('subscriptions')
+      .lean();
+    const subscribedIds = Array.isArray(currentUser?.subscriptions)
+      ? currentUser.subscriptions
+      : [];
 
-    const [books, sharedBooks, chats, messages, totalBooks, totalChatsCreated, totalMessages, viewedBooks, likedBooks, subscribedChannels] = await Promise.all([
+    const [
+      books,
+      sharedBooks,
+      chats,
+      messages,
+      totalBooks,
+      totalChatsCreated,
+      totalMessages,
+      viewedBooks,
+      likedBooks,
+      subscribedChannels,
+    ] = await Promise.all([
       Book.find({ userId: req.user._id })
         .sort({ createdAt: -1 })
         .limit(limit)
         .select('title format visibility createdAt updatedAt')
         .lean(),
-      Book.find({ userId: req.user._id, visibility: { $in: ['public', 'unlisted'] } })
+      Book.find({
+        userId: req.user._id,
+        visibility: { $in: ['public', 'unlisted'] },
+      })
         .sort({ createdAt: -1 })
-        .select('title description bookUrl thumbnailUrl format visibility createdAt updatedAt')
+        .select(
+          'title description bookUrl thumbnailUrl format visibility createdAt updatedAt academicTrack department publishYear courseSubject',
+        )
         .lean(),
       Chat.find({ creator: req.user._id })
         .sort({ createdAt: -1 })
@@ -169,19 +222,23 @@ router.get(
       Book.find({ viewedBy: req.user._id })
         .sort({ updatedAt: -1 })
         .limit(limit)
-        .select('title description thumbnailUrl format visibility createdAt updatedAt')
+        .select(
+          'title description thumbnailUrl format visibility createdAt updatedAt',
+        )
         .lean(),
       Book.find({ likedBy: req.user._id })
         .sort({ updatedAt: -1 })
         .limit(limit)
-        .select('title description thumbnailUrl format visibility createdAt updatedAt')
+        .select(
+          'title description thumbnailUrl format visibility createdAt updatedAt',
+        )
         .lean(),
       User.find({ _id: { $in: subscribedIds } })
         .select('username name avatar')
         .lean(),
     ]);
 
-    const bookActivity = books.map(book => ({
+    const bookActivity = books.map((book) => ({
       id: `book-${book._id}`,
       type: 'book_upload',
       title: `Uploaded "${book.title}"`,
@@ -189,7 +246,7 @@ router.get(
       at: book.createdAt,
     }));
 
-    const chatActivity = chats.map(chat => ({
+    const chatActivity = chats.map((chat) => ({
       id: `chat-${chat._id}`,
       type: 'chat_create',
       title: `Created classroom "${chat.name}"`,
@@ -197,11 +254,13 @@ router.get(
       at: chat.createdAt,
     }));
 
-    const messageActivity = messages.map(message => ({
+    const messageActivity = messages.map((message) => ({
       id: `message-${message._id}`,
       type: 'message_send',
       title: `Sent a message in "${message.chat?.name || 'Classroom'}"`,
-      subtitle: message.content ? message.content.slice(0, 90) : message.messageType,
+      subtitle: message.content
+        ? message.content.slice(0, 90)
+        : message.messageType,
       at: message.createdAt,
     }));
 
@@ -220,14 +279,55 @@ router.get(
       activity,
       viewedBooks,
       likedBooks,
-      subscribedChannels: subscribedChannels.map(channel => ({
+      subscribedChannels: subscribedChannels.map((channel) => ({
         id: String(channel._id),
         name: channel.name || channel.username || 'User',
         username: channel.username || '',
         avatar: channel.avatar || '',
       })),
     });
-  })
+  }),
+);
+
+/* ===== Change password (local accounts) ===== */
+router.put(
+  '/password',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!req.user.password) {
+      return res.status(400).json({
+        message:
+          'This account has no password set. Sign in with Google or use password reset.',
+      });
+    }
+
+    if (
+      typeof currentPassword !== 'string' ||
+      typeof newPassword !== 'string'
+    ) {
+      return res
+        .status(400)
+        .json({ message: 'Current and new password required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res
+        .status(400)
+        .json({ message: 'New password must be at least 8 characters' });
+    }
+
+    const match = await bcrypt.compare(currentPassword, req.user.password);
+    if (!match) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    req.user.password = await bcrypt.hash(newPassword, 10);
+    await req.user.save();
+
+    res.json({ message: 'Password updated' });
+  }),
 );
 
 /* ===== Update Profile ===== */
@@ -235,20 +335,71 @@ router.put(
   '/',
   ensureAuth,
   asyncHandler(async (req, res) => {
-    const { username, displayName } = req.body;
+    const { username, name, displayName, avatar } = req.body || {};
 
-    if (username !== undefined) req.user.username = username;
-    if (displayName !== undefined) req.user.displayName = displayName;
+    if (username !== undefined) {
+      const nextUsername = String(username).trim();
+      if (!nextUsername) {
+        return res.status(400).json({ message: 'Username cannot be empty' });
+      }
+      if (nextUsername.length < 3 || nextUsername.length > 32) {
+        return res
+          .status(400)
+          .json({ message: 'Username must be between 3 and 32 characters' });
+      }
+      const taken = await User.findOne({
+        username: nextUsername,
+        _id: { $ne: req.user._id },
+      })
+        .select('_id')
+        .lean();
+      if (taken) {
+        return res.status(409).json({ message: 'Username is already taken' });
+      }
+      req.user.username = nextUsername;
+    }
+
+    if (name !== undefined || displayName !== undefined) {
+      const rawName = name ?? displayName;
+      const nextName = String(rawName).trim();
+      if (!nextName) {
+        return res.status(400).json({ message: 'Name cannot be empty' });
+      }
+      if (nextName.length > 80) {
+        return res
+          .status(400)
+          .json({ message: 'Name must be 80 characters or fewer' });
+      }
+      req.user.name = nextName;
+    }
+
+    if (avatar !== undefined) {
+      const nextAvatar = String(avatar || '').trim();
+      if (nextAvatar.length > 2048) {
+        return res
+          .status(400)
+          .json({ message: 'Avatar URL is too long (max 2048 chars)' });
+      }
+      req.user.avatar = nextAvatar || '';
+    }
 
     await req.user.save();
 
     res.json({
       message: 'Profile updated',
-      user: {
+      profile: {
         id: req.user._id,
         username: req.user.username,
-        displayName: req.user.displayName,
+        name: req.user.name,
+        email: req.user.email,
+        displayName: req.user.name || req.user.username || '',
+        provider: req.user.provider,
+        photo: req.user.avatar || null,
         avatar: req.user.avatar || null,
+        lastSeen: req.user.lastSeen || null,
+        geminiConfigured: !!String(req.user.geminiApiKey || '').trim(),
+        geminiModelId: req.user.geminiModelId || '',
+        hasLocalPassword: !!req.user.password,
       },
     });
   }),

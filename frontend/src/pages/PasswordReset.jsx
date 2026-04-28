@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
+import { useAuth } from '../contexts/AuthContext';
 
 function PasswordReset() {
+  const { user } = useAuth();
   const [email, setEmail] = useState('');
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
@@ -73,10 +75,10 @@ function PasswordReset() {
 
       <div className="mt-4 text-center text-sm">
         <Link
-          to="/login"
-          className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline"
+          to={user ? '/' : '/login'}
+          className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200"
         >
-          Back to sign in
+          {user ? 'Back to dashboard' : 'Back to sign in'}
         </Link>
       </div>
     </AuthShell>

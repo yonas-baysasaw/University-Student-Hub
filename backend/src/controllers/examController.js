@@ -96,7 +96,7 @@ async function uploadExamController(req, res, next) {
         } else {
           content = textContent;
         }
-        await processExamInBatches(exam._id.toString(), content);
+        await processExamInBatches(exam._id.toString(), content, userId);
       } catch (err) {
         console.error(
           `Background processing failed for exam ${exam._id}:`,

@@ -1,0 +1,2218 @@
+ 
+ 
+ADDIS ABABA UNIVERISITY 
+COLLEGE OF TECHNOLOGY AND BUILT ENVORONMENT 
+SCHOOL OF INFORMATION TECHNOLOGY AND 
+ENGINEERING 
+DEPARTMENT OF INFORMATION TECHNOLOGY 
+University Student Hub 
+Software Design Specification 
+ 
+PREPARED BY: - 
+1. Yonas Baysasaw  ATE/9495/13 
+2. Yididiya Tamirat  ATE/6282/13 
+3. Yeabsira hailu   ATE/7665/13 
+4.  Solomon Awoke ATE/8291/13 
+5.Natinael Henok  ATE/6792/13 
+ 
+Advisor: MR. GETINET          Date: 15/01/2025 
+ 
+  
+ 
+
+
+University Student Hub (USH) 
+Software Design Specification 
+Project Name: University Student Hub (USH) 
+Document Status: Draft - Version 1.0 
+Team Members: 
+Yonas Baysasaw (ATE/9495/13) 
+Solomon Awoke (ATE/8291/13) 
+Yididiya Tamirat (ATE/6282/13) 
+Yeabsira Hailu (ATE/7665/13) 
+Natinael Henok (ATE/6792/13) 
+Advisor: MR. GETINET 
+Date: January 10, 2026 
+ 
+Revision History 
+Date Version Description Author Comments 
+01/15/2026 1.0 Initial Draft USH Team  SDS  
+ 
+ 
+ 
+ 
+ 
+
+ 
+Table of Contents 
+1. Introduction  
+1.1 Purpose 
+1.2 General Overview 
+1.3 Development Methods & Contingencies 
+2. System Architecture  
+2.1 Subsystem Decomposition 
+2.2 Hardware/Software Mapping 
+2.3 Access Control 
+3. Object Model  
+3.1 Class Diagram 
+3.2 Sequence Diagrams 
+3.3 State Chart Diagrams 
+4. Detailed Design  
+4.1 Core Entity Classes 
+4.2 Service Layer Classes 
+4.3 Database Schema Design 
+5. References 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+ 
+List of Tables 
+Table 1: Subsystem Components and Responsibilities 
+Table 2: Hardware Requirements Mapping 
+Table 3: Access Control Matrix 
+Table 4: User Entity Attributes 
+Table 5: Announcement Entity Attributes 
+Table 6: Resource Entity Attributes 
+Table 7: Classroom Entity Attributes 
+Table 8: Database Tables Overview 
+Table 9: User Class Operations 
+Table 10: Announcement Class Operations 
+Table 11: Resource Class Operations 
+Table 12: Classroom Class Operations 
+Table 13: AuthService Methods 
+Table 14: NotificationService Methods 
+Table 15: RecommendationEngine Methods 
+ 
+ 
+ 
+ 
+ 
+ 
+
+List of Figures 
+Figure 1: High-Level System Context Diagram 
+Figure 2: Three-Tier Architecture Diagram 
+Figure 3: Subsystem Decomposition (Component Diagram) 
+Figure 4: Deployment Diagram 
+Figure 5: Access Control Flow Diagram 
+Figure 6: Core Domain Class Diagram 
+Figure 7: User Registration and Login Sequence Diagram 
+Figure 8: Announcement Publishing Sequence Diagram 
+Figure 9: AI Chatbot Query Sequence Diagram 
+Figure 10: Resource Upload Sequence Diagram 
+Figure 11: Announcement State Chart Diagram Figure 
+12: User Session State Chart Diagram 
+Figure 13: Entity-Relationship Diagram (ERD) 
+ 
+Definitions, Acronyms, and Abbreviations 
+Term Definition 
+USH University Student Hub 
+SDS Software Design Specification 
+SRS Software Requirements Specification 
+API Application Programming Interface 
+REST Representational State Transfer 
+JWT JSON Web Token 
+RBAC Role-Based Access Control 
+ 
+ 
+ 
+
+    Term   Definition 
+CORS Cross-Origin Resource Sharing 
+ORM Object-Relational Mapping 
+DTO Data Transfer Object 
+MVC Model-View-Controller 
+SPA Single Page Application 
+SMTP Simple Mail Transfer Protocol 
+TLS Transport Layer Security 
+CSRF Cross-Site Request Forgery 
+XSS Cross-Site Scripting 
+WCAG Web Content Accessibility Guidelines 
+ERD Entity-Relationship Diagram 
+UML Unified Modeling Language 
+UUID Universally Unique Identifier 
+HTTPS Hypertext Transfer Protocol Secure 
+SQL Structured Query Language 
+JSON JavaScript Object Notation 
+JSONB JSON Binary (PostgreSQL data type) 
+AWS Amazon Web Services 
+S3 Simple Storage Service (AWS) 
+RDS Relational Database Service (AWS) 
+EC2 Elastic Compute Cloud (AWS) 
+ALB Application Load Balancer (AWS) 
+ 
+
+1. Introduction 
+1.1 Purpose 
+The purpose of this Software Design Specification (SDS) document is to translate the business requirements 
+and functional specifications documented in the University Student Hub (USH) Software Requirements 
+Specification (SRS) into a comprehensive technical design that will guide the development team during 
+implementation. 
+This document serves as: 
+ A blueprint for the development team to understand the system architecture, component interactions, and 
+data flows 
+A reference for quality assurance teams to develop test cases aligned with the design 
+A communication tool between stakeholders, ensuring technical decisions are transparent and justified 
+Documentation for future maintainers to understand design rationale and system structure 
+The intended audience includes: 
+Software Developers: To implement the system according to architectural patterns and design decisions 
+Database Administrators: To create and optimize the database schema 
+UI/UX Designers: To implement interface designs consistent with system architecture 
+Quality Assurance Team: To verify that implementation adheres to design specifications 
+Project Advisor: To review technical approach and validate design decisions 
+Future Maintainers: To understand system architecture for enhancements and troubleshooting 
+1.2 General Overview 
+System Context 
+The University Student Hub (USH) is a web-based platform designed to centralize academic communication, 
+resource sharing, and student management for Addis Ababa Institute of Technology (AAiT). The system 
+operates as a standalone application that complements existing institutional infrastructure without replacing 
+core academic systems such as the Student Information System (SIS) or grade management platforms. 
+High-Level Architecture 
+USH adopts a Three-Tier Architecture pattern with clear separation of concerns: 
+
+1. Presentation Layer (Client Tier): A React-based Single Page Application (SPA) providing responsive, 
+interactive user interfaces accessible via web browsers on desktop and mobile devices. 
+2. Application Layer (Business Logic Tier): A Node.js/Express.js RESTful API server handling business 
+logic, authentication, authorization, and orchestrating data operations. 
+3. Data Layer (Data Tier): PostgreSQL relational database managing persistent storage with proper 
+indexing, transactions, and data integrity constraints. 
+ 
+Figure 2: Three-Tier Architecture Diagram 
+System Context Overview 
+The USH system interacts with several external services: 
+
+
+ 
+Figure 1: High-Level System Context Diagram 
+Client Devices: 
+➢ Mobile browsers (iOS, Android) 
+External Services: 
+➢ AWS S3 (file storage) 
+➢ SMTP Service (email notifications) 
+➢ OpenAI API (AI chatbot functionality) 
+Internal Components: 
+➢ Express.js API (application layer) 
+➢ PostgreSQL Database (data layer) 
+➢ Redis Cache (session and data caching) 
+ 
+Design Approach 
+The design follows industry-standard best practices: 
+RESTful API Design: Stateless, resource-oriented endpoints with standard HTTP methods 
+JWT-Based Authentication: Secure, scalable token-based authentication eliminating server-side session 
+storage 
+Role-Based Access Control (RBAC): Granular permission management for different user types  
+Repository Pattern: Abstraction layer between business logic and data access 
+Service Layer Architecture: Business logic encapsulated in reusable service classes 
+Responsive Design: Mobile-first UI approach using Tailwind CSS for consistent styling 
+Progressive Enhancement: Core functionality accessible with graceful degradation for older browsers 
+Design Goals 
+1. Scalability: Support 1,000+ concurrent users with horizontal scaling capability 
+
+
+2. Maintainability: Modular codebase with clear separation of concerns and comprehensive documentation 
+3. Security: Multi-layered security approach protecting user data and preventing common vulnerabilities 
+4. Performance: Sub-2-second response times with optimized database queries and efficient caching 
+5. Accessibility: WCAG 2.1 Level AA compliance ensuring usability for all students 
+6. Reliability: 99.5% uptime during academic hours with automated monitoring and recovery 
+ 
+ 
+ 
+ 
+Technology Stack Summary 
+Frontend: 
+React 18.x (UI framework) 
+React Router 6.x (client-side routing) 
+Tailwind CSS (styling) 
+Axios (HTTP client) 
+Lucide React (icons) 
+Recharts (data visualization) 
+Backend: 
+Node.js 18.x LTS (runtime environment) 
+Express.js 4.x (web framework) 
+PostgreSQL 14.x (relational database) 
+JWT (authentication) 
+Bcrypt (password hashing) 
+Socket.io (real-time notifications) 
+External Services: 
+
+AWS S3 (file storage) 
+Google OAuth (authentication) 
+OpenAI API (AI chatbot) 
+SMTP service (email notifications) 
+1.3 Development Methods & Contingencies 
+Development Methodology 
+The USH project follows an Agile-Scrum hybrid approach adapted for academic constraints: 
+Iterative Development: The system will be developed in 2-week sprints with deliverable increments after each 
+sprint, allowing for continuous feedback and adjustment. 
+Component-Based Architecture: React components and backend services are designed as independent, 
+reusable modules that can be developed and tested in parallel by different team members. 
+API-First Design: The RESTful API is designed and documented before implementation, allowing frontend 
+and backend teams to work concurrently against a defined contract. 
+Test-Driven Development (TDD): Critical business logic components (authentication, authorization, data 
+validation) are developed using TDD principles with 70%+ code coverage target. 
+Design Patterns Applied 
+1. Model-View-Controller (MVC): Clear separation between data models (PostgreSQL schemas), views 
+(React components), and controllers (Express route handlers) 
+2. Repository Pattern: Data access logic abstracted into repository classes, making database operations 
+testable and maintainable 
+3. Service Layer Pattern: Business logic encapsulated in service classes, called by controllers and reusable 
+across multiple endpoints 
+4. Factory Pattern: Used for creating complex objects like notification instances with different delivery 
+mechanisms 
+5. Strategy Pattern: Applied for recommendation algorithms, allowing different recommendation strategies 
+to be swapped dynamically 
+6. Observer Pattern: Implemented via Socket.io for real-time notification delivery to subscribed clients   
+Contingency Plans 
+
+Contingency 1: OpenAI API Rate Limiting or Downtime 
+Risk: The AI chatbot depends on external OpenAI API which has rate limits and potential service disruptions. 
+Mitigation: 
+Implement request queuing and exponential backoff retry logic 
+Cache frequently asked questions and responses locally 
+Display graceful error messages directing users to alternative support channels 
+Maintain fallback FAQ database for common queries 
+Contingency 2: Third-Party Authentication Unavailability 
+Risk: Google OAuth service disruption could prevent user authentication. 
+Mitigation: 
+Implement email/password authentication as backup mechanism 
+Store encrypted password hashes for users who register with email 
+Allow users to link both Google and email credentials 
+Provide clear user communication during OAuth service issues 
+Contingency 3: Database Performance Degradation 
+Risk: As data volume grows, query performance may degrade affecting user experience. 
+Mitigation: 
+Implement database indexing strategy on frequently queried columns 
+Use database query monitoring tools to identify slow queries 
+Implement Redis caching layer for frequently accessed data 
+Design database schema with partitioning capability for future horizontal scaling 
+Contingency 4: Storage Capacity Limitations 
+Risk: User-uploaded resources may exceed allocated S3 storage budget. 
+Mitigation: 
+
+Implement storage quotas per user and per department 
+Provide administrators with storage usage analytics dashboard 
+Implement file compression for document types (PDFs, images) 
+Archive old resources to cheaper long-term storage tiers 
+Implement duplicate file detection to prevent redundant storage 
+Contingency 5: Real-Time Notification Scalability 
+Risk: WebSocket connections for real-time notifications may not scale to thousands of concurrent users. 
+Mitigation: 
+Implement connection pooling and load balancing for Socket.io 
+Use Redis pub/sub for distributing messages across multiple server instances 
+Implement graceful degradation to polling mechanism if WebSocket fails 
+Provide email notifications as reliable backup delivery method 
+Contingency 6: Development Team Changes 
+Risk: Team member unavailability due to academic commitments or other projects. 
+Mitigation: 
+Comprehensive code documentation with inline comments and README files 
+Regular code reviews to ensure knowledge sharing across team members 
+Modular architecture allowing components to be worked on independently 
+Git branching strategy protecting main codebase from incomplete work 
+Weekly sprint meetings to identify blockers and reassign tasks 
+Contingency 7: Technology Stack Incompatibility 
+Risk: Library version conflicts or deprecated features during development. 
+Mitigation: 
+
+Lock dependency versions in package.json to prevent breaking changes 
+Regular dependency updates in controlled manner with testing 
+Maintain compatibility layer for major version upgrades 
+ 
+2. System Architecture 
+2.1 Subsystem Decomposition 
+The University Student Hub system is decomposed into seven major subsystems, each responsible for a 
+distinct domain of functionality. This modular architecture promotes separation of concerns, enables parallel 
+development, and facilitates future maintenance and scaling. 
+Subsystem Overview 
+The USH system consists of the following major subsystems: 
+ 
+ 
+Figure 3: Subsystem Decomposition (Component Diagram) 
+Presentation Layer: 
+➢ Web UI Subsystem (React SPA) 
+Application Layer - Core Subsystems: 
+➢ Authentication & Authorization Subsystem 
+➢ Announcement Management Subsystem 
+➢ Resource Management Subsystem 
+➢ Schedule Management Subsystem 
+
+
+➢ Messaging & Chat Subsystem 
+➢ AI Services Subsystem 
+➢ Notification Subsystem 
+Data Layer: 
+➢ PostgreSQL Database 
+External Services: 
+➢ AWS S3 (storage) 
+➢ SMTP Service (email) 
+➢ Google OAuth (authentication) 
+➢ OpenAI API (AI services) 
+ 
+Detailed Subsystem Descriptions 
+Table 1: Subsystem Components and Responsibilities 
+ 
+Subsystem Primary Responsibilities Key Components External 
+Dependencies 
+Web UI Subsystem - Render user interfaces 
+- Handle user interactions 
+- Client-side routing 
+- State management 
+- React components 
+- Redux store 
+- React Router 
+- Axios HTTP client 
+None (standalone SPA) 
+Authentication & 
+Authorization 
+- User registration/login 
+- JWT tokengeneration/validation  
+- Password hashing 
+- Session management 
+- RBAC enforcement 
+- AuthController 
+- AuthService 
+- JWTMiddleware 
+- PermissionService 
+- UserRepository 
+- Google OAuth API 
+- Bcrypt library 
+Announcement 
+Management 
+- Create/edit/deleteannouncements 
+- Categorization and tagging 
+- Priority management 
+- View tracking 
+- AnnouncementController 
+- AnnouncementService 
+-AnnouncementRepository 
+- AttachmentHandler 
+- Notification 
+Subsystem 
+Resource 
+Management 
+- File upload/download 
+- Resource categorization 
+- Search and filtering 
+- Rating and reviews 
+- Duplicate detection 
+- ResourceController 
+- ResourceService 
+- ResourceRepository 
+- FileStorageService 
+- SearchService 
+- AWS S3 
+- AI Services 
+(recommendations) 
+
+Schedule 
+Management 
+- Schedule CRUD operations 
+- Calendar views 
+- Reminder scheduling 
+- Conflict detection 
+- ScheduleController 
+- ScheduleService 
+- ScheduleRepository 
+- ReminderService 
+- Notification 
+Subsystem 
+Messaging & Chat - Real-time messaging 
+- Message delivery status 
+- File sharing in chat 
+- Conversation history 
+- ChatController 
+- ChatService 
+- MessageRepository 
+- WebSocketHandler 
+- Socket.io library 
+AI Services - Chatbot query processing 
+- Recommendation generation 
+- Natural languageunderstanding 
+- Context management 
+- ChatbotController 
+- ChatbotService 
+- RecommendationEngine 
+- NLPProcessor 
+- OpenAI API 
+Notification 
+Subsystem 
+- Multi-channel 
+notificationdelivery 
+- Email composition 
+- Push notification handling 
+- Notification preferences 
+- NotificationService 
+- EmailService 
+- PushNotificationService 
+- NotificationQueue 
+- SMTP Service 
+- Socket.io 
+ 
+Component-Level Decomposition 
+Each subsystem is further decomposed into three architectural layers following the MVC pattern: 
+Controller Layer: Handles HTTP requests, validates input, calls service layer, and formats responses. 
+Service Layer: Contains business logic, orchestrates repository calls, and manages transactions. 
+Repository Layer: Abstracts database operations, executes SQL queries, and maps results to domain objects. 
+Inter-Subsystem Communication 
+Subsystems communicate through well-defined interfaces: 
+1. Synchronous Communication: RESTful API endpoints for request-response interactions 
+2. Asynchronous Communication: Event-driven messaging via internal event bus for cross-cutting 
+concerns 
+3. Database Sharing: Controlled access to shared database tables through repository interfaces 
+
+Example: When a new announcement is published: 
+1. Announcement Management creates the record 
+2. Triggers event: announcement.created 
+3. Notification Subsystem listens to event 
+4. Sends email/push notifications to target users 
+Dependency Management 
+To prevent circular dependencies and maintain clean architecture: 
+➢ Lower-level subsystems (Auth, Notification) have no dependencies on higher-level subsystems 
+➢ Higher-level subsystems (Announcement, Resource) depend on lower-level services 
+➢ Shared utilities (validation, logging, error handling) are extracted into separate modules 
+➢ Database access flows through repository layer only, never direct queries in controllers 
+2.2 Hardware/Software Mapping 
+The deployment architecture maps software components to physical hardware infrastructure using a 
+cloudbased, containerized deployment model for scalability, reliability, and cost-effectiveness. 
+Deployment Diagram 
+ 
+Figure 4: Deployment Diagram 
+ 
+
+
+ 
+Hardware Requirements 
+Table 2: Hardware Requirements Mapping 
+Component Environment Hardware Specifications Quantity Purpose 
+Application Server Production AWS EC2 t3.medium 
+2 vCPUs, 4GB RAM 
+50GB SSD 
+2+ 
+instances 
+Host Node.js/Express 
+backend 
+Handle API requests 
+Horizontal scaling 
+Database Server Production AWS RDS db.t3.large 
+2 vCPUs, 8GB RAM 
+100GB SSD, Multi-AZ 
+1 primary 
+1 replica 
+PostgreSQL database 
+Read replica for analytics 
+Load Balancer Production AWS Application Load Balancer 
+Auto-scaling enabled 
+1 Distribute traffic 
+SSL termination 
+Health checks 
+Cache Server Production AWS ElastiCache for Redis 
+cache.t3.micro 
+1 vCPU, 0.5GB RAM 
+1 Session storage 
+Frequently accessed data 
+cache 
+File Storage Production AWS S3 Standard 
+1TB storage allocation 
+1 bucket User-uploaded files 
+Static assets 
+Development 
+Server 
+Development Local machine or AWS EC2 
+t3.small 
+1 vCPU, 2GB RAM 
+1 Development and testing 
+ 
+Software Mapping 
+Operating System: Ubuntu 20.04 LTS for all server instances  
+Runtime Environment: 
+➢ Node.js 18.x LTS (application runtime) 
+➢ PostgreSQL 14.x (database server) 
+➢ Nginx (reverse proxy for static file serving) 
+➢ Redis 6.x (caching and session store) 
+Containerization: 
+
+➢ Docker 20.x (container runtime) 
+➢ Docker Compose (local development orchestration) 
+➢ AWS ECS or Kubernetes (production container orchestration) 
+Monitoring & Logging: 
+➢ CloudWatch (AWS native monitoring) 
+➢ PM2 (Node.js process manager with auto-restart) 
+➢ Winston (application logging library) 
+Network Architecture  
+Public Subnet: 
+➢ Load Balancer (internet-facing) 
+➢ Bastion host for SSH access 
+Private Subnet: 
+➢ Application servers (no direct internet access) 
+➢ Database servers (accessible only from app servers) 
+➢ Redis cache (internal communication only) 
+Security Groups: 
+➢ ALB: Allow inbound HTTPS (443) from anywhere, HTTP (80) redirect to HTTPS 
+➢ App Servers: Allow inbound from ALB only on port 3000 
+➢ Database: Allow inbound PostgreSQL (5432) from app servers only 
+➢ Redis: Allow inbound on port 6379 from app servers only 
+Scaling Strategy 
+Horizontal Scaling (Application Tier): 
+➢ Auto-scaling group with 2-10 EC2 instances 
+➢ Trigger: CPU > 70% for 5 minutes → scale up 
+➢ Trigger: CPU < 30% for 10 minutes → scale down 
+➢ Session affinity handled via Redis (stateless servers) 
+Vertical Scaling (Database Tier): 
+➢ Initial: db.t3.large (2 vCPU, 8GB RAM) 
+➢ Growth path: db.t3.xlarge → db.m5.large → db.m5.xlarge 
+➢ Read replicas for analytics and reporting workloads 
+
+Storage Scaling: 
+➢ S3 automatically scales with usage 
+➢ Implement lifecycle policies to move old files to Glacier for cost optimization 
+Disaster Recovery 
+Backup Strategy: 
+➢ Database: Automated daily backups with 30-day retention 
+➢ File Storage: S3 versioning enabled with 7-day retention 
+➢ Application: Infrastructure as Code (Terraform/CloudFormation) for rapid re-deployment 
+High Availability: 
+➢ Multi-AZ deployment for RDS (automatic failover) 
+➢ Multiple application server instances across availability zones 
+➢ Load balancer health checks with automatic instance replacement 
+Recovery Time Objective (RTO): 2 hours Recovery Point Objective (RPO): 24 hours (daily backups) 
+2.3 Access Control 
+The USH system implements a comprehensive Role-Based Access Control (RBAC) model with three user roles: 
+Student, Instructor, and Administrator. Access control is enforced at multiple layers: API endpoints, service 
+methods, and database row-level security. 
+Access Control Architecture 
+ 
+ 
+ 
+ 
+ 
+
+                                                 
+  Figure 5: Access Control Flow Diagram 
+
+
+Role Definitions 
+Student Role (Default) 
+Description: Basic authenticated user with read access and limited write capabilities Granted 
+Upon: Email verification during registration 
+Permissions: 
+View announcements in enrolled classrooms 
+Upload and download resources 
+Participate in classroom chats 
+Interact with AI chatbot 
+Manage own profile 
+Create and manage own schedule 
+Rate and review resources 
+Join classrooms via invitation link 
+Instructor Role 
+Description: Faculty members or teaching assistants with classroom management capabilities Granted 
+By: Administrator approval or automated institutional email verification 
+Permissions: 
+All Student permissions 
+Create and manage classrooms 
+Post announcements to own classrooms 
+Upload resources to own classrooms 
+Moderate classroom discussions 
+View classroom analytics 
+Manage classroom members 
+Generate classroom invitation links 
+ 
+ 
+
+Administrator Role 
+Description: System administrators with full system access for moderation and configuration Granted 
+By: Manual assignment by existing administrator or project team 
+Permissions: 
+All Instructor permissions 
+Manage user roles (promote/demote users) 
+Delete any content (announcements, resources, comments) 
+View system-wide analytics 
+Manage featured announcements 
+Configure system settings 
+Access audit logs 
+Moderate reported content 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+Access Control Matrix 
+Table 3: Access Control Matrix 
+ 
+Resource/Operation Student Instructor Administrator 
+User Management    
+Register Account ✓ ✓ ✓ 
+Edit Own Profile ✓ ✓ ✓ 
+View User Profile ✓ (public only) ✓ (public only) ✓ (all data) 
+Change User Role ✗ ✗ ✓ 
+Delete User Account ✓ (own) ✓ (own) ✓ (any) 
+Classroom Management    
+Create Classroom ✗ ✓ ✓ 
+Join Classroom ✓ (via invite) ✓ ✓ 
+Leave Classroom ✓ ✓ (if not owner) ✓ 
+Edit Classroom Settings ✗ ✓ (own) ✓ (any) 
+Delete Classroom ✗ ✓ (own) ✓ (any) 
+Announcement Management    
+View Announcements ✓ (enrolled) ✓ (enrolled) ✓ (all) 
+Create Announcement ✗ ✓ (own classroom) ✓ (any classroom) 
+Edit Announcement ✗ ✓ (own) ✓ (any) 
+Delete Announcement ✗ ✓ (own) ✓ (any) 
+Pin Announcement ✗ ✓ (own classroom) ✓ (any) 
+Resource Management    
+View Resources ✓ (classroom) ✓ (classroom) ✓ (all) 
+
+Upload Resources ✓ ✓ ✓ 
+Download Resources ✓ ✓ ✓ 
+Edit Resources ✓ (own) ✓ (own + classroom) ✓ (any) 
+Resource/Operation Student Instructor Administrator 
+Delete Resources ✓ (own, <10 downloads) ✓ (classroom) ✓ (any) 
+Rate Resources ✓ (downloaded) ✓ (downloaded) ✓ 
+Schedule Management    
+View Schedule ✓ (own) ✓ (own) ✓ (any) 
+Create Schedule Entry ✓ (own) ✓ (own) ✓ 
+Edit Schedule Entry ✓ (own) ✓ (own) ✓ (any) 
+Delete Schedule Entry ✓ (own) ✓ (own) ✓ (any) 
+Chat & Messaging    
+Send Message ✓ (enrolled) ✓ (classroom) ✓ 
+View Messages ✓ (classroom) ✓ (classroom) ✓ (all) 
+Delete Message ✓ (own, <5min) ✓ (classroom) ✓ (any) 
+AI Services    
+Query Chatbot ✓ ✓ ✓ 
+View Chatbot Analytics ✗ ✓ (classroom) ✓ (all) 
+View Recommendations ✓ ✓ ✓ 
+System Administration    
+View Audit Logs ✗ ✗ ✓ 
+Configure System Settings ✗ ✗ ✓ 
+Access Analytics Dashboard ✗ ✓ (classroom) ✓ (system-wide) 
+
+Authorization Implementation 
+JWT Token Structure: 
+ 
+ 
+Middleware Chain: 
+1. authenticateToken(): Verifies JWT signature and expiration 
+2. authorizeRole([roles]): Checks if user has required role 
+3. checkOwnership(): Validates resource ownership for edit/delete operations  
+ 
+Example Route Protection: 
+ 
+ 
+ 
+json 
+{ 
+{ 
+   
+   
+"userId" 
+"userId" 
+: 
+: 
+  
+  
+"uuid-string" 
+"uuid-string" 
+, 
+, 
+   
+   
+"email" 
+"email" 
+: 
+: 
+  
+  
+"user@aait.edu.et" 
+"user@aait.edu.et" 
+, 
+, 
+   
+   
+"role" 
+"role" 
+: 
+: 
+  
+  
+"student" 
+"student" 
+, 
+, 
+   
+   
+"permissions" 
+"permissions" 
+: 
+: 
+  
+  
+[ 
+[ 
+"read:announcements" 
+"read:announcements" 
+, 
+, 
+  
+  
+"write:resources" 
+"write:resources" 
+] 
+] 
+, 
+, 
+   
+   
+"iat" 
+"iat" 
+: 
+: 
+  
+  
+1704876000 
+1704876000 
+, 
+, 
+   
+   
+"exp" 
+"exp" 
+: 
+: 
+  
+  
+1704962400 
+1704962400 
+} 
+} 
+javascript 
+// Announcement creation - Instructor or Admin only 
+// Announcement creation - Instructor or Admin only 
+router 
+router 
+. 
+. 
+post 
+post 
+( 
+( 
+'/announcements' 
+'/announcements' 
+, 
+, 
+  
+  
+  authenticateToken 
+  authenticateToken 
+, 
+, 
+  
+  
+   
+   
+authorizeRole 
+authorizeRole 
+( 
+( 
+[ 
+[ 
+'instructor' 
+'instructor' 
+, 
+, 
+  
+  
+'admin' 
+'admin' 
+] 
+] 
+) 
+) 
+, 
+, 
+  
+  
+  announcementController 
+  announcementController 
+. 
+. 
+create 
+create 
+) 
+) 
+; 
+; 
+// Announcement deletion - Owner or Admin 
+// Announcement deletion - Owner or Admin 
+router 
+router 
+. 
+. 
+delete 
+delete 
+( 
+( 
+'/announcements/:id' 
+'/announcements/:id' 
+, 
+, 
+  
+  
+  authenticateToken 
+  authenticateToken 
+, 
+, 
+  
+  
+   
+   
+checkOwnership 
+checkOwnership 
+( 
+( 
+'announcement' 
+'announcement' 
+) 
+) 
+, 
+, 
+  
+  
+  announcementController 
+  announcementController 
+. 
+. 
+delete 
+delete 
+) 
+) 
+; 
+; 
+
+Database Row-Level Security: PostgreSQL Row-Level Security (RLS) policies enforce additional access 
+control: 
+Students can only query classrooms they are enrolled in 
+Instructors can modify records in their classrooms 
+Administrators bypass all RLS policies 
+Security Audit Trail 
+All access control decisions are logged: 
+Successful operations: User ID, resource, action, timestamp 
+Failed authorization attempts: User ID, attempted resource, reason for denial, IP address 
+Role changes: Administrator who made change, affected user, old role, new role, timestamp 
+Audit logs are retained for 90 days and accessible only to administrators for security investigations. 
+ 
+3. Object Model 
+3.1 Class Diagram 
+The USH system's object model represents the core domain entities, their attributes, relationships, and 
+operations. The class diagram follows object-oriented design principles with clear inheritance, composition, 
+and association relationships. 
+Core Domain Class Diagram 
+
+ 
+Figure 6: Core Domain Class Diagram 
+
+
+Core Domain Entities 
+The system's core domain model includes the following primary entities: 
+User: Represents system users (students, instructors, administrators) 
+➢ Attributes: userId, email, passwordHash, fullName, role, etc. 
+➢ Operations: register(), login(), updateProfile(), changePassword() 
+Classroom: Represents academic classrooms/courses 
+➢ Attributes: classroomId, name, courseCode, ownerId, invitationCode 
+➢ Operations: create(), update(), addMember(), generateInviteCode() 
+Announcement: Represents classroom announcements 
+➢ Attributes: announcementId, title, content, category, priority 
+➢ Operations: create(), publish(), update(), pin() 
+Resource: Represents academic resources (notes, assignments, etc.) 
+➢ Attributes: resourceId, title, type, fileUrl, avgRating 
+➢ Operations: upload(), download(), rate(), delete() 
+Schedule: Represents class schedules 
+➢ Attributes: scheduleId, courseName, dayOfWeek, startTime, location 
+➢ Operations: create(), update(), checkConflict() 
+Message: Represents chat messages 
+➢ Attributes: messageId, content, status, sentAt 
+➢ Operations: send(), markDelivered(), markRead() 
+ChatbotConversation: Represents AI chatbot sessions 
+➢ Attributes: conversationId, userId, classroomId 
+➢ Operations: start(), addMessage() 
+Notification: Represents system notifications 
+➢ Attributes: notificationId, type, content, isRead 
+➢ Operations: create(), markRead() 
+ 
+Key Relationships 
+User Relationships: 
+➢ User owns 0..* Classrooms 
+➢ User is member of 0..* Classrooms (through ClassroomMember) 
+➢ User authors 0..* Announcements 
+➢ User uploads 0..* Resources 
+➢ User manages 0..* Schedules 
+➢ User sends 0..* Messages 
+➢ User initiates 0..* ChatbotConversations 
+➢ User receives 0..* Notifications 
+Classroom Relationships: 
+➢ Classroom contains 0..* ClassroomMembers 
+➢ Classroom has 0..* Announcements 
+➢ Classroom contains 0..* Resources 
+➢ Classroom hosts 0..* Messages 
+Other Key Relationships: 
+➢ Announcement includes 0..* Attachments 
+➢ Resource is rated by 0..* ResourceRatings 
+➢ Schedule triggers 0..* Reminders 
+➢ ChatbotConversation contains 0..* ChatbotMessages 
+
+Entity Relationship Summary 
+User-Centric Relationships: 
+• A User has one UserRole (Student, Instructor, or Administrator) 
+• A User participates in multiple Classrooms through ClassroomMembership 
+• A User creates multiple Announcements, Resources, Schedules, and Messages 
+• A User receives multiple Notifications and Recommendations 
+Classroom-Centric Relationships: 
+• A Classroom is owned by one User (Instructor) 
+• A Classroom contains multiple Announcements, Resources, and Messages 
+• A Classroom has multiple Members through ClassroomMembership 
+Content Relationships: 
+• An Announcement belongs to one Classroom, has one Category, Priority, and Status 
+• An Announcement may have multiple Attachments 
+• A Resource belongs to one Classroom, has one ResourceType, and multiple ResourceRatings 
+• A Schedule belongs to one User and may trigger multiple Reminders 
+• A Message belongs to one Classroom and may have replies (parent-child relationship) 
+AI Service Relationships: 
+• A ChatbotSession belongs to one User and Classroom 
+• A ChatbotSession contains multiple ChatbotInteractions 
+• A Recommendation links a User to a Resource with confidence scoring 
+3.2 Sequence Diagrams  
+Sequence diagrams illustrate the dynamic behavior of the system by showing how objects interact over time for 
+specific use cases. 
+3.2.1 User Registration Sequence Diagram 
+
+ 
+Figure 7: User Registration Sequence Diagram 
+3.2.2 Announcement Publishing Sequence Diagram 
+
+
+ 
+Figure 8: Announcement Publishing Sequence Diagram 
+3.2.3 AI Chatbot Query Sequence Diagram 
+
+
+ 
+Figure 9: AI Chatbot Query Sequence Diagram 
+3.2.4 Resource Upload Sequence Diagram 
+
+
+ 
+Figure 10: Resource Upload Sequence Diagram 
+ 
+ 
+
+
+ 
+3.3 State Chart Diagrams 
+State chart diagrams model the dynamic behavior of individual objects as they transition between states in 
+response to events. 
+3.3.1 Announcement State Chart 
+ 
+Figure 11: Announcement State Chart Diagram 
+State Descriptions: 
+Draft State: 
+• Entry condition: Instructor creates new announcement or unpublishes existing one 
+• Characteristics: Not visible to students, editable without restrictions, no notifications triggered 
+• Possible transitions: Publish (to Published), Delete (to termination) 
+
+
+• Operations allowed: edit(), addAttachment(), removeAttachment(), delete() 
+Published State: 
+• Entry condition: Instructor publishes draft announcement 
+• Characteristics: Visible to all classroom members, triggers notifications based on priority, view counts 
+tracked, can be pinned 
+• Possible transitions: Expire (automatic when expiration date reached), Archive (manual by admin), 
+Unpublish (back to Draft for edits) 
+• Operations allowed: edit() (limited), pin(), unpin(), archive() 
+• Side effects on entry: Send notifications to classroom members (push + email for URGENT), increment 
+announcement count in classroom 
+Expired State: 
+• Entry condition: System reaches announcement's expiration date 
+• Characteristics: Announcement marked as expired, removed from active feed, still searchable in 
+archive view 
+• Possible transitions: Archive (automatic after 30 days or manual by admin) 
+• Operations allowed: archive() 
+• Side effects on entry: Remove from home feed, send to expired announcements list 
+Archived State: 
+• Entry condition: Administrator manually archives or automatic after 30 days in Expired state 
+• Characteristics: Hidden from normal views, accessible only via archive search, read-only 
+• Possible transitions: Permanent deletion (admin only) 
+• Operations allowed: view(), permanentDelete() (admin only) 
+3.3.2 User Session State Chart 
+
+ 
+Figure 12: User Session State Chart Diagram 
+State Descriptions: 
+Anonymous State: 
+• Entry condition: User accesses website without authentication or after logout/session expiration 
+• Characteristics: No JWT token, access limited to public landing pages, login/register forms visible 
+• Possible transitions: To Authenticating (when login/register initiated) 
+• Operations allowed: viewPublicPages(), initiateLogin(), initiateRegistration() 
+Authenticating State: 
+• Entry condition: User submits login credentials or registration form 
+• Characteristics: Temporary state during authentication process, credentials being verified 
+• Possible transitions: To Authenticated (success), back to Anonymous (failure) 
+• Operations: verifyCredentials(), generateJWT() 
+Authenticated State: 
+
+
+• Entry condition: Successful authentication with valid credentials 
+• Characteristics: JWT token issued and stored, user gains access to system features based on role, 
+session tracked in Redis cache 
+• Possible transitions: To Active (first interaction), to SessionExpired (token expiration), to LoggingOut 
+(manual logout) 
+• Side effects on entry: Create session record, initialize WebSocket connection, load user preferences 
+Active State: 
+• Entry condition: Authenticated user interacts with system (< 5 minutes since last action) 
+• Characteristics: Full system access, WebSocket connection established for real-time notifications, 
+activity timestamps updated 
+• Possible transitions: To Idle (inactivity > 5 minutes), to LoggingOut (manual logout) 
+• Operations allowed: All operations permitted by user role 
+Idle State: 
+• Entry condition: No user activity detected for 5 minutes 
+• Characteristics: Session still valid, WebSocket connection may be closed to save resources, user can 
+resume without re-authentication 
+• Possible transitions: To Active (user resumes), to SessionExpired (24 hours of inactivity) 
+• Side effects on entry: Close WebSocket connection (if applicable), pause background operations 
+SessionExpired State: 
+• Entry condition: JWT token expires (24 hours of inactivity) or manual session termination 
+• Characteristics: Token invalidated, session data cleared from Redis 
+• Possible transitions: To Anonymous (cleanup complete) 
+• Side effects on entry: Clear session from Redis, close all connections, invalidate JWT 
+• Operations: redirectToLogin() 
+LoggingOut State: 
+• Entry condition: User manually clicks logout button 
+• Characteristics: Temporary state during logout process 
+• Possible transitions: To Anonymous (logout complete) 
+• Operations: invalidateToken(), clearSession(), closeConnections() 
+ 
+4. Detailed Design 
+This section provides comprehensive specifications for the core entity classes, service layer components, and 
+database schema design. 
+4.1 Core Entity Classes 
+4.1.1 User Class 
+Table 4: User Entity Attributes 
+
+Attribute Type Visibility Constraints/Invariants 
+id UUID Private - NOT NULL 
+- PRIMARY KEY 
+- Auto-generated on creation 
+email String Private - NOT NULL 
+- UNIQUE 
+- Must match email regex pattern 
+- Max length: 255 characters 
+passwordHash String Private - NOT NULL 
+- Bcrypt hashed (work factor 10+) 
+- Never returned in API responses 
+fullName String Public - NOT NULL 
+- Must contain first and last name 
+- Min length: 3, Max length: 100 characters 
+- No special characters except spaces, hyphens 
+department String Public - NOT NULL 
+- Must be from predefined list (CS, SE, IT, CE, etc.) 
+- Max length: 50 characters 
+yearOfStudy Integer Public - For students: 1-5 
+- For instructors/admin: NULL 
+- Must be positive integer 
+phoneNumber String Public - NULLABLE 
+- Format: +251XXXXXXXXX or 09XXXXXXXX 
+- Must be 10-13 digits 
+profilePicture String Public - NULLABLE 
+- URL to S3 stored image 
+- Max file size: 2MB 
+role UserRole (Enum) Public - NOT NULL 
+- Values: STUDENT, INSTRUCTOR, ADMINISTRATOR 
+- Default: STUDENT 
+createdAt DateTime Public - NOT NULL 
+- Auto-set on creation 
+- Immutable 
+lastLogin DateTime Public - NULLABLE 
+- Updated on each successful login 
+isVerified Boolean Private - NOT NULL 
+- Default: FALSE 
+- Set to TRUE after email verification 
+User Class Operations 
+Operation Visibil
+ity 
+Return 
+Type 
+Arguments Pre-Condition Post-Condition 
+register() Public Boolean email, password, 
+fullName, 
+department 
+- Email not registered 
+- Password meets 
+complexity 
+- Required fields 
+provided 
+- User record created 
+- Email verification sent 
+- isVerified = FALSE 
+- role = STUDENT 
+login() Public String 
+(JWT) 
+email, password - User exists - Password hash verified 
+
+- isVerified = TRUE 
+- Account not locked 
+- lastLogin timestamp 
+updated 
+- JWT token returned 
+- Session created in Redis 
+updateProfile() Public Boolean profileData: 
+Object 
+- User authenticated 
+- User updating own 
+profile OR admin 
+- Specified fields updated 
+- Validation applied 
+- Update timestamp 
+recorded 
+changePasswor
+d() 
+Public Boolean currentPassword, 
+newPassword 
+- User authenticated 
+- currentPassword 
+matches hash 
+- newPassword meets 
+complexity 
+- newPassword != 
+currentPassword 
+- Password hash updated 
+- Sessions invalidated 
+- User must re-
+authenticate 
+- Password change email 
+sent 
+verifyEmail() Public Boolean verificationToke
+n 
+- Token is valid JWT 
+- Token not expired 
+- User exists 
+- isVerified set to TRUE 
+- Token invalidated 
+- Welcome email sent 
+- User can now login 
+resetPassword() Public Boolean email - User exists with given 
+email 
+- Account not locked 
+- Reset token generated 
+- Reset email sent with 
+token 
+- Token valid for 1 hour 
+register() Public Boolean email: String 
+password: String 
+fullName: String 
+department: 
+String 
+- Email not already 
+registered 
+- Password meets 
+complexity 
+requirements 
+- All required fields 
+provided 
+- User record created in 
+database 
+- Email verification sent 
+- isVerified = FALSE 
+- role = STUDENT 
+login() Public String 
+(JWT) 
+email: String 
+password: String 
+- User exists in database 
+- isVerified = TRUE 
+- Account not locked 
+- Password hash verified 
+- lastLogin timestamp 
+updated 
+- JWT token generated 
+and returned 
+- Session created in Redis 
+updateProfile() Public Boolean profileData: 
+Object 
+- User authenticated 
+- User updating own 
+profile OR admin 
+- Specified fields updated 
+- Validation applied to all 
+fields 
+- Profile update 
+timestamp recorded 
+ 
+ 
+ 
+ 
+
+4.1.2 Classroom Class 
+Table 5: Classroom Entity Attributes 
+ 
+ 
+Classroom Class Operations 
+Operation Visibilit
+y 
+Return Type Arguments Pre-Condition Post-
+Condition 
+create() Public Boolean classroomData: 
+Object 
+ownerId: UUID 
+- Owner has 
+INSTRUCTO
+R or ADMIN 
+role 
+- All required 
+fields provided 
+- Classroom 
+name unique 
+for owner 
+- Classroom 
+record created 
+- Owner 
+added as 
+member 
+- Unique 
+invitation link 
+generated 
+Attribute Type Visibility Constraints/Invariants 
+id UUID Private - NOT NULL 
+- PRIMARY KEY 
+- Auto-generated on creation 
+name String Public - NOT NULL 
+- Min length: 5, Max length: 200 characters 
+- Must be unique within owner's classrooms 
+courseCode String Public - NOT NULL 
+- Format: [A-Z]{2,4}[0-9]{3,4} 
+- Example: CS301, SWEN4201 
+- Max length: 20 characters 
+description String Public - NULLABLE 
+- Max length: 1000 characters 
+- Plain text or basic markdown 
+academicTerm String Public - NOT NULL 
+- Format: "Fall 2024", "Spring 2025" 
+- Max length: 50 characters 
+isPublic Boolean Public - NOT NULL 
+- Default: FALSE 
+- If TRUE, visible in public classroom directory 
+invitationLink String Private - NOT NULL 
+- Unique random token 
+- Format: /join/{uniqueToken} 
+- Regenerable by owner 
+ownerId UUID Private - NOT NULL 
+- FOREIGN KEY references users(id) 
+- Must be instructor or admin role 
+createdAt DateTime Public - NOT NULL 
+- Auto-set on creation 
+- Immutable 
+updatedAt DateTime Public - NOT NULL 
+- Auto-updated on any modification 
+
+- Owner 
+receives 
+confirmation 
+generateInviteLink() Public String None - Caller is 
+classroom 
+owner or 
+admin 
+- Classroom 
+exists 
+- New unique 
+token 
+generated 
+- Old 
+invitation link 
+invalidated 
+- New link 
+returned 
+addMember() Public Boolean userId: UUID 
+invitationToken
+: String 
+- Token 
+matches 
+classroom's 
+invitationLink 
+- User not 
+already a 
+member 
+- User has 
+verified 
+account 
+- Membership 
+record created 
+- User gains 
+access to 
+classroom 
+- Welcome 
+notification 
+sent to user 
+removeMember() Public Boolean userId: UUID 
+removedBy: 
+UUID 
+- Caller is 
+owner or 
+admin 
+- Target user is 
+classroom 
+member 
+- Cannot 
+remove owner 
+- Membership 
+record deleted 
+or set inactive 
+- User loses 
+classroom 
+access 
+- Removal 
+notification 
+sent 
+updateSettings() Public Boolean settingsData: 
+Object 
+- Caller is 
+owner or 
+admin 
+- Classroom 
+exists 
+- Specified 
+settings 
+updated 
+- Validation 
+applied 
+- Update 
+notification to 
+members if 
+significant 
+getMembers() Public List<User> filters: Object - Caller is 
+classroom 
+member or 
+admin 
+- List of user 
+objects 
+returned 
+- Filtered by 
+role, join date, 
+activity 
+getAnnouncements(
+) 
+Public List<Announcement
+> 
+filters: Object - Caller is 
+classroom 
+member or 
+admin 
+- List of 
+announcemen
+t objects 
+- Filtered by 
+date, priority, 
+category 
+
+- Ordered by 
+publish date 
+DESC 
+4.1.3 Announcement Class 
+Table 6: Announcement Entity Attributes 
+Attribute Type Visibility Constraints/Invariants 
+id UUID Private - NOT NULL 
+- PRIMARY KEY 
+- Auto-generated on creation 
+title String Public - NOT NULL 
+- Min length: 5, Max length: 200 characters 
+- Plain text only 
+content String Public - NOT NULL 
+- Min length: 10, Max length: 10,000 characters 
+- Supports rich text (HTML sanitized) 
+authorId UUID Private - NOT NULL 
+- FOREIGN KEY references users(id) 
+- Must have INSTRUCTOR or ADMIN role 
+classroomId UUID Private - NOT NULL 
+- FOREIGN KEY references classrooms(id) 
+- Author must be member of classroom 
+category AnnouncementCategory Public - NOT NULL 
+- Values: ACADEMIC, ADMINISTRATIVE, 
+EMERGENCY, EVENT 
+- Affects notification behavior 
+priority PriorityLevel Public - NOT NULL 
+- Values: NORMAL, IMPORTANT, URGENT 
+- Default: NORMAL 
+- Affects notification delivery 
+publishedAt DateTime Public - NULLABLE (NULL if draft) 
+- Set when status changes to PUBLISHED 
+- Immutable once set 
+expiresAt DateTime Public - NULLABLE 
+- Must be future date if set 
+- Auto-archives when reached 
+viewCount Integer Public - NOT NULL 
+- Default: 0 
+- Incremented on each unique user view 
+- Cannot be negative 
+isPinned Boolean Public - NOT NULL 
+- Default: FALSE 
+- Maximum 3 pinned per classroom 
+- Pinned items appear first 
+status AnnouncementStatus Public - NOT NULL 
+- Values: DRAFT, PUBLISHED, EXPIRED, 
+ARCHIVED 
+- Default: DRAFT 
+- Drives visibility logic 
+
+Announcement Class Operations 
+Operation Visibility Return 
+Type 
+Arguments Pre-Condition Post-Condition 
+create() Public Boolean announcementData: 
+Object 
+authorId: UUID 
+- Author is 
+instructor or 
+admin 
+- Author is 
+classroom 
+member 
+- All required 
+fields provided 
+- Announcement 
+created with 
+DRAFT status 
+- Author receives 
+confirmation 
+- No notifications 
+sent 
+publish() Public Boolean None - Announcement 
+in DRAFT status 
+- Caller is author 
+or admin 
+- Content passes 
+validation 
+- Status changed 
+to PUBLISHED 
+- publishedAt 
+timestamp set 
+- Notifications 
+sent based on 
+priority 
+- Appears in 
+classroom feed 
+edit() Public Boolean updatedData: Object - Caller is author 
+or admin 
+- Announcement 
+not ARCHIVED 
+- Content passes 
+validation 
+- Specified fields 
+updated 
+- If PUBLISHED, 
+"Edited" flag set 
+- Viewers notified 
+of update 
+(optional) 
+delete() Public Boolean None - Caller is author 
+or admin 
+- Announcement 
+exists 
+- Status changed 
+to ARCHIVED 
+(soft delete) 
+- Removed from 
+active feeds 
+- Accessible in 
+archive view 
+pin() Public Boolean None - Caller is 
+classroom owner 
+or admin 
+- Announcement 
+is PUBLISHED 
+- < 3 
+announcements 
+already pinned 
+- isPinned set to 
+TRUE 
+- Announcement 
+moves to top of 
+feed 
+- Pin notification 
+sent (optional) 
+incrementViewCount() Public Void userId: UUID - User is 
+classroom 
+member 
+- First view by 
+this user 
+- viewCount 
+incremented by 1 
+- User-view 
+record created 
+- Analytics 
+updated 
+addAttachment() Public Boolean fileData: Object - Announcement 
+exists 
+- File uploaded to 
+S3 
+
+- Caller is author 
+or admin 
+- File passes 
+validation 
+- < 5 attachments 
+currently 
+- Attachment 
+record created 
+- File URL 
+returned 
+4.1.4 Resource Class 
+Table 7: Resource Entity Attributes 
+Attribute Type Visibility Constraints/Invariants 
+id UUID Private - NOT NULL<br/>- PRIMARY KEY<br/>- Auto-generated 
+on creation 
+title String Public - NOT NULL<br/>- Min length: 5, Max length: 200 
+characters<br/>- Plain text only 
+description String Public - NULLABLE<br/>- Max length: 2000 characters<br/>- Plain 
+text or markdown 
+uploaderId UUID Private - NOT NULL<br/>- FOREIGN KEY references users(id) 
+classroomId UUID Private - NOT NULL<br/>- FOREIGN KEY references 
+classrooms(id)<br/>- Uploader must be member 
+type ResourceType Public - NOT NULL<br/>- Values: LECTURE_NOTES, 
+ASSIGNMENT, TEXTBOOK, PAST_PAPER, 
+REFERENCE_MATERIAL<br/>- Affects categorization 
+fileUrl String Private - NOT NULL<br/>- S3 URL with access restrictions<br/>- 
+Generated signed URLs for downloads 
+fileSize Integer Public - NOT NULL<br/>- In bytes<br/>- Max: 52,428,800 
+(50MB)<br/>- Must be positive 
+semester String Public - NULLABLE<br/>- Format: "Fall 2024", "Spring 
+2025"<br/>- Max length: 50 characters 
+averageRating Float Public - Default: NULL<br/>- Range: 0.0 - 5.0<br/>- Calculated 
+from ResourceRating records<br/>- Rounded to 1 decimal 
+place 
+downloadCount Integer Public - NOT NULL<br/>- Default: 0<br/>- Incremented on each 
+download<br/>- Cannot be negative 
+uploadedAt DateTime Public - NOT NULL<br/>- Auto-set on creation<br/>- Immutable 
+tags List<String> Public - Array of tag strings<br/>- Each tag: max 30 characters<br/>- 
+Max 10 tags per resource<br/>- Case-insensitive, trimmed 
+Resource Class Operations 
+Operation Visibilit
+y 
+Return 
+Type Arguments Pre-Condition Post-Condition 
+upload() Public Boolea
+n 
+fileData: 
+Object<br/>metadata: 
+Object<br/>uploaderId
+: UUID 
+- User is 
+classroom 
+member<br/>- 
+File passes 
+validation 
+(size, type, 
+malware)<br/>- 
+- File uploaded to 
+S3<br/>- Resource 
+record created<br/>- 
+File hash calculated 
+for duplicate 
+detection<br/>- 
+
+Operation Visibilit
+y 
+Return 
+Type Arguments Pre-Condition Post-Condition 
+All required 
+metadata 
+provided 
+Uploader receives 
+confirmation 
+download() Public Stream userId: UUID 
+- User is 
+classroom 
+member<br/>- 
+Resource exists 
+and not deleted 
+- Signed S3 URL 
+generated (valid 1 
+hour)<br/>- 
+downloadCount 
+incremented<br/>- 
+Download logged for 
+analytics<br/>- 
+Recommendation 
+engine updated 
+edit() Public Boolea
+n updatedData: Object 
+- Caller is 
+uploader OR 
+classroom 
+owner OR 
+admin<br/>- 
+Resource not 
+deleted 
+- Metadata fields 
+updated<br/>- File 
+cannot be changed 
+(must re-
+upload)<br/>- Edit 
+timestamp recorded 
+delete() Public Boolea
+n userId: UUID 
+- Caller is 
+uploader OR 
+admin<br/>- If 
+downloadCoun
+t >= 10, only 
+admin can 
+delete 
+- Resource marked as 
+deleted (soft 
+delete)<br/>- File 
+retained in S3 with 
+archive flag<br/>- 
+Removed from search 
+results<br/>- 
+Accessible in admin 
+archive 
+rate() Public Boolea
+n 
+userId: 
+UUID<br/>rating: 
+Integer<br/>review: 
+String 
+- User has 
+downloaded 
+resource<br/>- 
+Rating 1-
+5<br/>- User 
+hasn't rated 
+before OR 
+updating 
+existing 
+- ResourceRating 
+record 
+created/updated<br/>
+- averageRating 
+recalculated<br/>- 
+Uploader notified 
+(optional) 
+incrementDownloadCount(
+) Public Void None 
+- Resource 
+exists<br/>- 
+Called 
+internally after 
+successful 
+download 
+- downloadCount += 
+1<br/>- No external 
+validation needed 
+addTag() Public Boolea
+n tag: String 
+- Caller is 
+uploader OR 
+classroom 
+owner OR 
+admin<br/>- < 
+- Tag normalized 
+(lowercase, 
+trimmed)<br/>- 
+Added to tags 
+
+Operation Visibilit
+y 
+Return 
+Type Arguments Pre-Condition Post-Condition 
+10 tags 
+currently<br/>- 
+Tag not 
+duplicate 
+array<br/>- Search 
+index updated 
+4.2 Service Layer Classes 
+The service layer encapsulates business logic and orchestrates interactions between controllers and repositories. 
+Each service class corresponds to a major subsystem. 
+4.2.1 AuthenticationService 
+Responsibilities: 
+• User registration and email verification 
+• Login authentication and JWT generation 
+• Password reset and change operations 
+• Session management 
+• OAuth integration with Google 
+Key Methods: 
+Method Parameters Returns Description 
+registerUser() userData: 
+RegisterDTO 
+{success: Boolean, 
+userId: UUID} 
+Validates input, hashes password, 
+creates user, sends verification 
+email 
+authenticateUser() email: String, 
+password: String 
+{token: String, 
+user: UserDTO} 
+Verifies credentials, generates 
+JWT, creates session 
+verifyEmailToken() token: String Boolean Validates email verification token, 
+activates account 
+initiatePasswordReset() email: String Boolean Generates reset token, sends email 
+with reset link 
+resetPassword() token: String, 
+newPassword: String 
+Boolean Validates reset token, updates 
+password hash 
+refreshToken() expiredToken: String {token: String} Issues new JWT if refresh window 
+valid 
+authenticateWithGoogle() googleToken: String {token: String, 
+user: UserDTO} 
+Validates Google OAuth token, 
+creates/retrieves user 
+Dependencies: 
+• UserRepository (data access) 
+• EmailService (sending verification/reset emails) 
+• JWTUtil (token generation/validation) 
+• Bcrypt (password hashing) 
+4.2.2 AnnouncementService 
+
+Responsibilities: 
+• Announcement creation, publishing, editing 
+• Priority-based notification triggering 
+• View count tracking 
+• Attachment management 
+• Expiration and archival logic 
+Key Methods: 
+Method Parameters Returns Description 
+createAnnouncement() announcementData: 
+AnnouncementDTO, 
+authorId: UUID 
+{success: Boolean, 
+announcementId: UUID} 
+Validates data, 
+creates draft 
+announcement 
+publishAnnouncement() announcementId: 
+UUID, publisherId: 
+UUID 
+Boolean Changes status to 
+PUBLISHED, 
+triggers 
+notifications 
+editAnnouncement() announcementId: 
+UUID, updates: Object, 
+editorId: UUID 
+Boolean Validates 
+ownership, applies 
+updates, marks as 
+edited 
+deleteAnnouncement() announcementId: 
+UUID, deleterId: 
+UUID 
+Boolean Soft deletes 
+(archives) 
+announcement 
+getClassroomAnnouncements() classroomId: UUID, 
+filters: Object 
+List<AnnouncementDTO> Retrieves filtered 
+announcements, 
+applies pagination 
+pinAnnouncement() announcementId: 
+UUID, pinnerId: UUID 
+Boolean Pins 
+announcement, 
+enforces 3-pin 
+limit 
+recordView() announcementId: 
+UUID, viewerId: 
+UUID 
+Void Increments view 
+count if first view 
+by user 
+expireAnnouncements() None Integer Cron job: marks 
+expired 
+announcements, 
+returns count 
+Dependencies: 
+• AnnouncementRepository 
+• ClassroomRepository (ownership validation) 
+• NotificationService (sending alerts) 
+• FileStorageService (attachment handling) 
+4.2.3 ResourceService 
+Responsibilities: 
+
+• File upload with validation and malware scanning 
+• Resource metadata management 
+• Download tracking and signed URL generation 
+• Duplicate detection via file hashing 
+• Rating and review aggregation 
+• Integration with recommendation engine 
+Key Methods: 
+Method Parameters Returns Description 
+uploadResource() fileData: File, metadata: 
+ResourceDTO, 
+uploaderId: UUID 
+{success: Boolean, 
+resourceId: UUID} 
+Validates file, 
+uploads to S3, creates 
+record 
+downloadResource() resourceId: UUID, 
+downloaderId: UUID 
+{signedUrl: String, 
+expiresAt: DateTime} 
+Generates time-
+limited S3 URL, logs 
+download 
+editResourceMetadata() resourceId: UUID, 
+updates: Object, 
+editorId: UUID 
+Boolean Updates metadata 
+fields, validates 
+ownership 
+deleteResource() resourceId: UUID, 
+deleterId: UUID 
+Boolean Soft deletes if 
+conditions met, 
+archives file 
+searchResources() query: String, filters: 
+Object, userId: UUID 
+List<ResourceDTO> Full-text search with 
+filtering, pagination 
+rateResource() resourceId: UUID, 
+userId: UUID, rating: 
+Integer, review: String 
+Boolean Creates/updates 
+rating, recalculates 
+average 
+getResourcesByClassroom() classroomId: UUID, 
+filters: Object 
+List<ResourceDTO> Retrieves classroom 
+resources with filters 
+checkDuplicate() fileHash: String, 
+classroomId: UUID 
+{isDuplicate: Boolean, 
+existingResourceId: 
+UUID} 
+Detects duplicate files 
+via hash comparison 
+Dependencies: 
+• ResourceRepository 
+• FileStorageService (S3 operations) 
+• FileValidationService (malware scan, type check) 
+• SearchService (Elasticsearch integration - optional) 
+• RecommendationEngine (AI-based suggestions) 
+4.2.4 ChatbotService 
+Responsibilities: 
+• Natural language query processing 
+• Conversation context management 
+• OpenAI API integration 
+• Source citation extraction from announcements 
+• Interaction logging and analytics 
+
+Key Methods: 
+Method Parameters Returns Description 
+processQuery() userId: UUID, 
+classroomId: UUID, 
+query: String 
+{response: String, citations: 
+List<Citation>} 
+Processes query, 
+generates AI response 
+with sources 
+getOrCreateSession() userId: UUID, 
+classroomId: UUID 
+{sessionId: UUID} Retrieves existing 
+session or creates new 
+one 
+getConversationHistory() sessionId: UUID, 
+limit: Integer 
+List<InteractionDTO> Retrieves recent 
+interactions for 
+context 
+rateInteraction() interactionId: UUID, 
+rating: Integer 
+Boolean Records user 
+feedback on bot 
+response quality 
+getClassroomAnalytics() classroomId: UUID, 
+instructorId: UUID 
+{totalQueries: Integer, 
+avgRating: Float, 
+commonTopics: List} 
+Returns chatbot usage 
+statistics 
+endSession() sessionId: UUID Boolean Marks session as 
+inactive 
+Dependencies: 
+• ChatbotSessionRepository 
+• AnnouncementRepository (source retrieval) 
+• OpenAIClient (API integration) 
+• NLPProcessor (query understanding) 
+4.2.5 NotificationService 
+Responsibilities: 
+• Multi-channel notification delivery (email, push, in-app) 
+• Notification preferences management 
+• Batching and rate limiting 
+• Delivery status tracking 
+• Template-based message composition 
+Key Methods: 
+Method Parameters Returns Description 
+sendNotification() recipientId: UUID, 
+notifData: 
+NotificationDTO 
+Boolean Sends notification 
+via appropriate 
+channel(s) 
+sendBulkNotification() recipientIds: List<UUID>, 
+notifData: 
+NotificationDTO 
+{successCount: Integer, 
+failureCount: Integer} 
+Batch sends to 
+multiple users 
+sendEmailNotification() recipientEmail: String, 
+subject: String, body: 
+String 
+Boolean Sends email via 
+SMTP service 
+
+sendPushNotification() recipientId: UUID, 
+message: String 
+Boolean Sends real-time push 
+via WebSocket 
+getUserNotifications() userId: UUID, filters: 
+Object 
+List<NotificationDTO> Retrieves user's 
+notifications with 
+pagination 
+markAsRead() notificationId: UUID, 
+userId: UUID 
+Boolean Marks notification as 
+read, updates 
+timestamp 
+updatePreferences() userId: UUID, preferences: 
+Object 
+Boolean Updates user's 
+notification channel 
+preferences 
+queueNotification() notifData: 
+NotificationDTO, 
+deliveryTime: DateTime 
+Boolean Schedules 
+notification for 
+future delivery 
+Dependencies: 
+• NotificationRepository 
+• EmailService (SMTP integration) 
+• WebSocketService (real-time push) 
+• UserRepository (preferences retrieval) 
+4.3 Database Schema Design 
+Entity-Relationship Diagram (ERD) 
+
+ 
+   
+Figure 13: Entity-Relationship Diagram (ERD) 
+Database Tables Overview 
+Table 8: Database Tables Overview 
+Table Name Primary Purpose Row Estimate 
+(Year 1) 
+Key Indexes 
+users Store user accounts and 
+authentication data 
+5,000 email (UNIQUE), role 
+classrooms Store classroom/course 
+information 
+500 owner_id, invitation_link 
+(UNIQUE) 
+classroom_memberships Track user-classroom 
+relationships 
+25,000 user_id + classroom_id 
+(COMPOSITE), classroom_id 
+announcements Store announcement content 
+and metadata 
+10,000 classroom_id + status, 
+published_at 
+attachments Store announcement file 
+references 
+5,000 announcement_id 
+resources Store academic resource 
+metadata 
+50,000 classroom_id + type, 
+uploader_id, file_hash 
+
+
+resource_tags Tag-resource many-to-many 
+relationship 
+200,000 resource_id, tag (for search) 
+resource_ratings Store user ratings and 
+reviews 
+20,000 resource_id, user_id + 
+resource_id (UNIQUE) 
+schedules Store user class schedules 15,000 user_id, day_of_week + user_id 
+reminders Store schedule reminders 30,000 schedule_id, scheduled_time + 
+is_sent 
+messages Store chat messages 100,000 classroom_id + sent_at, 
+sender_id 
+chatbot_sessions Track chatbot conversation 
+sessions 
+10,000 user_id + classroom_id, is_active 
+chatbot_interactions Store individual chatbot 
+Q&A pairs 
+50,000 session_id, created_at 
+notifications Store user notifications 200,000 user_id + is_read, created_at 
+recommendations Store AI-generated resource 
+suggestions 
+100,000 user_id + is_viewed, 
+generated_at 
+Key Database Design Decisions 
+1. UUID Primary Keys: All tables use UUID (type: uuid in PostgreSQL) for primary keys instead of auto-
+incrementing integers. This provides: 
+• Global uniqueness across distributed systems 
+• No sequence collision in multi-instance deployments 
+• Security (non-guessable IDs) 
+• Future-proofing for potential microservices architecture 
+2. Soft Deletes: Critical tables (users, announcements, resources) implement soft deletion patterns: 
+• Add deleted_at timestamp column (NULL when active) 
+• Queries filter by WHERE deleted_at IS NULL 
+• Enables data recovery and audit trails 
+• Preserves referential integrity 
+3. Timestamps: All tables include: 
+• created_at (timestamp with timezone, NOT NULL, DEFAULT NOW()) 
+• updated_at (timestamp with timezone, auto-updated via trigger) 
+• Enables audit trails and analytics 
+4. Indexing Strategy: 
+• Foreign keys: Always indexed for JOIN performance 
+• Composite indexes: For common query patterns (e.g., classroom_id + status on announcements) 
+• Partial indexes: For filtered queries (e.g., WHERE is_active = true) 
+• Full-text search: GIN indexes on text columns for efficient search (announcements.content, 
+resources.title) 
+5. JSON Columns: JSONB type used for: 
+• chatbot_interactions.source_citations: Array of citation objects with flexible schema 
+
+• notifications.metadata: Additional context-specific data 
+• Provides flexibility without schema migrations 
+• Supports indexing and querying with GIN indexes 
+6. Enum Types: PostgreSQL native ENUMs for fixed value sets: 
+• user_role_enum: STUDENT, INSTRUCTOR, ADMINISTRATOR 
+• announcement_category_enum: ACADEMIC, ADMINISTRATIVE, EMERGENCY, EVENT 
+• priority_level_enum: NORMAL, IMPORTANT, URGENT 
+• announcement_status_enum: DRAFT, PUBLISHED, EXPIRED, ARCHIVED 
+• Enforces data integrity at database level 
+• Self-documenting schema 
+7. Referential Integrity: Foreign key constraints with appropriate ON DELETE behaviors: 
+• ON DELETE CASCADE: For dependent records (attachments when announcement deleted) 
+• ON DELETE SET NULL: For optional references (parent_message_id in messages) 
+• ON DELETE RESTRICT: For critical references (classroom owner_id) 
+8. Performance Optimizations: 
+• Partitioning strategy for large tables (messages, notifications) by created_at month 
+• Materialized views for complex analytics queries 
+• Connection pooling (pgBouncer) with max 100 connections 
+• Query result caching in Redis for frequently accessed data 
+Sample SQL Schema (Users Table) 
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; 
+ 
+CREATE TYPE user_role_enum AS ENUM ('STUDENT', 'INSTRUCTOR', 'ADMINISTRATOR'); 
+ 
+CREATE TABLE users ( 
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), 
+    email VARCHAR(255) NOT NULL UNIQUE, 
+    password_hash VARCHAR(255) NOT NULL, 
+    full_name VARCHAR(100) NOT NULL, 
+    department VARCHAR(50) NOT NULL, 
+    year_of_study INTEGER CHECK (year_of_study BETWEEN 1 AND 5), 
+    phone_number VARCHAR(20), 
+    profile_picture TEXT, 
+    role user_role_enum NOT NULL DEFAULT 'STUDENT', 
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(), 
+    last_login TIMESTAMP WITH TIME ZONE, 
+    is_verified BOOLEAN NOT NULL DEFAULT FALSE, 
+    deleted_at TIMESTAMP WITH TIME ZONE, 
+     
+    CONSTRAINT email_format CHECK (email ~* '^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-
+z]{2,}$') 
+); 
+ 
+CREATE INDEX idx_users_email ON users(email) WHERE deleted_at IS NULL; 
+CREATE INDEX idx_users_role ON users(role) WHERE deleted_at IS NULL; 
+CREATE INDEX idx_users_department ON users(department) WHERE deleted_at IS NULL; 
+ 
+-- Auto-update updated_at timestamp 
+
+CREATE OR REPLACE FUNCTION update_updated_at_column() 
+RETURNS TRIGGER AS $$ 
+BEGIN 
+    NEW.updated_at = NOW(); 
+    RETURN NEW; 
+END; 
+$$ language 'plpgsql'; 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+5. References 
+Standards and Guidelines 
+1. IEEE Std 1016-2009 
+o IEEE Standard for Information Technology—Systems Design—Software Design Descriptions 
+o Institute of Electrical and Electronics Engineers 
+o https://standards.ieee.org/standard/1016-2009.html 
+2. ISO/IEC/IEEE 42010:2011 
+o Systems and Software Engineering—Architecture Description 
+o International Organization for Standardization 
+o https://www.iso.org/standard/50508.html 
+3. REST API Design Best Practices 
+o RESTful Web API Design with Node.js 
+o Roy Fielding's Dissertation on Architectural Styles (REST) 
+ 

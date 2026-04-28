@@ -8,27 +8,30 @@ import {
 import { Toaster } from 'sonner';
 import Nav from './components/Nav';
 import Navbar from './components/Navbar';
+import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
-import About from './pages/About';
-import Home from './pages/Home';
-import Library from './pages/Library';
+import Landing from './pages/Landing';
 import BookDetail from './pages/BookDetail';
-import Profile from './pages/Profile';
-import PublicProfile from './pages/PublicProfile';
-import ClassRoom from './pages/ClassRoom';
 import ChatRoom from './pages/ChatRoom';
+import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
 import ExamPractice from './pages/ExamPractice';
 import Exams from './pages/Exams';
+import Home from './pages/Home';
+import Library from './pages/Library';
 import LiquAI from './pages/LiquAI';
 import Login from './pages/login';
 import NotFound from './pages/NotFound';
 import PasswordReset from './pages/PasswordReset';
+import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
 import Reset from './pages/Reset';
+import Settings from './pages/Settings';
 import Signup from './pages/Signup';
+import StudyBuddy from './pages/StudyBuddy';
 
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
@@ -55,6 +58,7 @@ function AppRoutes() {
   if (user) {
     return (
       <Navbar>
+        <SupportChatWidget />
         <div key={location.pathname} className="route-fade">
           <Routes>
             <Route path="/" element={<Home />} />
@@ -70,17 +74,20 @@ function AppRoutes() {
             />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:bookId" element={<BookDetail />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/liqu-ai" element={<LiquAI />} />
+            <Route path="/liqu-ai/study-buddy" element={<StudyBuddy />} />
+            <Route
+              path="/liqu-ai/did-exit"
+              element={<Navigate to="/exams" replace />}
+            />
             <Route path="/exams" element={<Exams />} />
             <Route path="/exams/:examId" element={<ExamPractice />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
-            <Route
-              path="/password/reset"
-              element={<Navigate to="/" replace />}
-            />
+            <Route path="/password/reset" element={<PasswordReset />} />
             <Route
               path="/reset-password/:token"
               element={<Navigate to="/" replace />}
@@ -92,12 +99,14 @@ function AppRoutes() {
     );
   }
 
+  const hideGlobalNavForLanding = location.pathname === '/';
+
   return (
     <>
-      <Nav />
+      {!hideGlobalNavForLanding && <Nav />}
       <div key={location.pathname} className="route-fade">
         <Routes>
-          <Route path="/" element={<About />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/password/reset" element={<PasswordReset />} />
@@ -117,9 +126,17 @@ function AppRoutes() {
           />
           <Route path="/library" element={<Navigate to="/login" replace />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
+          <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
+          <Route
+            path="/liqu-ai/study-buddy"
+            element={<Navigate to="/login" replace />}
+          />
+          <Route
+            path="/liqu-ai/did-exit"
+            element={<Navigate to="/login" replace />}
+          />
           <Route path="/profile" element={<Navigate to="/login" replace />} />
           <Route path="/users/:userId" element={<PublicProfile />} />
-          <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
           <Route path="/exams" element={<Navigate to="/login" replace />} />
           <Route
             path="/exams/:examId"

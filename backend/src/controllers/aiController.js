@@ -1,11 +1,15 @@
 import ChatSession from '../models/ChatSession.js';
-import { geminiService } from '../services/geminiService.js';
+import { augmentMessagesWithBookRag } from '../services/bookRagService.js';
+import {
+  geminiService,
+  getGeminiServiceForUser,
+} from '../services/geminiService.js';
 
 // ── Chat (REST, non-streaming) ─────────────────────────────────────────────────
 
 async function chatController(req, res, next) {
   try {
-    const { messages, sessionId } = req.body;
+    const { messages, sessionId, bookId } = req.body;
     const userId = req.user._id;
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -27,20 +31,26 @@ async function chatController(req, res, next) {
       }
     }
 
-    // Use BYOK if user has a key saved
-    let service = geminiService;
-    if (req.user.geminiApiKey) {
-      service = await geminiService.forUser(
-        req.user.geminiApiKey,
-        req.user.geminiModelId,
+    const service = await getGeminiServiceForUser(req.user);
+    let messagesForLlm = messages;
+    if (bookId && String(bookId).trim()) {
+      const aug = await augmentMessagesWithBookRag(
+        messages,
+        String(bookId).trim(),
+        userId,
+        req.user,
       );
+      messagesForLlm = aug.messages;
     }
+    const responseText = await service.chat(messagesForLlm);
 
-    const responseText = await service.chat(messages);
-
-    // Persist to session
+    // Persist to session (Liqu AI only, not support widget sessions)
     let session = sessionId
-      ? await ChatSession.findOne({ _id: sessionId, userId })
+      ? await ChatSession.findOne({
+          _id: sessionId,
+          userId,
+          $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
+        })
       : null;
 
     if (!session) {
@@ -78,7 +88,10 @@ async function chatController(req, res, next) {
 
 async function listSessionsController(req, res, next) {
   try {
-    const sessions = await ChatSession.find({ userId: req.user._id })
+    const sessions = await ChatSession.find({
+      userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
+    })
       .sort({ updatedAt: -1 })
       .select('_id title updatedAt createdAt')
       .limit(50);
@@ -94,6 +107,7 @@ async function getSessionController(req, res, next) {
     const session = await ChatSession.findOne({
       _id: req.params.sessionId,
       userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
     });
 
     if (!session)
@@ -109,6 +123,7 @@ async function deleteSessionController(req, res, next) {
     const result = await ChatSession.findOneAndDelete({
       _id: req.params.sessionId,
       userId: req.user._id,
+      $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
     });
 
     if (!result) return res.status(404).json({ message: 'Session not found.' });

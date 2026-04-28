@@ -188,7 +188,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     });
 
     // ── AI streaming chat ────────────────────────────────────────────────────
-    socket.on('ai:chat', async ({ messages, sessionId }) => {
+    socket.on('ai:chat', async ({ messages, sessionId, bookId }) => {
       try {
         if (!Array.isArray(messages) || messages.length === 0) {
           socket.emit('ai:error', { message: 'messages array is required' });
@@ -196,7 +196,12 @@ export const initSocketServer = async (server, sessionMiddleware) => {
         }
 
         // Lazy import to avoid circular deps at module load time
-        const { geminiService } = await import('../services/geminiService.js');
+        const { getGeminiServiceForUser } = await import(
+          '../services/geminiService.js'
+        );
+        const { augmentMessagesWithBookRag } = await import(
+          '../services/bookRagService.js'
+        );
         const ChatSession = (await import('../models/ChatSession.js')).default;
 
         // Resolve or create a chat session
@@ -216,20 +221,24 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           });
         }
 
-        // Override Gemini key if user has BYOK
-        let serviceToUse = geminiService;
-        if (user.geminiApiKey) {
-          serviceToUse = await geminiService.forUser(
-            user.geminiApiKey,
-            user.geminiModelId,
+        const serviceToUse = await getGeminiServiceForUser(user);
+
+        let messagesForLlm = messages;
+        if (bookId && String(bookId).trim()) {
+          const aug = await augmentMessagesWithBookRag(
+            messages,
+            String(bookId).trim(),
+            user._id,
+            user,
           );
+          messagesForLlm = aug.messages;
         }
 
         const resolvedSessionId = session._id.toString();
         socket.emit('ai:sessionId', { sessionId: resolvedSessionId });
 
         let fullResponse = '';
-        await serviceToUse.chatStream(messages, (chunk) => {
+        await serviceToUse.chatStream(messagesForLlm, (chunk) => {
           fullResponse += chunk;
           socket.emit('ai:chunk', { chunk, sessionId: resolvedSessionId });
         });

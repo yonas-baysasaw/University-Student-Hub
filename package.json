@@ -4,6 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:full": "concurrently -n backend,frontend \"npm run dev --prefix backend\" \"npm run dev --prefix frontend\"",
     "build": "npm install --prefix backend && npm install --prefix frontend --include=dev && npm run build --prefix frontend",
     "start": "npm run start --prefix backend",
     "heroku-postbuild": "npm run build",
@@ -28,6 +31,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.12",
     "@tailwindcss/vite": "^4.2.2",
+    "concurrently": "^9.2.1",
     "daisyui": "^5.5.19",
     "tailwindcss": "^4.2.2"
   }

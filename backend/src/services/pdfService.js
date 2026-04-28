@@ -1,5 +1,7 @@
 import crypto from 'node:crypto';
 import { createRequire } from 'node:module';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 // canvas is an optional native dependency required only for scanned/image-based PDFs.
 // It is loaded lazily so the server starts without it when only text-based PDFs are used.
@@ -32,18 +34,19 @@ async function getPdfjs() {
   const mod = await import('pdfjs-dist/legacy/build/pdf.mjs');
   pdfjsLib = mod;
 
-  // Resolve the worker and standard-font paths relative to pdfjs-dist in node_modules
+  // Resolve the worker and standard-font paths relative to pdfjs-dist in node_modules.
+  // On Windows, require.resolve() returns a drive path; pdfjs must load the worker as a
+  // file:// URL or the ESM loader rejects "c:" as a protocol.
   const require = createRequire(import.meta.url);
-  const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerPath;
+  const workerFile = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = pathToFileURL(workerFile).href;
 
   // Pre-build the options object used for every getDocument() call
   let standardFontDataUrl;
   try {
-    const fontsDir = require
-      .resolve('pdfjs-dist/standard_fonts/')
-      .replace(/\/[^/]+$/, '/');
-    standardFontDataUrl = `file://${fontsDir}`;
+    const pdfPkgRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+    const fontsDir = path.join(pdfPkgRoot, 'standard_fonts') + path.sep;
+    standardFontDataUrl = pathToFileURL(fontsDir).href;
   } catch {
     // Not critical — only affects font rendering warnings
   }

@@ -20,4 +20,18 @@ export const ENV = {
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
   GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || 'gemini-2.0-flash',
+  /** RAG `embedContent` model id (path segment after `models/`). */
+  GEMINI_EMBEDDING_MODEL:
+    process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
+  /**
+   * Milliseconds for TCP/TLS connect to `generativelanguage.googleapis.com`.
+   * Node’s default `fetch` (Undici) uses 10s — too low on slow networks.
+   */
+  GEMINI_HTTP_CONNECT_TIMEOUT_MS: (() => {
+    const n = parseInt(
+      String(process.env.GEMINI_HTTP_CONNECT_TIMEOUT_MS || '90000'),
+      10,
+    );
+    return Number.isFinite(n) && n >= 5_000 ? n : 90_000;
+  })(),
 };

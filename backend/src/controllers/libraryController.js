@@ -27,17 +27,20 @@ const toBookResponse = (book, req) => {
   delete rest.dislikedBy;
   delete rest.savedBy;
 
-  const uploaderSource = book?.userId && typeof book.userId === 'object' ? book.userId : null;
+  const uploaderSource =
+    book?.userId && typeof book.userId === 'object' ? book.userId : null;
   const uploader = uploaderSource
     ? {
         id: uploaderSource._id ? String(uploaderSource._id) : null,
         name: uploaderSource.name || uploaderSource.username || 'Unknown user',
         username: uploaderSource.username || '',
         avatar: uploaderSource.avatar || '',
-        subscribersCount: Array.isArray(uploaderSource.subscribers) ? uploaderSource.subscribers.length : 0,
+        subscribersCount: Array.isArray(uploaderSource.subscribers)
+          ? uploaderSource.subscribers.length
+          : 0,
         viewerSubscribed:
           viewerId && Array.isArray(uploaderSource.subscribers)
-            ? uploaderSource.subscribers.some(id => String(id) === viewerId)
+            ? uploaderSource.subscribers.some((id) => String(id) === viewerId)
             : false,
       }
     : null;
@@ -45,12 +48,18 @@ const toBookResponse = (book, req) => {
   return {
     ...rest,
     uploader,
-    likesCount: Number.isFinite(book.likesCount) ? book.likesCount : likedBy.length,
-    dislikesCount: Number.isFinite(book.dislikesCount) ? book.dislikesCount : dislikedBy.length,
+    likesCount: Number.isFinite(book.likesCount)
+      ? book.likesCount
+      : likedBy.length,
+    dislikesCount: Number.isFinite(book.dislikesCount)
+      ? book.dislikesCount
+      : dislikedBy.length,
     viewerState: {
-      liked: viewerId ? likedBy.some(id => String(id) === viewerId) : false,
-      disliked: viewerId ? dislikedBy.some(id => String(id) === viewerId) : false,
-      saved: viewerId ? savedBy.some(id => String(id) === viewerId) : false,
+      liked: viewerId ? likedBy.some((id) => String(id) === viewerId) : false,
+      disliked: viewerId
+        ? dislikedBy.some((id) => String(id) === viewerId)
+        : false,
+      saved: viewerId ? savedBy.some((id) => String(id) === viewerId) : false,
     },
   };
 };
@@ -60,7 +69,7 @@ export const getAllBooks = asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .populate('userId', 'username name avatar subscribers')
     .lean();
-  const data = books.map(book => toBookResponse(book, req));
+  const data = books.map((book) => toBookResponse(book, req));
 
   res.status(200).json({
     success: true,
@@ -100,7 +109,8 @@ export const getBookById = asyncHandler(async (req, res) => {
 });
 
 export const createBook = asyncHandler(async (req, res) => {
-  const { title, description, bookUrl, thumbnailUrl, format, visibility } = req.body ?? {};
+  const { title, description, bookUrl, thumbnailUrl, format, visibility } =
+    req.body ?? {};
 
   if (!title?.trim() || !bookUrl?.trim()) {
     return res.status(400).json({
@@ -226,8 +236,10 @@ export const reactToBook = asyncHandler(async (req, res) => {
   }
 
   const userId = String(req.user._id);
-  book.likedBy = (book.likedBy || []).filter(id => String(id) !== userId);
-  book.dislikedBy = (book.dislikedBy || []).filter(id => String(id) !== userId);
+  book.likedBy = (book.likedBy || []).filter((id) => String(id) !== userId);
+  book.dislikedBy = (book.dislikedBy || []).filter(
+    (id) => String(id) !== userId,
+  );
 
   if (reaction === 'like') {
     book.likedBy.push(req.user._id);
@@ -270,10 +282,10 @@ export const toggleSaveBook = asyncHandler(async (req, res) => {
 
   const userId = String(req.user._id);
   const savedBy = Array.isArray(book.savedBy) ? book.savedBy : [];
-  const hasSaved = savedBy.some(id => String(id) === userId);
+  const hasSaved = savedBy.some((id) => String(id) === userId);
 
   if (hasSaved) {
-    book.savedBy = savedBy.filter(id => String(id) !== userId);
+    book.savedBy = savedBy.filter((id) => String(id) !== userId);
   } else {
     book.savedBy = [...savedBy, req.user._id];
   }
@@ -309,7 +321,7 @@ export const incrementBookDownload = asyncHandler(async (req, res) => {
       ...listFilterForRequest(req),
     },
     update,
-    { new: true }
+    { new: true },
   ).lean();
 
   if (!book) {

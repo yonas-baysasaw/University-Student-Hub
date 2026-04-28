@@ -32,4 +32,31 @@ const imageUpload = multer({
 const uploadApplicationMiddleware = applicationUpload.any();
 const uploadImageMiddleware = imageUpload.any();
 
-export { uploadApplicationMiddleware, uploadImageMiddleware };
+function classroomResourceFileFilter(_req, file, cb) {
+  const m = (file?.mimetype || '').toLowerCase();
+  if (
+    m.startsWith('application/') ||
+    m.startsWith('image/') ||
+    m.startsWith('text/') ||
+    m.startsWith('video/') ||
+    m.startsWith('audio/')
+  ) {
+    return cb(null, true);
+  }
+  return cb(new Error('File type not allowed for this resource.'));
+}
+
+const classroomResourceUpload = multer({
+  storage,
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: classroomResourceFileFilter,
+});
+
+/** Optional single `file` field; title/link in same multipart body. */
+const uploadClassroomResourceSingle = classroomResourceUpload.single('file');
+
+export {
+  uploadApplicationMiddleware,
+  uploadClassroomResourceSingle,
+  uploadImageMiddleware,
+};
