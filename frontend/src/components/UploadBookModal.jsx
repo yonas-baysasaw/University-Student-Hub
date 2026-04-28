@@ -5,6 +5,8 @@ import {
   Check,
   Cpu,
   Leaf,
+  Lock,
+  ShieldCheck,
   Upload,
   Users,
 } from 'lucide-react';
@@ -495,6 +497,27 @@ export default function UploadBookModal({
                 </div>
               </div>
             ) : null}
+
+            <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50/95 via-white to-cyan-50/40 px-4 py-3 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95">
+              <div className="flex flex-wrap items-start gap-3">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-400">
+                    Publishing standards
+                  </p>
+                  <ul className="space-y-1.5 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
+                    <li className="flex gap-2">
+                      <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                      Files upload over HTTPS and stay scoped to your library permissions—never shared publicly unless visibility allows it.
+                    </li>
+                    <li className="flex gap-2">
+                      <BookOpen className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+                      PDFs keep richer previews; readers can jump into Liqu AI Study Buddy after publishing.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200/90 bg-slate-50/95 px-5 py-4 dark:border-slate-600 dark:bg-slate-900/95 md:px-7">

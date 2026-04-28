@@ -438,6 +438,108 @@ a {
     );
 }
 
+/* Classrooms — cohesive ambient + interactive surfaces */
+.classroom-ambient {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.96) 0%,
+    rgba(236, 248, 255, 0.5) 45%,
+    rgba(241, 245, 249, 0.92) 100%
+  );
+}
+
+.dark .classroom-ambient {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.98) 0%,
+    rgba(15, 23, 42, 0.94) 100%
+  );
+}
+
+.classroom-ambient::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.92;
+  background:
+    radial-gradient(
+      ellipse 95% 55% at 8% -12%,
+      rgba(6, 182, 212, 0.14),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 75% 50% at 92% 8%,
+      rgba(79, 70, 229, 0.09),
+      transparent 48%
+    );
+}
+
+.dark .classroom-ambient::before {
+  opacity: 0.32;
+}
+
+.classroom-card-lift {
+  transition:
+    transform 0.22s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.22s ease,
+    border-color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .classroom-card-lift:hover {
+    transform: translateY(-4px);
+    box-shadow:
+      0 22px 44px rgba(15, 23, 42, 0.09),
+      0 0 0 1px rgba(6, 182, 212, 0.06);
+  }
+}
+
+.dark .classroom-card-lift:hover {
+  box-shadow:
+    0 22px 44px rgba(0, 0, 0, 0.38),
+    0 0 0 1px rgba(34, 211, 238, 0.08);
+}
+
+.classroom-chat-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(6, 182, 212, 0.35) transparent;
+}
+
+.classroom-chat-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+
+.classroom-chat-scroll::-webkit-scrollbar-thumb {
+  border-radius: 9999px;
+  background: rgba(6, 182, 212, 0.35);
+}
+
+.classroom-live-dot {
+  animation: classroomPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes classroomPulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .classroom-live-dot {
+    animation: none;
+  }
+}
+
 /* Do not set position on all children — it overrides Tailwind `absolute` on the
    decorative mesh layer and forces ~50vh empty space before content. */
 
