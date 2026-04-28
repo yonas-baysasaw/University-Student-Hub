@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
 import { useAuth } from '../contexts/AuthContext';
-import { canManageClassroom } from '../utils/classroom';
+import { canManageClassroom, isClassroomMember } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
 
 function ClassRoom() {
@@ -188,11 +188,13 @@ function ClassRoom() {
                   >
                     Enter classroom
                   </Link>
-                  {canManageClassroom(user, classroom) ? (
+                  {canManageClassroom(user, classroom) ||
+                  isClassroomMember(user, classroom) ? (
                     <ClassroomScheduleEditor
                       chatId={String(classroom._id)}
                       initialSlots={classroom.metadata?.classSchedule?.slots}
                       onSaved={fetchChats}
+                      canEdit={canManageClassroom(user, classroom)}
                     />
                   ) : null}
                 </article>
