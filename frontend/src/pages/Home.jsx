@@ -2,28 +2,15 @@ import {
   ArrowRight,
   BookOpen,
   CalendarDays,
-  ChevronLeft,
-  ChevronRight,
   GraduationCap,
   Library,
   Sparkles,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { SCHEDULE_SAVED_EVENT } from '../constants/dashboardEvents.js';
 import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
-import {
-  getComingDaysThisWeek,
-  getDaysInMonth,
-  getWeekContaining,
-  occurrencesForDates,
-  readScheduleViewPreference,
-  SCHEDULE_VIEW_OPTIONS,
-  scheduleHeadingTitle,
-  scheduleSubtitle,
-  startOfLocalDay,
-  writeScheduleViewPreference,
-} from '../utils/scheduleViews.js';
 
 const NOTES_KEY = 'ush_frontend_notes_v1';
 
@@ -38,6 +25,13 @@ function formatLocalDate(d = new Date()) {
   const m = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${y}-${m}-${day}`;
+}
+
+/** @param {string} t */
+function slotStartToMinutes(t) {
+  const m = String(t).match(/^([01]\d|2[0-3]):([0-5]\d)$/);
+  if (!m) return 0;
+  return Number(m[1]) * 60 + Number(m[2]);
 }
 
 function formatRelativeTime(iso) {
@@ -81,73 +75,15 @@ function Home() {
   const [dashError, setDashError] = useState('');
   const [summary, setSummary] = useState(null);
 
-  const [scheduleView, setScheduleView] = useState(() =>
-    readScheduleViewPreference(),
-  );
-  const [displayMonth, setDisplayMonth] = useState(() => {
-    const n = new Date();
-    return { y: n.getFullYear(), m: n.getMonth() };
-  });
-
   const weekdayNow = useMemo(() => new Date().getDay(), []);
 
-  const scheduleRows = useMemo(() => {
-    const rooms = summary?.scheduleCalendar ?? [];
-    if (!Array.isArray(rooms) || rooms.length === 0) return [];
-    const now = new Date();
-
-    if (scheduleView === 'day') {
-      return occurrencesForDates(rooms, [startOfLocalDay(now)]);
-    }
-    if (scheduleView === 'week') {
-      return occurrencesForDates(rooms, getWeekContaining(now));
-    }
-    if (scheduleView === 'weekUpcoming') {
-      return occurrencesForDates(rooms, getComingDaysThisWeek(now));
-    }
-    if (scheduleView === 'month') {
-      return occurrencesForDates(
-        rooms,
-        getDaysInMonth(displayMonth.y, displayMonth.m),
-      );
-    }
-    return [];
-  }, [summary?.scheduleCalendar, scheduleView, displayMonth]);
-
-  const hasScheduleData = (summary?.scheduleCalendar ?? []).length > 0;
-  const hasAnyOccurrence = scheduleRows.some((row) => row.entries.length > 0);
-
-  const monthTitle = new Intl.DateTimeFormat(undefined, {
-    month: 'long',
-    year: 'numeric',
-  }).format(new Date(displayMonth.y, displayMonth.m, 1));
-
-  const bumpMonth = (delta) => {
-    setDisplayMonth((prev) => {
-      const d = new Date(prev.y, prev.m + delta, 1);
-      return { y: d.getFullYear(), m: d.getMonth() };
-    });
-  };
-
-  const formatDayHeading = (date) =>
-    new Intl.DateTimeFormat(undefined, {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    }).format(date);
-
-  const todayIso = formatLocalDate(new Date());
-
-  useEffect(() => {
-    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
-  }, [notes]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      setDashLoading(true);
-      setDashError('');
+  const loadDashboard = useCallback(
+    async (opts = {}) => {
+      const silent = opts.silent === true;
+      if (!silent) {
+        setDashLoading(true);
+        setDashError('');
+      }
       try {
         const params = new URLSearchParams({
           weekday: String(weekdayNow),
@@ -158,20 +94,33 @@ function Home() {
           credentials: 'include',
         });
         const data = await readJsonOrThrow(res, 'Could not load dashboard');
-        if (!cancelled) setSummary(data);
+        setSummary(data);
+        setDashError('');
       } catch (err) {
-        if (!cancelled)
-          setDashError(err?.message || 'Could not load dashboard');
+        setDashError(err?.message || 'Could not load dashboard');
       } finally {
-        if (!cancelled) setDashLoading(false);
+        if (!silent) setDashLoading(false);
       }
-    };
+    },
+    [weekdayNow],
+  );
 
-    load();
-    return () => {
-      cancelled = true;
+  useEffect(() => {
+    localStorage.setItem(NOTES_KEY, JSON.stringify(notes));
+  }, [notes]);
+
+  useEffect(() => {
+    loadDashboard({ silent: false });
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const onScheduleSaved = () => {
+      loadDashboard({ silent: true });
     };
-  }, [weekdayNow]);
+    window.addEventListener(SCHEDULE_SAVED_EVENT, onScheduleSaved);
+    return () =>
+      window.removeEventListener(SCHEDULE_SAVED_EVENT, onScheduleSaved);
+  }, [loadDashboard]);
 
   const completedCount = useMemo(
     () => tasks.filter((task) => task.done).length,
@@ -205,9 +154,44 @@ function Home() {
     year: 'numeric',
   }).format(new Date());
 
-  const todayClasses = summary?.todayClasses ?? [];
   const announcements = summary?.recentAnnouncements ?? [];
   const stats = summary?.stats ?? {};
+
+  const todayMeetingRows = useMemo(() => {
+    const rooms = summary?.todayClasses;
+    if (!Array.isArray(rooms)) return [];
+    const rows = [];
+    for (const room of rooms) {
+      const slots = room.slots;
+      if (!Array.isArray(slots)) continue;
+      for (const slot of slots) {
+        rows.push({
+          chatId: String(room.chatId),
+          courseName: room.name,
+          slot,
+        });
+      }
+    }
+    rows.sort(
+      (a, b) =>
+        slotStartToMinutes(a.slot.start) - slotStartToMinutes(b.slot.start),
+    );
+    return rows;
+  }, [summary?.todayClasses]);
+
+  const scheduleDateLabel = useMemo(() => {
+    const iso = summary?.localDate;
+    const d =
+      typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+        ? new Date(`${iso}T12:00:00`)
+        : new Date();
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }).format(d);
+  }, [summary?.localDate]);
 
   const quickLinks = [
     {
@@ -293,7 +277,7 @@ function Home() {
                 Today’s meetings
               </p>
               <p className="mt-2 font-display text-3xl text-slate-900 dark:text-slate-50">
-                {todayClasses.length}
+                {todayMeetingRows.length}
               </p>
               <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 From weekly schedules
@@ -303,161 +287,125 @@ function Home() {
         ) : null}
 
         <section className="grid gap-4 lg:grid-cols-2">
-          <article className="panel-card rounded-2xl p-5 md:p-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
-                <h2 className="font-display text-xl text-slate-900 dark:text-slate-50">
-                  {scheduleHeadingTitle(scheduleView)}
-                </h2>
-                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {scheduleSubtitle(scheduleView)}
-                </p>
-              </div>
-
-              <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-end lg:w-auto lg:max-w-md">
-                {scheduleView === 'month' ? (
-                  <div className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-2 py-1 dark:border-slate-600 dark:bg-slate-800/60">
-                    <button
-                      type="button"
-                      onClick={() => bumpMonth(-1)}
-                      className="rounded-lg p-1.5 text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-                      aria-label="Previous month"
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <span className="min-w-[10rem] flex-1 text-center text-xs font-semibold text-slate-800 dark:text-slate-100">
-                      {monthTitle}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => bumpMonth(1)}
-                      className="rounded-lg p-1.5 text-slate-600 transition hover:bg-white hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-700 dark:hover:text-white"
-                      aria-label="Next month"
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : null}
-
-                <label className="flex min-w-[12rem] flex-col gap-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                    Schedule view
-                  </span>
-                  <select
-                    value={scheduleView}
-                    onChange={(e) => {
-                      const v = e.target.value;
-                      setScheduleView(v);
-                      writeScheduleViewPreference(v);
-                    }}
-                    className="input-field h-10 cursor-pointer text-xs font-medium"
-                  >
-                    {SCHEDULE_VIEW_OPTIONS.map((opt) => (
-                      <option key={opt.id} value={opt.id} title={opt.hint}>
-                        {opt.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <Link
-                  to="/classroom"
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-900 dark:border-slate-600 dark:text-slate-200 dark:hover:border-cyan-600 dark:hover:bg-cyan-950/30"
-                >
-                  Edit classroom hours
-                </Link>
-              </div>
+          <article className="panel-card flex flex-col rounded-2xl p-5 md:p-6">
+            <div className="border-b border-slate-100 pb-4 dark:border-slate-700">
+              <h2 className="font-display text-xl text-slate-900 dark:text-slate-50">
+                Today&apos;s classes
+              </h2>
             </div>
 
             {dashLoading ? (
               <p className="mt-6 text-sm text-slate-500">Loading schedule…</p>
             ) : dashError ? (
               <p className="mt-6 text-sm text-rose-600">{dashError}</p>
-            ) : !hasScheduleData ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center dark:border-slate-600 dark:bg-slate-800/40">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  No weekly hours yet. Admins can add meeting times from each
-                  classroom card on the Classrooms page.
+            ) : todayMeetingRows.length === 0 ? (
+              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-gradient-to-b from-slate-50/90 to-white px-4 py-10 text-center dark:border-slate-600 dark:from-slate-900/50 dark:to-slate-900/30">
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                  No upcoming class
                 </p>
                 <Link
                   to="/classroom"
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+                  className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
                 >
                   Open classrooms
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>
-            ) : !hasAnyOccurrence ? (
-              <div className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center dark:border-slate-600 dark:bg-slate-800/40">
-                <p className="text-sm text-slate-600 dark:text-slate-400">
-                  {scheduleView === 'day'
-                    ? 'Nothing on your calendar for today.'
-                    : scheduleView === 'month'
-                      ? 'No classes fall on these weekdays in this month.'
-                      : 'No classes in this date range for your current weekly pattern.'}
-                </p>
-                <Link
-                  to="/classroom"
-                  className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
-                >
-                  Adjust weekly hours
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
             ) : (
-              <div className="mt-5 space-y-4">
-                {scheduleRows.map((row) => (
-                  <div
-                    key={row.iso}
-                    className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70 dark:border-slate-600 dark:bg-slate-900/35"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/90 px-4 py-2.5 dark:border-slate-600/90">
-                      <span className="font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
-                        {formatDayHeading(row.date)}
-                      </span>
-                      {row.iso === todayIso ? (
-                        <span className="rounded-full bg-cyan-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-800 dark:bg-cyan-900/60 dark:text-cyan-200">
-                          Today
-                        </span>
-                      ) : null}
-                    </div>
-                    {row.entries.length === 0 ? (
-                      <p className="px-4 py-4 text-xs text-slate-500 dark:text-slate-400">
-                        No classes this day.
-                      </p>
-                    ) : (
-                      <ul className="divide-y divide-slate-200/90 dark:divide-slate-600/90">
-                        {row.entries.map((entry) => (
-                          <li
-                            key={`${row.iso}-${entry.chatId}-${entry.slot.weekday}-${entry.slot.start}-${entry.slot.end}-${entry.slot.label ?? ''}`}
-                          >
+              <div className="mt-6 flex min-h-0 flex-1 flex-col gap-5">
+                <div className="hidden overflow-hidden rounded-2xl border border-slate-200/90 shadow-sm dark:border-slate-600 md:block">
+                  <table className="w-full border-collapse text-left text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-200 bg-slate-50/95 dark:border-slate-600 dark:bg-slate-800/80">
+                        <th className="px-4 py-3 font-display font-semibold text-slate-700 dark:text-slate-200">
+                          Course
+                        </th>
+                        <th className="px-4 py-3 font-display font-semibold text-slate-700 dark:text-slate-200">
+                          Date
+                        </th>
+                        <th className="px-4 py-3 font-display font-semibold text-slate-700 dark:text-slate-200">
+                          Instructor
+                        </th>
+                        <th className="px-4 py-3 font-display font-semibold text-slate-700 dark:text-slate-200">
+                          Time
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {todayMeetingRows.map((row) => (
+                        <tr
+                          key={`${row.chatId}-${row.slot.weekday}-${row.slot.start}-${row.slot.end}-${row.slot.label ?? ''}`}
+                          className="border-b border-slate-100 transition hover:bg-cyan-50/50 dark:border-slate-700/90 dark:hover:bg-cyan-950/25"
+                        >
+                          <td className="px-4 py-3">
                             <Link
-                              to={`/classroom/${entry.chatId}`}
-                              className="flex flex-wrap items-start justify-between gap-3 px-4 py-3 transition hover:bg-white dark:hover:bg-slate-800/80"
+                              to={`/classroom/${row.chatId}`}
+                              className="font-display font-semibold text-cyan-800 hover:underline dark:text-cyan-300"
                             >
-                              <div className="min-w-0 flex-1">
-                                <p className="font-display text-sm font-semibold text-slate-900 dark:text-slate-100">
-                                  {entry.roomName}
-                                </p>
-                                {entry.slot.label ? (
-                                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                                    {entry.slot.label}
-                                  </p>
-                                ) : null}
-                              </div>
-                              <div className="flex shrink-0 items-center gap-2">
-                                <span className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm dark:bg-slate-800 dark:text-slate-100">
-                                  {entry.slot.start}–{entry.slot.end}
-                                </span>
-                                <ArrowRight className="h-4 w-4 text-slate-400" />
-                              </div>
+                              {row.courseName}
                             </Link>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
+                          </td>
+                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                            {scheduleDateLabel}
+                          </td>
+                          <td className="px-4 py-3 text-slate-700 dark:text-slate-200">
+                            {row.slot.label?.trim()
+                              ? row.slot.label.trim()
+                              : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex rounded-lg bg-slate-900/5 px-2.5 py-1 font-mono text-xs font-semibold text-slate-800 ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-slate-100 dark:ring-slate-600">
+                              {row.slot.start}–{row.slot.end}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <ul className="space-y-3 md:hidden">
+                  {todayMeetingRows.map((row) => (
+                    <li
+                      key={`m-${row.chatId}-${row.slot.weekday}-${row.slot.start}-${row.slot.end}-${row.slot.label ?? ''}`}
+                    >
+                      <Link
+                        to={`/classroom/${row.chatId}`}
+                        className="block rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/90 p-4 shadow-sm transition hover:border-cyan-300/70 hover:shadow-md dark:border-slate-600 dark:from-slate-900 dark:to-slate-900/70 dark:hover:border-cyan-700"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-display text-[15px] font-semibold text-slate-900 dark:text-slate-50">
+                              {row.courseName}
+                            </p>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                              {scheduleDateLabel}
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-lg bg-cyan-500/15 px-2.5 py-1 font-mono text-xs font-semibold text-cyan-900 dark:bg-cyan-500/20 dark:text-cyan-200">
+                            {row.slot.start}–{row.slot.end}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+                          <span className="text-slate-400 dark:text-slate-500">
+                            Instructor{' '}
+                          </span>
+                          {row.slot.label?.trim() ? row.slot.label.trim() : '—'}
+                        </p>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+
+                <div className="flex justify-end pt-1">
+                  <Link
+                    to="/classroom"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+                  >
+                    Open classrooms
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                </div>
               </div>
             )}
           </article>

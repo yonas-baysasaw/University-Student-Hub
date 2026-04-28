@@ -12,7 +12,7 @@ import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
-import About from './pages/About';
+import Landing from './pages/Landing';
 import BookDetail from './pages/BookDetail';
 import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
@@ -99,12 +99,14 @@ function AppRoutes() {
     );
   }
 
+  const hideGlobalNavForLanding = location.pathname === '/';
+
   return (
     <>
-      <Nav />
+      {!hideGlobalNavForLanding && <Nav />}
       <div key={location.pathname} className="route-fade">
         <Routes>
-          <Route path="/" element={<About />} />
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/password/reset" element={<PasswordReset />} />

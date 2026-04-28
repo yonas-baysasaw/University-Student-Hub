@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { SCHEDULE_SAVED_EVENT } from '../constants/dashboardEvents.js';
 import { readJsonOrThrow } from '../utils/http';
 import {
   earliestNextOccurrenceMs,
@@ -8,6 +9,53 @@ import {
 } from '../utils/scheduleCountdown.js';
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+/** @param {string} t */
+function slotMinutes(t) {
+  const m = String(t).match(HH_MM);
+  if (!m) return NaN;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
+/**
+ * Client-side checks aligned with PATCH `/api/chats/:chatId/schedule`.
+ * Cross-classroom duplicates are enforced on the server.
+ * @param {Array<{ weekday: number, start: string, end: string, label?: string }>} rows
+ */
+function validateDraftSlots(rows) {
+  const seen = new Set();
+  for (const row of rows) {
+    const wd = Number(row.weekday);
+    const start = String(row.start || '09:00').trim();
+    const end = String(row.end || '10:00').trim();
+    if (!HH_MM.test(start) || !HH_MM.test(end)) {
+      return {
+        ok: false,
+        message: 'Use 24-hour times (HH:mm) for start and end.',
+      };
+    }
+    const sm = slotMinutes(start);
+    const em = slotMinutes(end);
+    if (!(sm < em)) {
+      return {
+        ok: false,
+        message: 'Each row needs a start time before its end time.',
+      };
+    }
+    const triple = `${wd}|${start}|${end}`;
+    if (seen.has(triple)) {
+      return {
+        ok: false,
+        message:
+          'Two rows use the same weekday with identical start and end times. Remove one or change the times.',
+      };
+    }
+    seen.add(triple);
+  }
+  return { ok: true };
+}
 
 function newRowId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -141,8 +189,9 @@ function MiniCalendar({
           );
         })}
       </div>
-      <p className="mt-2 text-[10px] text-slate-500 dark:text-slate-400">
-        Tap a date — class repeats every {WEEKDAY_LABELS[selectedWeekday]}.
+      <p className="mt-2 text-[10px] leading-snug text-slate-500 dark:text-slate-400">
+        Tap a date — this row repeats every {WEEKDAY_LABELS[selectedWeekday]}.
+        Other rows can use the same weekday with different times.
       </p>
     </div>
   );
@@ -225,8 +274,14 @@ function ClassroomScheduleEditor({
   };
 
   const submit = async () => {
-    setSaving(true);
     setError('');
+    const localCheck = validateDraftSlots(slots);
+    if (!localCheck.ok) {
+      setError(localCheck.message);
+      return;
+    }
+
+    setSaving(true);
     try {
       const payloadSlots = slots.map((s) => {
         const base = {
@@ -250,6 +305,7 @@ function ClassroomScheduleEditor({
         },
       );
       await readJsonOrThrow(res, 'Could not save schedule');
+      window.dispatchEvent(new CustomEvent(SCHEDULE_SAVED_EVENT));
       onSaved?.();
       setModalOpen(false);
     } catch (err) {
@@ -339,8 +395,20 @@ function ClassroomScheduleEditor({
 
               {canEdit ? (
                 <div className="space-y-5">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    Weekly recurrence — appears on your dashboard.
+                  <p
+                    id="schedule-editor-hint"
+                    className="text-xs leading-relaxed text-slate-600 dark:text-slate-400"
+                  >
+                    Weekly times sync to the dashboard.{' '}
+                    <strong className="font-semibold text-slate-800 dark:text-slate-200">
+                      Same day, different times
+                    </strong>{' '}
+                    (for example a morning and afternoon class): click{' '}
+                    <strong>Add time slot</strong> again and pick the same
+                    weekday on each row—only the start/end times need to differ.
+                    To list a <strong>different course title</strong>, create
+                    another classroom on the Classrooms page—each classroom has
+                    one course name.
                   </p>
                   {slots.map((row) => (
                     <ScheduleSlotBlock
@@ -359,6 +427,7 @@ function ClassroomScheduleEditor({
                 <button
                   type="button"
                   onClick={addSlot}
+                  aria-describedby="schedule-editor-hint"
                   className="btn-secondary flex-1 px-4 py-2.5 text-sm sm:flex-none"
                 >
                   Add time slot
