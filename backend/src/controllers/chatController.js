@@ -2,6 +2,9 @@ import mongoose from 'mongoose';
 import { customAlphabet } from 'nanoid';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Chat from '../models/Chat.js';
+import ClassroomAnnouncement from '../models/ClassroomAnnouncement.js';
+import ClassroomResource from '../models/ClassroomResource.js';
+import Membership from '../models/Membership.js';
 import Message from '../models/Message.js';
 import { canManageClassroomContent } from '../utils/classroomContentAuth.js';
 
@@ -17,16 +20,6 @@ function minutesFromHHMM(t) {
   return Number(m[1]) * 60 + Number(m[2]);
 }
 
-/**
- * @param {{ weekday: unknown, start: unknown, end: unknown }} s
- */
-function scheduleTripleKey(s) {
-  const wd = Number(s.weekday);
-  const start = String(s.start ?? '').trim();
-  const end = String(s.end ?? '').trim();
-  return `${wd}|${start}|${end}`;
-}
-
 function validateClassScheduleSlots(slots) {
   const fail = (msg) => {
     const e = new Error(msg);
@@ -39,7 +32,6 @@ function validateClassScheduleSlots(slots) {
   if (slots.length > 48) {
     fail('Too many weekly slots');
   }
-  const seenTriple = new Set();
   for (const s of slots) {
     if (!s || typeof s !== 'object') {
       fail('Invalid slot');
@@ -61,73 +53,8 @@ function validateClassScheduleSlots(slots) {
     if (!(startMin < endMin)) {
       fail('Each slot must have start time before end time');
     }
-    const triple = scheduleTripleKey(s);
-    if (seenTriple.has(triple)) {
-      fail(
-        'Duplicate weekly slot in this schedule (same weekday, start, and end)',
-      );
-    }
-    seenTriple.add(triple);
     if (s.label != null && String(s.label).length > 120) {
       fail('Label too long');
-    }
-  }
-}
-
-/**
- * Same weekday + start + end cannot appear on another classroom for this user.
- * @param {import('mongoose').Types.ObjectId} userId
- * @param {string} excludeChatId
- * @param {Array<{ weekday: unknown, start: unknown, end: unknown }>} incomingSlots
- */
-async function assertScheduleTripleUniqueAcrossClassrooms(
-  userId,
-  excludeChatId,
-  incomingSlots,
-) {
-  const fail = (msg) => {
-    const e = new Error(msg);
-    e.status = 400;
-    throw e;
-  };
-
-  const incomingKeys = new Set(incomingSlots.map((s) => scheduleTripleKey(s)));
-
-  const others = await Chat.find({ members: userId })
-    .select('name metadata.classSchedule')
-    .lean();
-
-  /** @type {Map<string, string>} */
-  const tripleToClassroomName = new Map();
-
-  for (const doc of others) {
-    if (String(doc._id) === String(excludeChatId)) continue;
-    const slots = doc.metadata?.classSchedule?.slots;
-    if (!Array.isArray(slots)) continue;
-    const name = typeof doc.name === 'string' ? doc.name : 'Another classroom';
-    for (const s of slots) {
-      const wd = Number(s.weekday);
-      const start = String(s.start ?? '').trim();
-      const end = String(s.end ?? '').trim();
-      if (
-        !Number.isInteger(wd) ||
-        wd < 0 ||
-        wd > 6 ||
-        !HH_MM.test(start) ||
-        !HH_MM.test(end)
-      ) {
-        continue;
-      }
-      tripleToClassroomName.set(scheduleTripleKey({ weekday: wd, start, end }), name);
-    }
-  }
-
-  for (const key of incomingKeys) {
-    const conflict = tripleToClassroomName.get(key);
-    if (conflict != null) {
-      fail(
-        `That weekly time is already scheduled in "${conflict}". Use different times or edit that classroom.`,
-      );
     }
   }
 }
@@ -246,6 +173,99 @@ export const getUserChats = asyncHandler(async (req, res) => {
   });
 });
 
+export const patchChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const e = new Error('Invalid classroom id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select(
+    'members admins creator name metadata',
+  );
+  if (!chat) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+
+  if (!canManageClassroomContent(chat, req.user._id)) {
+    throw forbidden('Only classroom admins can update this classroom');
+  }
+
+  const { name, archived } = req.body ?? {};
+
+  if (name !== undefined) {
+    const trimmed = typeof name === 'string' ? name.trim() : '';
+    if (!trimmed) {
+      const e = new Error('Classroom name cannot be empty');
+      e.status = 400;
+      throw e;
+    }
+    if (trimmed.length > 120) {
+      const e = new Error('Classroom name is too long');
+      e.status = 400;
+      throw e;
+    }
+    chat.name = trimmed;
+  }
+
+  if (typeof archived === 'boolean') {
+    if (!chat.metadata || typeof chat.metadata !== 'object') {
+      chat.metadata = {};
+    }
+    chat.metadata.archived = archived;
+  }
+
+  await chat.save();
+
+  const populated = await Chat.findById(chat._id).populate([
+    { path: 'members', select: 'username email avatar photo' },
+    {
+      path: 'lastMessage',
+      populate: { path: 'sender', select: 'username email avatar photo' },
+    },
+  ]);
+
+  res.json(populated ?? chat);
+});
+
+export const deleteChat = asyncHandler(async (req, res) => {
+  const { chatId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const e = new Error('Invalid classroom id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select(
+    'members admins creator metadata name',
+  );
+  if (!chat) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+
+  if (!canManageClassroomContent(chat, req.user._id)) {
+    throw forbidden('Only classroom admins can delete this classroom');
+  }
+
+  await Promise.all([
+    Message.deleteMany({ chat: chatId }),
+    ClassroomAnnouncement.deleteMany({ chat: chatId }),
+    ClassroomResource.deleteMany({ chat: chatId }),
+    Membership.deleteMany({ chat: chatId }),
+  ]);
+
+  await Chat.findByIdAndDelete(chatId);
+
+  res.json({ message: 'Classroom deleted' });
+});
+
 export const patchChatSchedule = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
 
@@ -271,12 +291,6 @@ export const patchChatSchedule = asyncHandler(async (req, res) => {
   const raw = req.body?.classSchedule ?? req.body;
   const slots = raw?.slots;
   validateClassScheduleSlots(slots);
-
-  await assertScheduleTripleUniqueAcrossClassrooms(
-    req.user._id,
-    chatId,
-    slots,
-  );
 
   if (!chat.metadata || typeof chat.metadata !== 'object') {
     chat.metadata = {};

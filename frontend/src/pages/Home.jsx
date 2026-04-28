@@ -13,7 +13,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import TodayClassesCard from '../components/TodayClassesCard.jsx';
-import { SCHEDULE_SAVED_EVENT } from '../constants/dashboardEvents.js';
+import {
+  CLASSROOM_LIST_CHANGED_EVENT,
+  SCHEDULE_SAVED_EVENT,
+} from '../constants/dashboardEvents.js';
 import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
 
@@ -124,35 +127,31 @@ function Home() {
   const [summary, setSummary] = useState(null);
   const [now, setNow] = useState(() => new Date());
 
-  const weekdayNow = useMemo(() => new Date().getDay(), []);
-
-  const loadDashboard = useCallback(
-    async (opts = {}) => {
-      const silent = opts.silent === true;
-      if (!silent) {
-        setDashLoading(true);
-        setDashError('');
-      }
-      try {
-        const params = new URLSearchParams({
-          weekday: String(weekdayNow),
-          localDate: formatLocalDate(new Date()),
-          announcementsLimit: '12',
-        });
-        const res = await fetch(`/api/dashboard/summary?${params}`, {
-          credentials: 'include',
-        });
-        const data = await readJsonOrThrow(res, 'Could not load dashboard');
-        setSummary(data);
-        setDashError('');
+  const loadDashboard = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) {
+      setDashLoading(true);
+      setDashError('');
+    }
+    try {
+      const clock = new Date();
+      const params = new URLSearchParams({
+        weekday: String(clock.getDay()),
+        localDate: formatLocalDate(clock),
+        announcementsLimit: '12',
+      });
+      const res = await fetch(`/api/dashboard/summary?${params}`, {
+        credentials: 'include',
+      });
+      const data = await readJsonOrThrow(res, 'Could not load dashboard');
+      setSummary(data);
+      setDashError('');
       } catch (err) {
         setDashError(err?.message || 'Could not load dashboard');
       } finally {
         if (!silent) setDashLoading(false);
       }
-    },
-    [weekdayNow],
-  );
+  }, []);
 
   const handleManualRefresh = useCallback(async () => {
     setDashRefreshing(true);
@@ -182,6 +181,18 @@ function Home() {
     window.addEventListener(SCHEDULE_SAVED_EVENT, onScheduleSaved);
     return () =>
       window.removeEventListener(SCHEDULE_SAVED_EVENT, onScheduleSaved);
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    const onClassroomsChanged = () => {
+      loadDashboard({ silent: true });
+    };
+    window.addEventListener(CLASSROOM_LIST_CHANGED_EVENT, onClassroomsChanged);
+    return () =>
+      window.removeEventListener(
+        CLASSROOM_LIST_CHANGED_EVENT,
+        onClassroomsChanged,
+      );
   }, [loadDashboard]);
 
   useEffect(() => {

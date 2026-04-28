@@ -1,9 +1,11 @@
 import { Router } from 'express';
 import {
   createChat,
+  deleteChat,
   getChatMessages,
   getUserChats,
   joinChatByCode,
+  patchChat,
   patchChatSchedule,
   sendMessage,
 } from '../controllers/chatController.js';
@@ -27,6 +29,9 @@ router.post('/join', joinChatByCode);
 router.get('/', getUserChats);
 
 router.patch('/:chatId/schedule', patchChatSchedule);
+
+router.patch('/:chatId', patchChat);
+router.delete('/:chatId', deleteChat);
 
 router.get('/:chatId/announcements', listAnnouncements);
 router.post('/:chatId/announcements', createAnnouncement);

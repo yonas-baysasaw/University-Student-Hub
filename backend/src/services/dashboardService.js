@@ -5,7 +5,10 @@ import ClassroomAnnouncement from '../models/ClassroomAnnouncement.js';
  * @param {import('mongoose').Types.ObjectId} userId
  */
 export async function getClassroomCountForUser(userId) {
-  return Chat.countDocuments({ members: userId });
+  return Chat.countDocuments({
+    members: userId,
+    'metadata.archived': { $ne: true },
+  });
 }
 
 const BODY_PREVIEW_MAX = 220;
@@ -33,7 +36,12 @@ function timeToMinutes(t) {
  * @param {number} limit
  */
 export async function getRecentAnnouncementsForUser(userId, limit) {
-  const chats = await Chat.find({ members: userId }).select('_id name').lean();
+  const chats = await Chat.find({
+    members: userId,
+    'metadata.archived': { $ne: true },
+  })
+    .select('_id name')
+    .lean();
   const ids = chats.map((c) => c._id);
   if (ids.length === 0) return [];
 
@@ -62,7 +70,10 @@ export async function getRecentAnnouncementsForUser(userId, limit) {
  * @param {import('mongoose').Types.ObjectId} userId
  */
 export async function getAllScheduledClassesForUser(userId) {
-  const chats = await Chat.find({ members: userId })
+  const chats = await Chat.find({
+    members: userId,
+    'metadata.archived': { $ne: true },
+  })
     .select('name metadata')
     .lean();
 

@@ -3,23 +3,32 @@ import {
   BookOpen,
   Copy,
   GraduationCap,
+  Archive as ArchiveIcon,
   Sparkles,
   Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
+import ClassroomCardMenu from '../components/ClassroomCardMenu.jsx';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
+import { CLASSROOM_LIST_CHANGED_EVENT } from '../constants/dashboardEvents.js';
 import { useAuth } from '../contexts/AuthContext';
 import { canManageClassroom, isClassroomMember } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
+
+function notifyClassroomsChanged() {
+  window.dispatchEvent(new CustomEvent(CLASSROOM_LIST_CHANGED_EVENT));
+}
 
 async function copyInvitationCode(code) {
   try {
     await navigator.clipboard.writeText(code);
     toast.success('Invitation code copied to clipboard.');
   } catch {
-    toast.error('Could not copy automatically — select the code and copy manually.');
+    toast.error(
+      'Could not copy automatically — select the code and copy manually.',
+    );
   }
 }
 
@@ -37,6 +46,14 @@ function ClassRoom() {
   const [joinError, setJoinError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+
+  const [scheduleForId, setScheduleForId] = useState(null);
+  const [editClassroom, setEditClassroom] = useState(null);
+  const [editName, setEditName] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [archiveBusyId, setArchiveBusyId] = useState(null);
 
   const fetchChats = useCallback(async () => {
     setLoading(true);
@@ -58,6 +75,32 @@ function ClassRoom() {
   useEffect(() => {
     fetchChats();
   }, [fetchChats]);
+
+  useEffect(() => {
+    if (editClassroom) setEditName(editClassroom.name);
+  }, [editClassroom]);
+
+  const classrooms = data?.chats ?? [];
+
+  const activeRooms = useMemo(
+    () => classrooms.filter((c) => !c.metadata?.archived),
+    [classrooms],
+  );
+
+  const archivedRooms = useMemo(
+    () => classrooms.filter((c) => Boolean(c.metadata?.archived)),
+    [classrooms],
+  );
+
+  const scheduleClassroom = useMemo(
+    () => classrooms.find((c) => String(c._id) === scheduleForId),
+    [classrooms, scheduleForId],
+  );
+
+  const totalMembers = activeRooms.reduce(
+    (acc, c) => acc + (c.members?.length ?? 0),
+    0,
+  );
 
   const handleCreateClass = async () => {
     const trimmedName = classroomName.trim();
@@ -87,6 +130,7 @@ function ClassRoom() {
       setClassroomCode('');
       toast.success('Classroom created — invite classmates with the code.');
       await fetchChats();
+      notifyClassroomsChanged();
     } catch (submitError) {
       setCreateError(submitError.message);
     } finally {
@@ -116,11 +160,172 @@ function ClassRoom() {
       setJoinCode('');
       toast.success('You joined the classroom.');
       await fetchChats();
+      notifyClassroomsChanged();
     } catch (submitError) {
       setJoinError(submitError.message);
     } finally {
       setIsJoining(false);
     }
+  };
+
+  const patchClassroom = async (chatId, body) => {
+    const res = await fetch(`/api/chats/${encodeURIComponent(chatId)}`, {
+      method: 'PATCH',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    await readJsonOrThrow(res, 'Could not update classroom');
+  };
+
+  const submitEditName = async () => {
+    if (!editClassroom) return;
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      toast.error('Name cannot be empty.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await patchClassroom(editClassroom.id, { name: trimmed });
+      toast.success('Classroom updated.');
+      setEditClassroom(null);
+      await fetchChats();
+      notifyClassroomsChanged();
+    } catch (e) {
+      toast.error(e?.message || 'Could not update.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleArchiveToggle = async (classroom) => {
+    const id = String(classroom._id);
+    const next = !classroom.metadata?.archived;
+    setArchiveBusyId(id);
+    try {
+      await patchClassroom(id, { archived: next });
+      toast.success(next ? 'Classroom archived.' : 'Classroom restored.');
+      await fetchChats();
+      notifyClassroomsChanged();
+      if (scheduleForId === id) setScheduleForId(null);
+    } catch (e) {
+      toast.error(e?.message || 'Could not update.');
+    } finally {
+      setArchiveBusyId(null);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deleteConfirmId) return;
+    setDeleteBusy(true);
+    try {
+      const res = await fetch(
+        `/api/chats/${encodeURIComponent(deleteConfirmId)}`,
+        { method: 'DELETE', credentials: 'include' },
+      );
+      await readJsonOrThrow(res, 'Could not delete classroom');
+      toast.success('Classroom deleted.');
+      setDeleteConfirmId(null);
+      if (scheduleForId === deleteConfirmId) setScheduleForId(null);
+      await fetchChats();
+      notifyClassroomsChanged();
+    } catch (e) {
+      toast.error(e?.message || 'Could not delete.');
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
+
+  const renderClassroomCard = (classroom, index) => {
+    const id = String(classroom._id);
+    const archived = Boolean(classroom.metadata?.archived);
+    const manage = canManageClassroom(user, classroom);
+    const member = isClassroomMember(user, classroom);
+    const canSchedule = manage || member;
+
+    return (
+      <article
+        key={id}
+        style={{
+          animationDelay: `${Math.min(index * 55, 420)}ms`,
+        }}
+        className="classroom-card-lift fade-in-up group relative overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 p-5 pt-4 shadow-md dark:border-slate-700/85 dark:from-slate-900 dark:to-slate-950/95"
+      >
+        <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl transition-opacity group-hover:opacity-100 dark:bg-cyan-500/15" />
+
+        <div className="relative flex items-start gap-2">
+          <h3 className="min-w-0 flex-1 font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white">
+            {classroom.name}
+          </h3>
+          <ClassroomCardMenu
+            classroomId={id}
+            classroomName={classroom.name}
+            archived={archived}
+            canManage={manage}
+            canSchedule={canSchedule}
+            onSchedule={() => setScheduleForId(id)}
+            onEdit={() =>
+              setEditClassroom({ id, name: classroom.name })
+            }
+            onArchiveToggle={() => handleArchiveToggle(classroom)}
+            onDelete={() => setDeleteConfirmId(id)}
+          />
+        </div>
+
+        <div className="relative mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+              archived
+                ? 'bg-slate-500/90 text-white dark:bg-slate-700'
+                : 'bg-emerald-600/90 text-white dark:bg-emerald-800'
+            }`}
+          >
+            {archived ? 'Archived' : 'Active'}
+          </span>
+          {archiveBusyId === id ? (
+            <span className="text-[11px] font-medium text-slate-500">
+              Updating…
+            </span>
+          ) : null}
+        </div>
+
+        <div className="relative mt-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            Invite code
+          </p>
+          <div className="mt-1 flex items-center gap-2">
+            <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-cyan-900 dark:text-cyan-100">
+              {classroom.invitationCode}
+            </code>
+            <button
+              type="button"
+              onClick={() => copyInvitationCode(classroom.invitationCode)}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
+            >
+              <Copy className="h-3 w-3" aria-hidden />
+              Copy
+            </button>
+          </div>
+        </div>
+
+        <p className="relative mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+          <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
+          <span className="font-semibold text-slate-800 dark:text-slate-200">
+            {classroom.members?.length ?? 0}
+          </span>{' '}
+          {classroom.members?.length === 1 ? 'member' : 'members'}
+        </p>
+
+        <Link
+          to={`/classroom/${id}`}
+          className="relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
+        >
+          Open classroom
+          <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+        </Link>
+      </article>
+    );
   };
 
   if (loading) {
@@ -161,12 +366,6 @@ function ClassRoom() {
     );
   }
 
-  const classrooms = data?.chats ?? [];
-  const totalMembers = classrooms.reduce(
-    (acc, c) => acc + (c.members?.length ?? 0),
-    0,
-  );
-
   return (
     <div className="classroom-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 text-slate-900 md:px-6 md:pt-8 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(320px,42vh)] workspace-hero-mesh opacity-90 dark:opacity-60" />
@@ -183,18 +382,20 @@ function ClassRoom() {
                   Collaboration
                 </span>
                 <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  {classrooms.length}{' '}
-                  {classrooms.length === 1 ? 'space' : 'spaces'} · {totalMembers}{' '}
-                  seats filled
+                  {activeRooms.length}{' '}
+                  {activeRooms.length === 1 ? 'active space' : 'active spaces'}{' '}
+                  · {totalMembers} seats
+                  {archivedRooms.length > 0
+                    ? ` · ${archivedRooms.length} archived`
+                    : ''}
                 </span>
               </div>
               <h1 className="font-display text-balance text-3xl font-bold tracking-tight md:text-4xl">
                 Course classrooms
               </h1>
               <p className="max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                Host discussions, share weekly rhythm on your schedule, and keep
-                announcements and files organized—everything stays scoped to each
-                course.
+                Use the menu on each card for schedule, edits, and archiving—your
+                dashboard picks up weekly slots automatically.
               </p>
             </div>
           </div>
@@ -229,8 +430,8 @@ function ClassRoom() {
                 Your spaces
               </h2>
               <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Tap a classroom to open discussion, announcements, and shared
-                resources.
+                Cards stay interactive—open the ⋯ menu for schedule and admin
+                actions.
               </p>
             </div>
           </div>
@@ -261,79 +462,155 @@ function ClassRoom() {
               </div>
             </div>
           ) : (
-            <div className="mt-7 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-              {classrooms.map((classroom, index) => (
-                <article
-                  key={classroom._id}
-                  style={{
-                    animationDelay: `${Math.min(index * 55, 420)}ms`,
-                  }}
-                  className="classroom-card-lift fade-in-up group relative overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 p-5 shadow-md dark:border-slate-700/85 dark:from-slate-900 dark:to-slate-950/95"
-                >
-                  <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl transition-opacity group-hover:opacity-100 dark:bg-cyan-500/15" />
-                  <div className="relative flex items-start justify-between gap-2">
-                    <h3 className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-                      {classroom.name}
+            <div className="mt-7 space-y-10">
+              <div>
+                <h3 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                  Active
+                </h3>
+                {activeRooms.length === 0 ? (
+                  <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+                    No active classrooms. Restore one from the archive below or
+                    create a new space.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {activeRooms.map((c, i) => renderClassroomCard(c, i))}
+                  </div>
+                )}
+              </div>
+
+              {archivedRooms.length > 0 ? (
+                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/40 md:p-5">
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <ArchiveIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
+                    <h3 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300">
+                      Archived
                     </h3>
-                    <span className="rounded-full bg-slate-900/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-white dark:bg-cyan-900/80">
-                      Active
+                    <span className="text-xs text-slate-500 dark:text-slate-400">
+                      Hidden from dashboard summaries—restore anytime.
                     </span>
                   </div>
-
-                  <div className="relative mt-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
-                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
-                      Invite code
-                    </p>
-                    <div className="mt-1 flex items-center gap-2">
-                      <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-cyan-900 dark:text-cyan-100">
-                        {classroom.invitationCode}
-                      </code>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          copyInvitationCode(classroom.invitationCode)
-                        }
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
-                      >
-                        <Copy className="h-3 w-3" aria-hidden />
-                        Copy
-                      </button>
-                    </div>
+                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {archivedRooms.map((c, i) =>
+                      renderClassroomCard(c, i + activeRooms.length),
+                    )}
                   </div>
-
-                  <p className="relative mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                    <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {classroom.members?.length ?? 0}
-                    </span>{' '}
-                    {classroom.members?.length === 1 ? 'member' : 'members'}
-                  </p>
-
-                  <Link
-                    to={`/classroom/${classroom._id}`}
-                    className="relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
-                  >
-                    Open classroom
-                    <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
-                  </Link>
-
-                  {canManageClassroom(user, classroom) ||
-                  isClassroomMember(user, classroom) ? (
-                    <div className="relative mt-4 border-t border-slate-100 pt-4 dark:border-slate-700/80">
-                      <ClassroomScheduleEditor
-                        chatId={String(classroom._id)}
-                        initialSlots={classroom.metadata?.classSchedule?.slots}
-                        onSaved={fetchChats}
-                        canEdit={canManageClassroom(user, classroom)}
-                      />
-                    </div>
-                  ) : null}
-                </article>
-              ))}
+                </div>
+              ) : null}
             </div>
           )}
         </section>
       </div>
+
+      {scheduleForId && scheduleClassroom ? (
+        <ClassroomScheduleEditor
+          key={scheduleForId}
+          chatId={scheduleForId}
+          initialSlots={scheduleClassroom.metadata?.classSchedule?.slots}
+          onSaved={() => {
+            fetchChats();
+            notifyClassroomsChanged();
+          }}
+          canEdit={canManageClassroom(user, scheduleClassroom)}
+          showTrigger={false}
+          open
+          onOpenChange={(open) => {
+            if (!open) setScheduleForId(null);
+          }}
+        />
+      ) : null}
+
+      {editClassroom ? (
+        <div
+          className="fixed inset-0 z-[1002] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-md"
+          role="presentation"
+          onClick={() => setEditClassroom(null)}
+          onKeyDown={(e) => e.key === 'Escape' && setEditClassroom(null)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-class-title"
+            className="fade-in-up relative w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-7 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              id="edit-class-title"
+              className="font-display text-xl font-bold text-slate-900 dark:text-white"
+            >
+              Edit classroom name
+            </h3>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              className="input-field mt-4 text-sm"
+              maxLength={120}
+            />
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setEditClassroom(null)}
+                className="btn-secondary px-5 py-2.5 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={editSaving}
+                onClick={submitEditName}
+                className="btn-primary px-5 py-2.5 text-sm disabled:opacity-60"
+              >
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {deleteConfirmId ? (
+        <div
+          className="fixed inset-0 z-[1002] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-md"
+          role="presentation"
+          onClick={() => !deleteBusy && setDeleteConfirmId(null)}
+        >
+          <div
+            role="dialog"
+            aria-labelledby="delete-class-title"
+            className="relative w-full max-w-md rounded-3xl border border-rose-200/90 bg-white p-7 shadow-2xl dark:border-rose-900/40 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              id="delete-class-title"
+              className="font-display text-xl font-bold text-rose-900 dark:text-rose-100"
+            >
+              Delete classroom?
+            </h3>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              This removes discussion, announcements, resources, and messages for
+              this space. This cannot be undone.
+            </p>
+            <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={() => setDeleteConfirmId(null)}
+                className="btn-secondary px-5 py-2.5 text-sm disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={deleteBusy}
+                onClick={handleDeleteConfirm}
+                className="rounded-full bg-rose-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg hover:bg-rose-700 disabled:opacity-60 dark:bg-rose-700 dark:hover:bg-rose-600"
+              >
+                {deleteBusy ? 'Deleting…' : 'Delete forever'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {showCreateModal && (
         <div

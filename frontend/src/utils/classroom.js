@@ -24,8 +24,8 @@ export function getMemberName(member) {
  * @param {{ creator?: unknown, admins?: unknown[] } | null | undefined} chat
  */
 export function canManageClassroom(user, chat) {
-  if (!user?.id || !chat) return false;
-  const uid = String(user.id);
+  const uid = String(user?._id ?? user?.id ?? '');
+  if (!uid || !chat) return false;
   const creatorId = chat.creator?._id ?? chat.creator;
   if (creatorId != null && String(creatorId) === uid) return true;
   const admins = Array.isArray(chat.admins) ? chat.admins : [];
@@ -38,8 +38,8 @@ export function canManageClassroom(user, chat) {
  * @param {{ creator?: unknown, members?: unknown[] } | null | undefined} chat
  */
 export function isClassroomMember(user, chat) {
-  if (!user?.id || !chat) return false;
-  const uid = String(user.id);
+  const uid = String(user?._id ?? user?.id ?? '');
+  if (!uid || !chat) return false;
   const creatorId = chat.creator?._id ?? chat.creator;
   if (creatorId != null && String(creatorId) === uid) return true;
   const members = Array.isArray(chat.members) ? chat.members : [];
