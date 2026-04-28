@@ -18,6 +18,14 @@ export const ACADEMIC_TRACKS = [
   },
 ];
 
+/** Human-readable label for stored academicTrack values */
+export function academicTrackLabel(raw) {
+  const id = String(raw ?? '').trim().toLowerCase();
+  if (!id) return '';
+  const hit = ACADEMIC_TRACKS.find((t) => t.id === id);
+  return hit ? hit.label : String(raw).trim();
+}
+
 export const DEPARTMENTS_BY_TRACK = {
   engineering: [
     'Software Engineering',

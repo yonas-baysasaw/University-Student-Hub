@@ -16,6 +16,7 @@ import { Link } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchLibraryBooks } from '../utils/books';
+import { academicTrackLabel } from '../utils/bookUploadMeta';
 import {
   formatLibraryDate,
   humanizeFormat,
@@ -173,6 +174,13 @@ function Library() {
       const topicStr = topic ? topic.toLowerCase() : '';
       const categoryMatch = filter === 'All' || item.category === filter;
       const savedMatch = !savedOnly || isItemSaved(item);
+      const trackLbl = academicTrackLabel(item.academicTrack).toLowerCase();
+      const deptStr = String(item.department || '').toLowerCase();
+      const courseStr = String(item.courseSubject || '').toLowerCase();
+      const yearStr =
+        item.publishYear != null && Number.isFinite(Number(item.publishYear))
+          ? String(item.publishYear)
+          : '';
       const queryMatch =
         !normalized ||
         item.title.toLowerCase().includes(normalized) ||
@@ -181,7 +189,11 @@ function Library() {
         item.level.toLowerCase().includes(normalized) ||
         (item.description &&
           item.description.toLowerCase().includes(normalized)) ||
-        topicStr.includes(normalized);
+        topicStr.includes(normalized) ||
+        trackLbl.includes(normalized) ||
+        deptStr.includes(normalized) ||
+        courseStr.includes(normalized) ||
+        yearStr.includes(normalized);
       return categoryMatch && queryMatch && savedMatch;
     });
   }, [filter, query, resources, savedOnly, isItemSaved]);
@@ -349,7 +361,7 @@ function Library() {
                 type="search"
                 autoComplete="off"
                 className="input-field h-11 w-full border-slate-200/90 bg-white/90 pl-10 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
-                placeholder="Search titles, topics, descriptions, or format…"
+                placeholder="Search title, department, course, year, format…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 aria-label="Search library"
@@ -455,10 +467,15 @@ function Library() {
                       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[2] h-24 bg-gradient-to-t from-slate-950/65 to-transparent dark:from-black/75" />
                     </div>
 
-                    <div className="absolute left-3 top-3 z-[3] flex flex-wrap gap-1.5">
+                    <div className="absolute left-3 top-3 z-[3] flex max-w-[calc(100%-3.5rem)] flex-wrap gap-1.5">
                       <span className="rounded-lg bg-white/95 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-cyan-800 shadow-md shadow-black/10 ring-1 ring-cyan-500/25 backdrop-blur-sm dark:bg-slate-950/90 dark:text-cyan-200 dark:ring-cyan-400/30">
                         {formatLabel}
                       </span>
+                      {item.academicTrack ? (
+                        <span className="max-w-[10rem] truncate rounded-lg bg-indigo-500/95 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-md ring-1 ring-indigo-400/40 backdrop-blur-sm dark:bg-indigo-600/95">
+                          {academicTrackLabel(item.academicTrack)}
+                        </span>
+                      ) : null}
                       <span
                         className={`rounded-lg px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide shadow-md ring-1 backdrop-blur-sm ${visTone}`}
                       >
@@ -498,6 +515,53 @@ function Library() {
                         {item.title}
                       </Link>
                     </h2>
+
+                    {item.academicTrack ||
+                    item.department ||
+                    item.courseSubject ||
+                    (item.publishYear != null &&
+                      Number.isFinite(Number(item.publishYear))) ? (
+                      <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2 dark:border-slate-700/90 dark:bg-slate-800/55">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                          Catalog
+                        </p>
+                        <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-200">
+                          {item.academicTrack ? (
+                            <li>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Field ·{' '}
+                              </span>
+                              {academicTrackLabel(item.academicTrack)}
+                            </li>
+                          ) : null}
+                          {item.department ? (
+                            <li>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Dept ·{' '}
+                              </span>
+                              {item.department}
+                            </li>
+                          ) : null}
+                          {item.courseSubject ? (
+                            <li>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Course ·{' '}
+                              </span>
+                              {item.courseSubject}
+                            </li>
+                          ) : null}
+                          {item.publishYear != null &&
+                          Number.isFinite(Number(item.publishYear)) ? (
+                            <li>
+                              <span className="text-slate-500 dark:text-slate-400">
+                                Year ·{' '}
+                              </span>
+                              {item.publishYear}
+                            </li>
+                          ) : null}
+                        </ul>
+                      </div>
+                    ) : null}
 
                     {topic ? (
                       <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">

@@ -1,4 +1,12 @@
 export function mapBookToResource(book, index = 0) {
+  const pyRaw = book?.publishYear;
+  const publishYear =
+    pyRaw === null || pyRaw === undefined || pyRaw === ''
+      ? null
+      : Number.isFinite(Number(pyRaw))
+        ? Number(pyRaw)
+        : null;
+
   return {
     id: book?._id ?? book?.id ?? `book-${index}`,
     bookId: book?._id ?? book?.id ?? null,
@@ -6,6 +14,10 @@ export function mapBookToResource(book, index = 0) {
     category: book?.format ?? book?.category ?? book?.genre ?? 'General',
     type: book?.format ?? book?.type ?? 'Book',
     level: book?.visibility ?? book?.level ?? 'public',
+    academicTrack: book?.academicTrack ?? '',
+    department: book?.department ?? '',
+    publishYear,
+    courseSubject: book?.courseSubject ?? '',
     description: book?.description ?? '',
     bookUrl: book?.bookUrl ?? '',
     thumbnailUrl: book?.thumbnailUrl ?? '',

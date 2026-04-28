@@ -5,17 +5,22 @@ import {
   ChevronRight,
   Download,
   Eye,
+  GraduationCap,
   Heart,
   Library,
+  MessageSquare,
   Share2,
   Sparkles,
+  Star,
   ThumbsDown,
   ThumbsUp,
+  Trash2,
   UserRound,
 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
+import { useAuth } from '../contexts/AuthContext';
 import {
   formatLibraryDateTime,
   humanizeFormat,
@@ -23,9 +28,30 @@ import {
   visibilityLabel,
   visibilityTone,
 } from '../utils/formatLabels';
+import { academicTrackLabel } from '../utils/bookUploadMeta';
+
+function formatReviewTimestamp(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const diff = Date.now() - d.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
 
 function BookDetail() {
   const { bookId } = useParams();
+  const { user } = useAuth();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,6 +64,16 @@ function BookDetail() {
   const [actionLoading, setActionLoading] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subscribersCount, setSubscribersCount] = useState(0);
+
+  const [reviews, setReviews] = useState([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [reviewsError, setReviewsError] = useState('');
+  const [reviewBody, setReviewBody] = useState('');
+  const [reviewRating, setReviewRating] = useState(null);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewDeletingId, setReviewDeletingId] = useState(null);
+  const [reviewNotice, setReviewNotice] = useState('');
+  const reviewDraftLoaded = useRef(false);
 
   const applyBookState = useCallback((loadedBook) => {
     setBook(loadedBook);
@@ -105,6 +141,49 @@ function BookDetail() {
       active = false;
     };
   }, [bookId, applyBookState]);
+
+  const fetchReviews = useCallback(async () => {
+    if (!bookId) return;
+    try {
+      setReviewsLoading(true);
+      setReviewsError('');
+      const res = await fetch(`/api/books/${bookId}/reviews`, {
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not load reviews');
+      }
+      setReviews(Array.isArray(data.reviews) ? data.reviews : []);
+    } catch (err) {
+      setReviewsError(err?.message || 'Could not load reviews');
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  }, [bookId]);
+
+  useEffect(() => {
+    reviewDraftLoaded.current = false;
+    setReviewBody('');
+    setReviewRating(null);
+    setReviewNotice('');
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!bookId || loading || error || !book) return;
+    fetchReviews();
+  }, [bookId, loading, error, book, fetchReviews]);
+
+  useEffect(() => {
+    if (reviewsLoading || reviewDraftLoaded.current) return;
+    const mine = reviews.find((r) => r.viewerOwns);
+    if (mine) {
+      setReviewBody(mine.body);
+      setReviewRating(mine.rating ?? null);
+    }
+    reviewDraftLoaded.current = true;
+  }, [reviewsLoading, reviews]);
 
   const handleDownload = async () => {
     if (!book?.bookUrl) return;
@@ -274,6 +353,68 @@ function BookDetail() {
     }
   };
 
+  const handleReviewSubmit = async (e) => {
+    e.preventDefault();
+    setReviewNotice('');
+    if (!book?._id) return;
+    if (!user) {
+      setReviewNotice('Sign in to post a review.');
+      return;
+    }
+    const text = reviewBody.trim();
+    if (!text) {
+      setReviewNotice('Write something before submitting.');
+      return;
+    }
+    setReviewSubmitting(true);
+    try {
+      const res = await fetch(`/api/books/${book._id}/reviews`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: text,
+          rating: reviewRating,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not save your review.');
+      }
+      setReviewNotice('Thanks — your review was saved.');
+      await fetchReviews();
+    } catch (err) {
+      setReviewNotice(err?.message || 'Could not save review.');
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleDeleteReview = async (rid) => {
+    if (!book?._id || !rid) return;
+    setReviewDeletingId(rid);
+    setReviewNotice('');
+    try {
+      const res = await fetch(`/api/books/${book._id}/reviews/${rid}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not delete review.');
+      }
+      setReviewNotice('Review removed.');
+      setReviewBody('');
+      setReviewRating(null);
+      reviewDraftLoaded.current = false;
+      await fetchReviews();
+    } catch (err) {
+      setReviewNotice(err?.message || 'Could not delete.');
+    } finally {
+      setReviewDeletingId(null);
+    }
+  };
+
   const formatLabel = book ? humanizeFormat(book.format) : '';
   const topicFromBook =
     book &&
@@ -376,6 +517,22 @@ function BookDetail() {
                     >
                       {visibilityLabel(book.visibility)}
                     </span>
+                    {book.academicTrack ? (
+                      <span
+                        className="max-w-[11rem] truncate rounded-lg bg-indigo-500/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-indigo-900 ring-1 ring-indigo-500/25 dark:bg-indigo-400/15 dark:text-indigo-100 dark:ring-indigo-400/35"
+                        title={academicTrackLabel(book.academicTrack)}
+                      >
+                        {academicTrackLabel(book.academicTrack)}
+                      </span>
+                    ) : null}
+                    {book.department ? (
+                      <span
+                        className="max-w-[11rem] truncate rounded-lg bg-violet-500/12 px-2.5 py-1 text-[11px] font-bold text-violet-900 ring-1 ring-violet-500/25 dark:bg-violet-400/12 dark:text-violet-100 dark:ring-violet-400/35"
+                        title={book.department}
+                      >
+                        {book.department}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
               </aside>
@@ -390,21 +547,6 @@ function BookDetail() {
                       <h1 className="font-display text-balance text-3xl font-bold tracking-tight text-slate-900 md:text-4xl xl:text-[2.65rem] dark:text-white">
                         {book.title || 'Untitled'}
                       </h1>
-                      {book.department ||
-                      book.courseSubject ||
-                      Number.isFinite(book.publishYear) ? (
-                        <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                          {[
-                            book.department,
-                            book.courseSubject,
-                            Number.isFinite(book.publishYear)
-                              ? book.publishYear
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ')}
-                        </p>
-                      ) : null}
                       {topicFromBook ? (
                         <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
                           Topic · {topicFromBook}
@@ -472,6 +614,66 @@ function BookDetail() {
                     </div>
                   </div>
                 </header>
+
+                <section
+                  aria-labelledby="catalog-heading"
+                  className="rounded-3xl border border-cyan-200/60 bg-gradient-to-br from-cyan-50/80 via-white to-slate-50/90 p-6 shadow-lg shadow-slate-900/[0.04] ring-1 ring-cyan-100/80 dark:border-cyan-900/35 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950 dark:ring-slate-700/80"
+                >
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-500/25 dark:bg-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-400/35">
+                      <GraduationCap className="h-6 w-6" aria-hidden />
+                    </span>
+                    <div>
+                      <h2
+                        id="catalog-heading"
+                        className="font-display text-lg font-bold text-slate-900 dark:text-white"
+                      >
+                        Catalog information
+                      </h2>
+                      <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                        Academic metadata supplied when this title was uploaded.
+                      </p>
+                    </div>
+                  </div>
+                  <dl className="mt-6 grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        Academic field
+                      </dt>
+                      <dd className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                        {book.academicTrack
+                          ? academicTrackLabel(book.academicTrack)
+                          : '—'}
+                      </dd>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        Department / discipline
+                      </dt>
+                      <dd className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                        {book.department?.trim() ? book.department : '—'}
+                      </dd>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        Course / subject
+                      </dt>
+                      <dd className="mt-1 text-sm font-semibold text-slate-900 dark:text-white">
+                        {book.courseSubject?.trim() ? book.courseSubject : '—'}
+                      </dd>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
+                      <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
+                        Publish year
+                      </dt>
+                      <dd className="mt-1 font-display text-xl font-bold tabular-nums text-slate-900 dark:text-white">
+                        {Number.isFinite(book.publishYear)
+                          ? book.publishYear
+                          : '—'}
+                      </dd>
+                    </div>
+                  </dl>
+                </section>
 
                 <section className="rounded-3xl border border-slate-200/85 bg-gradient-to-br from-white to-slate-50/90 p-6 shadow-lg shadow-slate-900/[0.05] ring-1 ring-slate-100/90 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:ring-slate-800">
                   <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
@@ -550,6 +752,253 @@ function BookDetail() {
                         {isSubscribed ? 'Subscribed' : 'Subscribe'}
                       </button>
                     ) : null}
+                  </div>
+                </section>
+
+                <section
+                  aria-labelledby="reviews-heading"
+                  className="overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 shadow-xl shadow-slate-900/[0.06] ring-1 ring-slate-200/80 dark:border-slate-700 dark:from-slate-900 dark:to-slate-950 dark:ring-slate-700/80"
+                >
+                  <div className="border-b border-slate-200/90 bg-gradient-to-r from-cyan-50/90 via-white to-indigo-50/50 px-6 py-5 dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/95">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-cyan-500/15 text-cyan-700 ring-1 ring-cyan-500/25 dark:bg-cyan-500/10 dark:text-cyan-300 dark:ring-cyan-400/30">
+                          <MessageSquare
+                            className="h-6 w-6"
+                            strokeWidth={1.75}
+                            aria-hidden
+                          />
+                        </span>
+                        <div>
+                          <h2
+                            id="reviews-heading"
+                            className="font-display text-xl font-bold text-slate-900 dark:text-white"
+                          >
+                            Reader reviews
+                          </h2>
+                          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                            Share how this resource worked for your courses. One
+                            review per account — update anytime.
+                          </p>
+                        </div>
+                      </div>
+                      {reviewsLoading ? (
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          Loading…
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                          {reviews.length}{' '}
+                          {reviews.length === 1 ? 'review' : 'reviews'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    {user ? (
+                      <form
+                        onSubmit={handleReviewSubmit}
+                        className="rounded-2xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-600 dark:bg-slate-800/50"
+                      >
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          Your review
+                        </p>
+                        <div
+                          className="mt-3 flex flex-wrap items-center gap-1"
+                          role="group"
+                          aria-label="Star rating"
+                        >
+                          <span className="mr-2 text-sm font-medium text-slate-600 dark:text-slate-300">
+                            Rating
+                          </span>
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <button
+                              key={n}
+                              type="button"
+                              onClick={() =>
+                                setReviewRating((prev) =>
+                                  prev === n ? null : n,
+                                )
+                              }
+                              className="rounded-lg p-1 transition hover:bg-amber-50 dark:hover:bg-amber-950/40"
+                              aria-label={`${n} star${n === 1 ? '' : 's'}`}
+                              aria-pressed={reviewRating === n}
+                            >
+                              <Star
+                                className={`h-8 w-8 sm:h-7 sm:w-7 ${
+                                  reviewRating != null && n <= reviewRating
+                                    ? 'fill-amber-400 text-amber-500'
+                                    : 'text-slate-300 dark:text-slate-600'
+                                }`}
+                                strokeWidth={1.5}
+                              />
+                            </button>
+                          ))}
+                          {reviewRating ? (
+                            <span className="ml-2 text-sm font-semibold tabular-nums text-slate-700 dark:text-slate-200">
+                              {reviewRating}/5
+                            </span>
+                          ) : (
+                            <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                              Optional
+                            </span>
+                          )}
+                        </div>
+                        <label htmlFor="book-review-body" className="sr-only">
+                          Review text
+                        </label>
+                        <textarea
+                          id="book-review-body"
+                          rows={4}
+                          maxLength={4000}
+                          value={reviewBody}
+                          onChange={(e) => setReviewBody(e.target.value)}
+                          placeholder="What stood out? Was it aligned with lectures or exams? Would you recommend it?"
+                          className="input-field mt-4 min-h-[120px] resize-y py-3 text-sm leading-relaxed dark:bg-slate-900/60"
+                        />
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {reviewBody.length}/4000
+                          </span>
+                          <button
+                            type="submit"
+                            disabled={reviewSubmitting}
+                            className="btn-primary px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {reviewSubmitting
+                              ? 'Saving…'
+                              : reviews.some((r) => r.viewerOwns)
+                                ? 'Update review'
+                                : 'Post review'}
+                          </button>
+                        </div>
+                      </form>
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/90 px-5 py-8 text-center dark:border-slate-600 dark:bg-slate-800/40">
+                        <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                          Sign in to leave a review and help classmates choose
+                          readings.
+                        </p>
+                        <Link
+                          to="/login"
+                          className="btn-primary mt-4 inline-flex px-6 py-2.5 text-sm"
+                        >
+                          Sign in
+                        </Link>
+                      </div>
+                    )}
+
+                    {reviewNotice ? (
+                      <div
+                        role="status"
+                        className="mt-4 rounded-xl border border-cyan-200/90 bg-cyan-50/90 px-4 py-3 text-sm font-medium text-cyan-950 dark:border-cyan-900/50 dark:bg-cyan-950/40 dark:text-cyan-100"
+                      >
+                        {reviewNotice}
+                      </div>
+                    ) : null}
+
+                    {reviewsError ? (
+                      <div className="mt-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-200">
+                        {reviewsError}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-8 space-y-4">
+                      {reviewsLoading && reviews.length === 0 ? (
+                        <p className="py-8 text-center text-sm font-medium text-slate-500 dark:text-slate-400">
+                          Loading reviews…
+                        </p>
+                      ) : null}
+
+                      {!reviewsLoading && reviews.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 px-6 py-12 text-center dark:border-slate-700 dark:bg-slate-900/30">
+                          <MessageSquare
+                            className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600"
+                            aria-hidden
+                          />
+                          <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-400">
+                            No reviews yet — be the first to share your take.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {reviews.map((rev) => (
+                        <article
+                          key={rev.id}
+                          className="rounded-2xl border border-slate-200/90 bg-white px-5 py-4 shadow-sm transition hover:border-cyan-200/80 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/45 dark:hover:border-cyan-900/60"
+                        >
+                          <div className="flex gap-4">
+                            <img
+                              src={rev.author.avatar || defaultProfile}
+                              alt=""
+                              className="h-11 w-11 shrink-0 rounded-xl object-cover ring-2 ring-slate-100 dark:ring-slate-700"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-semibold text-slate-900 dark:text-white">
+                                    {rev.author.name}
+                                  </p>
+                                  {rev.author.username ? (
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                      @{rev.author.username}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <div className="flex shrink-0 flex-wrap items-center gap-2">
+                                  <time
+                                    className="text-xs font-medium text-slate-400 dark:text-slate-500"
+                                    dateTime={
+                                      rev.updatedAt || rev.createdAt || ''
+                                    }
+                                  >
+                                    {formatReviewTimestamp(
+                                      rev.updatedAt || rev.createdAt,
+                                    )}
+                                  </time>
+                                  {rev.viewerOwns ? (
+                                    <button
+                                      type="button"
+                                      disabled={reviewDeletingId === rev.id}
+                                      onClick={() =>
+                                        handleDeleteReview(rev.id)
+                                      }
+                                      className="inline-flex items-center gap-1 rounded-lg border border-rose-200/90 bg-rose-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-rose-800 transition hover:bg-rose-100 disabled:opacity-50 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200 dark:hover:bg-rose-950/70"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                      Delete
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                              {rev.rating != null &&
+                              Number.isFinite(Number(rev.rating)) ? (
+                                <div
+                                  className="mt-2 flex items-center gap-0.5"
+                                  aria-label={`${rev.rating} out of 5 stars`}
+                                >
+                                  {[1, 2, 3, 4, 5].map((n) => (
+                                    <Star
+                                      key={n}
+                                      className={`h-4 w-4 ${
+                                        n <= Number(rev.rating)
+                                          ? 'fill-amber-400 text-amber-500'
+                                          : 'text-slate-200 dark:text-slate-700'
+                                      }`}
+                                      aria-hidden
+                                    />
+                                  ))}
+                                </div>
+                              ) : null}
+                              <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                                {rev.body}
+                              </p>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   </div>
                 </section>
 
