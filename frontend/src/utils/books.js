@@ -32,6 +32,7 @@ export function mapBookToResource(book, index = 0) {
       avatar: book?.uploader?.avatar || book?.userId?.avatar || '',
     },
     createdAt: book?.createdAt ?? '',
+    saved: Boolean(book?.viewerState?.saved),
   };
 }
 

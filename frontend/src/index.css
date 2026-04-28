@@ -101,6 +101,93 @@ a {
   min-height: calc(100vh - 5.5rem);
 }
 
+/**
+ * Soft dual-tone wash for Liqu AI / Study Buddy routes (visual only).
+ * Content stays above via direct child z-index.
+ */
+.liqu-ai-ambient {
+  position: relative;
+  isolation: isolate;
+}
+
+.liqu-ai-ambient::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.85;
+  background: radial-gradient(
+      ellipse 100% 65% at 12% -18%,
+      rgba(6, 182, 212, 0.16),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 75% 50% at 98% 8%,
+      rgba(99, 102, 241, 0.12),
+      transparent 48%
+    );
+}
+
+.dark .liqu-ai-ambient::before {
+  opacity: 0.45;
+  background: radial-gradient(
+      ellipse 100% 65% at 12% -18%,
+      rgba(34, 211, 238, 0.12),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 75% 50% at 98% 8%,
+      rgba(129, 140, 248, 0.1),
+      transparent 48%
+    );
+}
+
+.liqu-ai-ambient > * {
+  position: relative;
+  z-index: 1;
+}
+
+/** Hero / card mesh — technical, low-contrast */
+.workspace-hero-mesh {
+  background-image:
+    linear-gradient(
+      to right,
+      rgba(148, 163, 184, 0.07) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(148, 163, 184, 0.07) 1px,
+      transparent 1px
+    );
+  background-size: 36px 36px;
+  -webkit-mask-image: radial-gradient(
+    ellipse 85% 75% at 50% 0%,
+    #000 20%,
+    transparent 72%
+  );
+  mask-image: radial-gradient(
+    ellipse 85% 75% at 50% 0%,
+    black 20%,
+    transparent 72%
+  );
+}
+
+.dark .workspace-hero-mesh {
+  background-image:
+    linear-gradient(
+      to right,
+      rgba(148, 163, 184, 0.06) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(148, 163, 184, 0.06) 1px,
+      transparent 1px
+    );
+}
+
 .panel-card {
   background: linear-gradient(
     180deg,
@@ -294,5 +381,145 @@ a {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Library / book detail — ambient wash + interactive cards */
+.library-ambient {
+  position: relative;
+  isolation: isolate;
+  background: linear-gradient(
+    180deg,
+    rgba(248, 250, 252, 0.92) 0%,
+    rgba(241, 245, 249, 0.88) 100%
+  );
+}
+
+.dark .library-ambient {
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0.98) 0%,
+    rgba(15, 23, 42, 0.92) 100%
+  );
+}
+
+.library-ambient::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.95;
+  background:
+    radial-gradient(
+      ellipse 100% 60% at 0% -8%,
+      rgba(6, 182, 212, 0.16),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 100% 4%,
+      rgba(99, 102, 241, 0.11),
+      transparent 48%
+    );
+}
+
+.dark .library-ambient::before {
+  opacity: 0.38;
+  background:
+    radial-gradient(
+      ellipse 100% 60% at 0% -8%,
+      rgba(34, 211, 238, 0.12),
+      transparent 52%
+    ),
+    radial-gradient(
+      ellipse 80% 55% at 100% 4%,
+      rgba(129, 140, 248, 0.08),
+      transparent 48%
+    );
+}
+
+/* Do not set position on all children — it overrides Tailwind `absolute` on the
+   decorative mesh layer and forces ~50vh empty space before content. */
+
+.library-book-card {
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.2s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .library-book-card:hover {
+    transform: translateY(-5px);
+    box-shadow:
+      0 24px 48px rgba(15, 23, 42, 0.1),
+      0 0 0 1px rgba(6, 182, 212, 0.08);
+  }
+
+  .library-book-card:hover .library-cover-img {
+    transform: scale(1.04);
+  }
+}
+
+.dark .library-book-card:hover {
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(34, 211, 238, 0.1);
+}
+
+.library-cover-img {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.library-cover-shine {
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.12) 48%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0.12) 52%,
+    transparent 58%
+  );
+  transform: translateX(-100%);
+  transition: transform 0.6s ease;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .library-book-card:hover .library-cover-shine {
+    transform: translateX(100%);
+  }
+}
+
+/* Profile — avatar ring & upload modal progress */
+.profile-avatar-ring {
+  box-shadow:
+    0 0 0 3px #fff,
+    0 0 0 6px rgba(6, 182, 212, 0.28),
+    0 16px 40px rgba(15, 23, 42, 0.12);
+}
+
+.dark .profile-avatar-ring {
+  box-shadow:
+    0 0 0 3px #0f172a,
+    0 0 0 6px rgba(34, 211, 238, 0.22),
+    0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.profile-upload-progress-indeterminate > div {
+  animation: profileUploadIndeterminate 1.15s ease-in-out infinite;
+}
+
+@keyframes profileUploadIndeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(380%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-upload-progress-indeterminate > div {
+    animation: none;
   }
 }
