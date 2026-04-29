@@ -87,15 +87,13 @@ function AppRoutes() {
             <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
-            <Route path="/password/reset" element={<PasswordReset />} />
-            <Route
-              path="/reset-password/:token"
-              element={<Navigate to="/" replace />}
-            />
+        <Route path="/password/reset" element={<PasswordReset />} />
+            <Route path="/reset-password/:token" element={<Reset />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
       </Navbar>
+      
     );
   }
 
