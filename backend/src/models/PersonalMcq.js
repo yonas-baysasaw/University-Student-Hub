@@ -77,7 +77,7 @@ const personalMcqSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-personalMcqSchema.pre('validate', function (next) {
+personalMcqSchema.pre('validate', function () {
   const n = this.options?.length ?? 0;
   if (n > 0 && this.correctAnswer >= n) {
     this.invalidate(
@@ -85,7 +85,6 @@ personalMcqSchema.pre('validate', function (next) {
       `correctAnswer must be less than options length (${n})`,
     );
   }
-  next();
 });
 
 personalMcqSchema.index({ owner: 1, updatedAt: -1 });

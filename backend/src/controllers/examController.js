@@ -19,6 +19,26 @@ import {
 import { formatExamForClient } from '../utils/examJson.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
+/**
+ * Prefer JSON errors for API clients; Express 5 may invoke handlers without `next`.
+ */
+function controllerError(res, next, error, label = 'examController') {
+  console.error(`[${label}]`, error);
+  const statusRaw = error.status ?? error.statusCode ?? 500;
+  const status =
+    typeof statusRaw === 'number' && Number.isFinite(statusRaw) && statusRaw >= 400
+      ? statusRaw
+      : 500;
+  const message = error.message || 'Request failed';
+  if (!res.headersSent) {
+    return res.status(status).json({ message });
+  }
+  if (typeof next === 'function') {
+    return next(error);
+  }
+  return undefined;
+}
+
 // ── Upload & Process ──────────────────────────────────────────────────────────
 
 async function uploadExamController(req, res, next) {
@@ -152,7 +172,7 @@ async function uploadExamController(req, res, next) {
     );
     return res.status(201).json(formatExamForClient(req, populatedNew));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'uploadExam');
   }
 }
 
@@ -230,7 +250,7 @@ async function listExamsController(req, res, next) {
       totalPages: Math.ceil(total / Number(limit)),
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'listExams');
   }
 }
 
@@ -251,7 +271,7 @@ async function getExamController(req, res, next) {
 
     return res.json(formatExamForClient(req, exam));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getExam');
   }
 }
 
@@ -282,7 +302,7 @@ async function getQuestionsController(req, res, next) {
       total: questions.length,
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getQuestions');
   }
 }
 
@@ -355,7 +375,7 @@ async function submitAttemptController(req, res, next) {
       details,
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'submitAttempt');
   }
 }
 
@@ -369,7 +389,7 @@ async function getAttemptsController(req, res, next) {
       .limit(10);
     return res.json({ attempts });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getAttempts');
   }
 }
 
@@ -434,7 +454,7 @@ async function updateExamController(req, res, next) {
     );
     return res.json(formatExamForClient(req, refreshed));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'updateExam');
   }
 }
 
@@ -483,7 +503,7 @@ async function deleteExamController(req, res, next) {
 
     return res.json({ message: 'Exam deleted.' });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'deleteExam');
   }
 }
 
@@ -527,7 +547,7 @@ async function reactToExamController(req, res, next) {
     );
     return res.json(formatExamForClient(req, refreshed));
   } catch (err) {
-    next(err);
+    return controllerError(res, next, err, 'reactToExam');
   }
 }
 
@@ -562,7 +582,7 @@ async function toggleSaveExamController(req, res, next) {
     );
     return res.json(formatExamForClient(req, refreshed));
   } catch (err) {
-    next(err);
+    return controllerError(res, next, err, 'toggleSaveExam');
   }
 }
 

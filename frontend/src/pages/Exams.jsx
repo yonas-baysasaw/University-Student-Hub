@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   FileStack,
+  FileText,
   Globe2,
   GraduationCap,
   GripHorizontal,
@@ -31,7 +32,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import { useAuth } from '../contexts/AuthContext';
@@ -2262,6 +2263,7 @@ function validatePdfCatalogForUpload(form) {
 }
 
 function PdfImportTab({ onUploaded }) {
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -2347,6 +2349,9 @@ function PdfImportTab({ onUploaded }) {
       const data = await readJsonOrThrow(res, 'Upload failed');
       setSuccess(data);
       setFile(null);
+      toast.success('PDF uploaded', {
+        description: 'AI is extracting questions in the background.',
+      });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -2354,54 +2359,136 @@ function PdfImportTab({ onUploaded }) {
     }
   }
 
-  if (success) {
-    return (
-      <div className="panel-card rounded-3xl p-8 text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950">
-          <Check className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <h2 className="font-display text-xl text-slate-900 dark:text-white">
-          Upload queued
-        </h2>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          <strong>{success.filename}</strong> is processing privately until you
-          open visibility on the Question bank tab.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
-          <Link
-            to={`/exams/${success.id}`}
-            className="btn-primary px-5 py-2.5 text-sm"
-          >
-            Open paper
-          </Link>
-          <button
-            type="button"
-            onClick={() => {
-              setSuccess(null);
-              onUploaded?.();
-            }}
-            className="btn-secondary px-5 py-2.5 text-sm"
-          >
-            Browse bank
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="panel-card rounded-3xl p-6 md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="font-display text-xl text-slate-900 dark:text-white">
+    <>
+      {success ? (
+        <div
+          className="fixed inset-0 z-[300] flex items-center justify-center p-4 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pdf-import-success-title"
+        >
+          <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-md" aria-hidden />
+          <div className="relative w-full max-w-xl overflow-hidden rounded-[1.85rem] border border-cyan-400/35 bg-gradient-to-b from-slate-900 via-[#0c1220] to-slate-950 p-6 shadow-[0_0_0_1px_rgba(34,211,238,0.1),0_28px_90px_-24px_rgba(0,0,0,0.75)] md:p-8">
+            <div className="pointer-events-none absolute -right-20 -top-24 h-52 w-52 rounded-full bg-cyan-500/20 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-56 rounded-full bg-violet-500/15 blur-3xl" />
+            <div className="relative text-center">
+              <div className="mx-auto mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-cyan-500 shadow-lg shadow-emerald-500/25 ring-4 ring-emerald-400/15">
+                <Check className="h-9 w-9 text-white" strokeWidth={2.5} aria-hidden />
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-300/90">
+                Extraction underway
+              </p>
+              <h2
+                id="pdf-import-success-title"
+                className="mt-2 font-display text-2xl font-bold tracking-tight text-white md:text-[1.65rem]"
+              >
+                Questions are being prepared
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-400">
+                <span className="font-semibold text-slate-200">{success.filename}</span>{' '}
+                is on our servers. Head to practice to track readiness, or continue curating
+                more papers.
+              </p>
+            </div>
+            <ul className="relative mt-7 grid list-none gap-3 sm:gap-4">
+              <li>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/exams/${success.id}`)}
+                  className="group flex w-full items-start gap-4 rounded-2xl border border-cyan-500/40 bg-gradient-to-r from-cyan-600/30 via-teal-600/15 to-transparent p-4 text-left transition hover:border-cyan-300/60 hover:shadow-lg hover:shadow-cyan-500/15"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-500/25 text-cyan-100 ring-1 ring-cyan-400/40">
+                    <GraduationCap className="h-6 w-6" aria-hidden />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-display text-sm font-bold text-white">
+                      Open practice workspace
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
+                      Start drills on these MCQs — the header shows extraction until every
+                      question is ready.
+                    </span>
+                  </span>
+                  <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-300/90 opacity-90" aria-hidden />
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccess(null);
+                    setProgress(0);
+                  }}
+                  className="group flex w-full items-start gap-4 rounded-2xl border border-violet-500/25 bg-slate-800/45 p-4 text-left transition hover:border-violet-400/45 hover:bg-violet-500/10"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-violet-500/20 text-violet-100 ring-1 ring-violet-400/30">
+                    <Upload className="h-6 w-6" aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-display text-sm font-bold text-white">
+                      Import another PDF
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
+                      Run the upload flow again for a fresh paper while this one finishes.
+                    </span>
+                  </span>
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccess(null);
+                    onUploaded?.();
+                  }}
+                  className="group flex w-full items-start gap-4 rounded-2xl border border-emerald-500/25 bg-slate-800/45 p-4 text-left transition hover:border-emerald-400/40 hover:bg-emerald-500/10"
+                >
+                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-100 ring-1 ring-emerald-400/30">
+                    <Library className="h-6 w-6" aria-hidden />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-display text-sm font-bold text-white">
+                      Browse the question bank
+                    </span>
+                    <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
+                      Explore community papers — this upload stays in your vault privately.
+                    </span>
+                  </span>
+                </button>
+              </li>
+            </ul>
+          </div>
+        </div>
+      ) : null}
+
+      <div
+        className={`relative overflow-hidden rounded-[1.75rem] border border-slate-200/90 bg-gradient-to-br from-white via-cyan-50/50 to-indigo-50/40 p-6 shadow-xl shadow-slate-200/50 ring-1 ring-slate-200/70 dark:border-slate-200/80 dark:from-[#f8fafc] dark:via-[#f6fbff] dark:to-[#f0f9ff] dark:shadow-[0_20px_50px_-20px_rgba(15,23,42,0.12)] dark:ring-slate-200/60 md:p-8 ${
+          success ? 'pointer-events-none opacity-[0.22] blur-[0.45px]' : ''
+        }`}
+        aria-hidden={success ? true : undefined}
+      >
+        <div className="pointer-events-none absolute inset-0 rounded-[inherit]" aria-hidden>
+          <div className="absolute -left-24 top-8 h-52 w-52 rounded-full bg-cyan-300/25 blur-3xl dark:bg-cyan-200/40" />
+          <div className="absolute -bottom-28 right-8 h-60 w-[18rem] rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-200/35" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_90%_55%_at_65%_-5%,rgba(34,211,238,0.12),transparent_55%)] dark:bg-[radial-gradient(ellipse_90%_50%_at_55%_-8%,rgba(125,211,252,0.15),transparent_55%)]" />
+        </div>
+
+      <div className="relative z-[1] flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <span className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-gradient-to-r from-cyan-50 to-teal-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-900 shadow-sm dark:border-cyan-300/50 dark:from-cyan-100/80 dark:to-sky-100/70 dark:text-cyan-950">
+            <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+            PDF → MCQs in one lane
+          </span>
+          <h2 className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900 dark:text-slate-900 md:text-2xl">
             Bring a syllabus PDF or past paper
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Max 10 MB · OCR-friendly · AI chunked extraction stays reliable in
-            the background.
+          <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-600">
+            We upload to your vault privately, OCR & chunk the PDF, then auto-build practice
+            questions — max <strong className="text-cyan-700 dark:text-cyan-700">10 MB</strong>.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/80 px-3 py-2 text-xs shadow-sm backdrop-blur dark:border-slate-700 dark:bg-slate-950/65">
+        <div className="flex items-center gap-2 rounded-2xl border border-slate-200/95 bg-white px-3 py-2 text-xs shadow-sm backdrop-blur-sm dark:border-slate-300/90 dark:bg-white/90">
           <PencilLine className="h-4 w-4 text-cyan-600" aria-hidden />
           <button
             type="button"
@@ -2418,7 +2505,7 @@ function PdfImportTab({ onUploaded }) {
               }`}
             />
           </button>
-          <span className="max-w-[9rem] font-semibold uppercase tracking-[0.05em] text-slate-600 dark:text-slate-400">
+          <span className="max-w-[9rem] font-semibold uppercase tracking-[0.05em] text-slate-600 dark:text-slate-700">
             {privacyPrivate ? 'Private import' : 'Share when ready'}
           </span>
         </div>
@@ -2426,12 +2513,12 @@ function PdfImportTab({ onUploaded }) {
 
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop requires event handlers on a container div; clickable action is on the inner <button> */}
       <div
-        className={`mt-6 rounded-2xl border-2 border-dashed transition ${
+        className={`relative z-[1] mt-6 rounded-2xl border-2 border-dashed transition ${
           dragOver
-            ? 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/35'
+            ? 'border-cyan-500 bg-cyan-100/90 shadow-lg shadow-cyan-500/15 dark:border-cyan-400 dark:bg-cyan-50/95'
             : file
-              ? 'border-emerald-400 bg-emerald-50/80 dark:bg-emerald-950/25'
-              : 'border-slate-300 bg-slate-50/80 dark:border-slate-600 dark:bg-slate-900/50'
+              ? 'border-emerald-500/80 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-md shadow-emerald-500/10 dark:border-emerald-400/70 dark:from-emerald-50 dark:to-teal-50'
+              : 'border-slate-300/95 bg-white/90 shadow-inner shadow-slate-100/80 dark:border-slate-300 dark:bg-[#fdfefe]'
         }`}
         onDragOver={(e) => {
           e.preventDefault();
@@ -2442,7 +2529,7 @@ function PdfImportTab({ onUploaded }) {
       >
         <button
           type="button"
-          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl p-10 hover:bg-cyan-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:hover:bg-slate-800/85"
+          className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white to-slate-50/30 p-10 transition hover:from-cyan-50 hover:to-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:from-white dark:to-slate-50/50 dark:hover:from-sky-50"
           onClick={() => inputRef.current?.click()}
           aria-label="Click or drag to upload PDF"
         >
@@ -2456,7 +2543,7 @@ function PdfImportTab({ onUploaded }) {
           <div className="text-5xl">{file ? '📄' : '⬆'}</div>
           {file ? (
             <>
-              <p className="mt-3 font-semibold text-slate-800 dark:text-slate-100">
+              <p className="mt-3 font-semibold text-slate-800 dark:text-slate-800">
                 {file.name}
               </p>
               <p className="text-xs text-slate-500">
@@ -2465,7 +2552,7 @@ function PdfImportTab({ onUploaded }) {
             </>
           ) : (
             <>
-              <p className="mt-3 font-semibold text-slate-700 dark:text-slate-200">
+              <p className="mt-3 font-semibold text-slate-700 dark:text-slate-800">
                 Drop your PDF here or tap to browse
               </p>
               <p className="mt-1 text-xs text-slate-500">
@@ -2476,24 +2563,25 @@ function PdfImportTab({ onUploaded }) {
         </button>
       </div>
 
-      <div className="mt-6 rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white/98 to-slate-50/80 p-5 shadow-inner dark:border-slate-700 dark:from-slate-950/80 dark:to-slate-900/50">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-700/80">
+      <div className="relative z-[1] mt-6 overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-white p-[1px] shadow-sm ring-1 ring-slate-200/60 dark:border-slate-300/85 dark:bg-slate-100 dark:shadow-slate-200/40 dark:ring-slate-300/70">
+        <div className="rounded-[calc(1.35rem-1px)] bg-white p-5 dark:bg-[#fdfdfd]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/85 pb-3 dark:border-slate-200">
           <div className="min-w-0">
-            <p className="font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
+            <p className="font-display text-sm font-semibold text-slate-900 dark:text-slate-900">
               Paper catalog
             </p>
-            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-600">
               Required metadata — mirrors the library so classmates see who curated
               the paper, field, course, and whether it&apos;s exit, mock, final, or mid.
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-cyan-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-900 dark:bg-cyan-950/65 dark:text-cyan-100">
+          <span className="shrink-0 rounded-full bg-cyan-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-900 dark:bg-cyan-100 dark:text-cyan-950">
             All required
           </span>
         </div>
 
         <div className="mt-4 space-y-3">
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
             Display title · optional rename
             <input
               value={displayTitle}
@@ -2504,7 +2592,7 @@ function PdfImportTab({ onUploaded }) {
           </label>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
               Academic field
               <select
                 value={importTrack}
@@ -2522,7 +2610,7 @@ function PdfImportTab({ onUploaded }) {
                 ))}
               </select>
             </label>
-            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
               Paper type
               <select
                 value={importPaperType}
@@ -2538,7 +2626,7 @@ function PdfImportTab({ onUploaded }) {
             </label>
           </div>
 
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
             Department / discipline
             <select
               value={importDept}
@@ -2557,7 +2645,7 @@ function PdfImportTab({ onUploaded }) {
             </select>
           </label>
           {importDept === 'Other' ? (
-            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
               Describe your department
               <input
                 value={importDeptOther}
@@ -2568,7 +2656,7 @@ function PdfImportTab({ onUploaded }) {
             </label>
           ) : null}
 
-          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-700">
             Course · subject line
             <input
               value={importCourse}
@@ -2584,7 +2672,7 @@ function PdfImportTab({ onUploaded }) {
             </datalist>
           </label>
           <div className="flex flex-wrap gap-1.5">
-            <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+            <span className="w-full text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-800 dark:text-cyan-800">
               Quick picks
             </span>
             {COURSE_SUBJECT_SUGGESTIONS.slice(0, 6).map((c) => (
@@ -2592,49 +2680,55 @@ function PdfImportTab({ onUploaded }) {
                 key={c}
                 type="button"
                 onClick={() => setImportCourse(c)}
-                className="rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600 hover:border-cyan-300/70 hover:text-cyan-800 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-cyan-700/55"
+                className="rounded-full border border-cyan-200 bg-gradient-to-r from-white to-cyan-50 px-3 py-1.5 text-[10px] font-semibold text-cyan-950 shadow-sm transition hover:border-cyan-400 hover:to-cyan-100 dark:border-cyan-200 dark:from-white dark:to-cyan-50 dark:text-slate-900"
               >
                 {c}
               </button>
             ))}
           </div>
         </div>
+        </div>
       </div>
 
       {error && (
-        <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-900/55 dark:bg-rose-950/40 dark:text-rose-200">
+        <p className="relative z-[1] mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm font-medium text-rose-900 shadow-sm dark:border-rose-200 dark:bg-rose-50 dark:text-rose-900">
           {error}
         </p>
       )}
 
       {uploading && (
-        <div className="mt-4">
-          <div className="flex items-center justify-between text-xs text-slate-500">
-            <span>Uploading…</span>
+        <div className="relative z-[1] mt-4">
+          <div className="flex items-center justify-between text-xs font-semibold text-cyan-800 dark:text-cyan-900">
+            <span>Upload &amp; extract…</span>
             <span>{progress}%</span>
           </div>
-          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+          <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-200">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-slate-800 transition-all duration-300 dark:from-cyan-500 dark:to-cyan-800"
+              className="h-full rounded-full bg-gradient-to-r from-cyan-500 via-teal-500 to-indigo-500 transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
         </div>
       )}
 
-      <div className="mt-6 flex flex-wrap gap-3">
+      <div className="relative z-[1] mt-6 flex flex-wrap gap-3">
         <button
           type="button"
           disabled={!file || uploading}
           onClick={upload}
-          className="btn-primary px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 px-7 py-2.5 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-cyan-500/25 transition hover:shadow-cyan-500/35 disabled:cursor-not-allowed disabled:opacity-50 dark:shadow-cyan-500/15"
           title={
             file
               ? 'Upload requires catalog fields above'
               : 'Pick a PDF first'
           }
         >
-          {uploading ? 'Working…' : 'Upload & extract'}
+          {uploading ? 'Working…' : (
+            <>
+              <Sparkles className="h-4 w-4 opacity-95" aria-hidden />
+              Upload &amp; extract
+            </>
+          )}
         </button>
         {file && !uploading && (
           <button
@@ -2650,6 +2744,7 @@ function PdfImportTab({ onUploaded }) {
         )}
       </div>
     </div>
+    </>
   );
 }
 

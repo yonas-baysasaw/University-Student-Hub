@@ -151,9 +151,10 @@ const examSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-examSchema.pre('validate', function (next) {
+// Sync hook — do not call next(); Mongoose 9 may not pass it (causes "next is not a function").
+examSchema.pre('validate', function () {
   if (this.examKind === 'vault_compiled') {
-    return next();
+    return;
   }
   if (!this.fileUrl?.trim()) {
     this.invalidate('fileUrl', 'PDF exams require a file URL');
@@ -164,7 +165,6 @@ examSchema.pre('validate', function (next) {
   if (this.fileSize == null || this.fileSize <= 0) {
     this.invalidate('fileSize', 'PDF exams require a positive file size');
   }
-  next();
 });
 
 examSchema.index({ contentHash: 1, processingStatus: 1 });
