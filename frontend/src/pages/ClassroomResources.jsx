@@ -1,4 +1,5 @@
 import {
+  AlertTriangle,
   BookOpen,
   CalendarClock,
   CheckCircle2,
@@ -7,16 +8,21 @@ import {
   FileText,
   FolderOpen,
   GraduationCap,
+  Library,
   Link2,
   Loader2,
   Menu,
+  Mountain,
+  Paperclip,
   Search,
+  ShieldCheck,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import ClassroomHero from '../components/ClassroomHero';
 import ClassroomParticipantsDrawer from '../components/ClassroomParticipantsDrawer';
 import ClassroomTabs from '../components/ClassroomTabs';
@@ -63,6 +69,81 @@ function formatDueSummary(iso) {
   return `Due in ${days} days`;
 }
 
+const SUMMIT_MAX_BYTES = 22 * 1024 * 1024;
+
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/** Pull likely checklist lines from free-form instructions (bullet / numbered). */
+function parseSummitChecklist(instructions) {
+  const lines = String(instructions || '').split(/\r?\n/);
+  const out = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (!t) continue;
+    let item = '';
+    if (/^[-*•]\s+/.test(t)) item = t.replace(/^[-*•]\s+/, '').trim();
+    else if (/^\d+[.)]\s+/.test(t))
+      item = t.replace(/^\d+[.)]\s+/, '').trim();
+    if (item && item.length <= 220) {
+      out.push(item);
+      if (out.length >= 8) break;
+    }
+  }
+  return out;
+}
+
+function summitTurnInMeta(assignment, now = new Date()) {
+  const due = assignment?.dueAt ? new Date(assignment.dueAt) : null;
+  const lateEnd = assignment?.allowLateUntil
+    ? new Date(assignment.allowLateUntil)
+    : null;
+  if (!due || Number.isNaN(due.getTime())) {
+    return {
+      tone: 'muted',
+      headline: 'Deadline',
+      detail: 'Confirm timing with your instructor.',
+      closed: Boolean(assignment?.isSubmissionClosed),
+    };
+  }
+  const t = now.getTime();
+  const dueT = due.getTime();
+  const winEnd = lateEnd && !Number.isNaN(lateEnd.getTime())
+    ? lateEnd.getTime()
+    : dueT;
+  const closed = Boolean(assignment?.isSubmissionClosed) || t > winEnd;
+  const msToDue = dueT - t;
+  const msToEnd = winEnd - t;
+  let tone = 'ok';
+  if (closed) tone = 'closed';
+  else if (msToDue < 0 && msToEnd > 0) tone = 'late';
+  else if (msToDue >= 0 && msToDue <= 36 * 3600000) tone = 'soon';
+
+  let headline = formatDueSummary(assignment.dueAt);
+  let detail = due.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+  if (lateEnd && !Number.isNaN(lateEnd.getTime()) && lateEnd.getTime() > dueT) {
+    detail = `${detail} · Late accepted until ${lateEnd.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })}`;
+  }
+  if (closed) {
+    headline = 'Submission window closed';
+    detail = 'Ask your instructor if you still need access.';
+  }
+
+  return { tone, headline, detail, closed, msToDue, msToEnd };
+}
+
 function ClassroomResourcesContent({ chatId }) {
   const { user } = useAuth();
   const [chatName, setChatName] = useState('Class Resources');
@@ -106,6 +187,8 @@ function ClassroomResourcesContent({ chatId }) {
   const [submitNote, setSubmitNote] = useState('');
   const [submitBusy, setSubmitBusy] = useState(false);
   const [submitAck, setSubmitAck] = useState(false);
+  const [submitSummitPreview, setSubmitSummitPreview] = useState(false);
+  const [summitDropHover, setSummitDropHover] = useState(false);
 
   const [gradeModal, setGradeModal] = useState(null);
   const [gradeScore, setGradeScore] = useState('');
@@ -124,6 +207,36 @@ function ClassroomResourcesContent({ chatId }) {
     creator,
     admins,
   });
+
+  const closeSummitModal = useCallback(() => {
+    setSubmitModal(null);
+    setSubmitFile(null);
+    setSubmitNote('');
+    setSubmitAck(false);
+    setSubmitSummitPreview(false);
+    setSummitDropHover(false);
+  }, []);
+
+  const summitChecklistItems = useMemo(
+    () => parseSummitChecklist(submitModal?.instructions),
+    [submitModal?.id, submitModal?.instructions],
+  );
+
+  const summitMeta = useMemo(
+    () => (submitModal ? summitTurnInMeta(submitModal) : null),
+    [submitModal],
+  );
+
+  useEffect(() => {
+    if (!submitModal) return undefined;
+    const onDocKey = (e) => {
+      if (e.key !== 'Escape') return;
+      e.preventDefault();
+      closeSummitModal();
+    };
+    document.addEventListener('keydown', onDocKey);
+    return () => document.removeEventListener('keydown', onDocKey);
+  }, [submitModal, closeSummitModal]);
 
   const refreshClassroomMetaAfterMutation = useCallback(async () => {
     if (!chatId) return;
@@ -217,6 +330,11 @@ function ClassroomResourcesContent({ chatId }) {
     loadMeta();
     return () => controller.abort();
   }, [chatId]);
+
+  const unpublishedDraftCount = useMemo(
+    () => assignments.filter((a) => !a.published).length,
+    [assignments],
+  );
 
   const filteredResources = useMemo(() => {
     let rows = resources;
@@ -378,7 +496,14 @@ function ClassroomResourcesContent({ chatId }) {
   };
 
   const submitAssignment = async () => {
-    if (!submitModal || !submitFile || !submitAck) return;
+    if (submitSummitPreview || !submitModal || !submitFile || !submitAck)
+      return;
+    if (submitFile.size > SUMMIT_MAX_BYTES) {
+      toast.error(
+        `Keep files under ${formatFileSize(SUMMIT_MAX_BYTES)} so uploads succeed.`,
+      );
+      return;
+    }
     setSubmitBusy(true);
     setLoadError('');
     try {
@@ -390,16 +515,32 @@ function ClassroomResourcesContent({ chatId }) {
         { method: 'POST', credentials: 'include', body: fd },
       );
       await readJsonOrThrow(res, 'Upload failed');
-      setSubmitModal(null);
-      setSubmitFile(null);
-      setSubmitNote('');
-      setSubmitAck(false);
+      closeSummitModal();
+      toast.success("Submission received — you're all set.");
       await loadAssignmentsList();
     } catch (err) {
       setLoadError(err?.message || 'Submit failed');
     } finally {
       setSubmitBusy(false);
     }
+  };
+
+  const openSummitStudent = (assignment) => {
+    setSubmitSummitPreview(false);
+    setSubmitFile(null);
+    setSubmitNote('');
+    setSubmitAck(false);
+    setSummitDropHover(false);
+    setSubmitModal(assignment);
+  };
+
+  const openSummitInstructorPreview = (assignment) => {
+    setSubmitSummitPreview(true);
+    setSubmitFile(null);
+    setSubmitNote('');
+    setSubmitAck(false);
+    setSummitDropHover(false);
+    setSubmitModal(assignment);
   };
 
   const saveGrade = async () => {
@@ -528,116 +669,148 @@ function ClassroomResourcesContent({ chatId }) {
 
           {workspaceTab === 'materials' ? (
             <>
-              <section className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-white to-indigo-50/35 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95 md:p-6">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
-                      Share course materials
-                    </h3>
-                    <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-                      {canManage
-                        ? 'Drop files, attach links, and tag by academic category so students scan faster.'
-                        : 'Browse categorized readings, slides, and uploads from your instructors.'}
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={submitResource} className="mt-6 space-y-4">
-                  <div
-                    className={`relative rounded-2xl border-2 border-dashed px-4 py-10 text-center transition ${
-                      dragOverMaterials
-                        ? 'border-cyan-500 bg-cyan-50/80 dark:bg-cyan-950/30'
-                        : 'border-slate-300 bg-white/70 dark:border-slate-600 dark:bg-slate-950/40'
-                    } ${!canManage ? 'opacity-60' : ''}`}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (canManage) setDragOverMaterials(true);
-                    }}
-                    onDragLeave={() => setDragOverMaterials(false)}
-                    onDrop={onMaterialsDrop}
-                  >
-                    <Upload className="mx-auto h-10 w-10 text-cyan-600 dark:text-cyan-400" aria-hidden />
-                    <p className="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                      {canManage
-                        ? 'Drag & drop a file, or browse'
-                        : 'Uploads are instructor-only'}
-                    </p>
-                    <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md hover:bg-slate-800 dark:bg-cyan-800 dark:hover:bg-cyan-700">
-                      Choose file
-                      <input
-                        type="file"
-                        className="sr-only"
-                        onChange={(ev) =>
-                          setSelectedFile(ev.target.files?.[0] ?? null)
-                        }
-                        disabled={!canManage || saving}
-                      />
-                    </label>
-                    {selectedFile ? (
-                      <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-400">
-                        Selected: {selectedFile.name}
+              {canManage ? (
+                <section className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-white to-indigo-50/35 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95 md:p-6">
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                        Share course materials
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
+                        Drop files, attach links, and tag by academic category so students scan faster.
                       </p>
-                    ) : null}
+                    </div>
                   </div>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    <input
-                      type="text"
-                      placeholder="Title"
-                      value={resourceTitle}
-                      onChange={(e) => setResourceTitle(e.target.value)}
-                      className="input-field text-sm md:col-span-2"
-                      disabled={!canManage || saving}
-                    />
-                    <textarea
-                      placeholder="Short description (optional—not shown as body text)"
-                      value={resourceDescription}
-                      onChange={(e) => setResourceDescription(e.target.value)}
-                      rows={2}
-                      className="rounded-xl border border-slate-200 bg-white/95 p-3 text-sm dark:border-slate-600 dark:bg-slate-950/60 md:col-span-2"
-                      disabled={!canManage || saving}
-                    />
-                    <input
-                      type="url"
-                      placeholder="https://… (optional if uploading)"
-                      value={resourceLink}
-                      onChange={(e) => setResourceLink(e.target.value)}
-                      className="input-field text-sm md:col-span-2"
-                      disabled={!canManage || saving}
-                    />
-                  </div>
+                  <form onSubmit={submitResource} className="mt-6 space-y-4">
+                    <div
+                      className={`relative rounded-2xl border-2 border-dashed px-4 py-10 text-center transition ${
+                        dragOverMaterials
+                          ? 'border-cyan-500 bg-cyan-50/80 dark:bg-cyan-950/30'
+                          : 'border-slate-300 bg-white/70 dark:border-slate-600 dark:bg-slate-950/40'
+                      }`}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOverMaterials(true);
+                      }}
+                      onDragLeave={() => setDragOverMaterials(false)}
+                      onDrop={onMaterialsDrop}
+                    >
+                      <Upload className="mx-auto h-10 w-10 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                      <p className="mt-3 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        Drag & drop a file, or browse
+                      </p>
+                      <label className="mt-4 inline-flex cursor-pointer items-center gap-2 rounded-full bg-slate-900 px-5 py-2 text-xs font-bold uppercase tracking-wide text-white shadow-md hover:bg-slate-800 dark:bg-cyan-800 dark:hover:bg-cyan-700">
+                        Choose file
+                        <input
+                          type="file"
+                          className="sr-only"
+                          onChange={(ev) =>
+                            setSelectedFile(ev.target.files?.[0] ?? null)
+                          }
+                          disabled={saving}
+                        />
+                      </label>
+                      {selectedFile ? (
+                        <p className="mt-3 text-xs font-medium text-slate-600 dark:text-slate-400">
+                          Selected: {selectedFile.name}
+                        </p>
+                      ) : null}
+                    </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <span className="w-full text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                      Category
-                    </span>
-                    {RESOURCE_CATEGORY_OPTIONS.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        disabled={!canManage || saving}
-                        onClick={() => setResourceCategory(c.id)}
-                        title={c.hint}
-                        className={`rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ring-1 transition ${
-                          resourceCategory === c.id
-                            ? 'bg-cyan-600 text-white ring-cyan-500 dark:bg-cyan-700'
-                            : 'bg-white text-slate-600 ring-slate-200 hover:ring-cyan-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600'
-                        }`}
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <input
+                        type="text"
+                        placeholder="Title"
+                        value={resourceTitle}
+                        onChange={(e) => setResourceTitle(e.target.value)}
+                        className="input-field text-sm md:col-span-2"
+                        disabled={saving}
+                      />
+                      <textarea
+                        placeholder="Short description (optional—not shown as body text)"
+                        value={resourceDescription}
+                        onChange={(e) => setResourceDescription(e.target.value)}
+                        rows={2}
+                        className="rounded-xl border border-slate-200 bg-white/95 p-3 text-sm dark:border-slate-600 dark:bg-slate-950/60 md:col-span-2"
+                        disabled={saving}
+                      />
+                      <input
+                        type="url"
+                        placeholder="https://… (optional if uploading)"
+                        value={resourceLink}
+                        onChange={(e) => setResourceLink(e.target.value)}
+                        className="input-field text-sm md:col-span-2"
+                        disabled={saving}
+                      />
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <span className="w-full text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Category
+                      </span>
+                      {RESOURCE_CATEGORY_OPTIONS.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={saving}
+                          onClick={() => setResourceCategory(c.id)}
+                          title={c.hint}
+                          className={`rounded-full px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide ring-1 transition ${
+                            resourceCategory === c.id
+                              ? 'bg-cyan-600 text-white ring-cyan-500 dark:bg-cyan-700'
+                              : 'bg-white text-slate-600 ring-slate-200 hover:ring-cyan-300 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-600'
+                          }`}
+                        >
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={saving}
+                      className="btn-primary px-8 py-3 text-sm disabled:opacity-50"
+                    >
+                      {saving ? 'Publishing…' : 'Publish material'}
+                    </button>
+                  </form>
+                </section>
+              ) : (
+                <section
+                  className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-cyan-50/25 to-indigo-50/40 p-5 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/90 dark:ring-white/[0.04] md:p-6"
+                  aria-labelledby="course-library-heading"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 text-cyan-700 shadow-inner ring-1 ring-cyan-500/15 dark:text-cyan-300 dark:ring-cyan-500/20">
+                      <Library className="h-7 w-7" aria-hidden />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h3
+                        id="course-library-heading"
+                        className="font-display text-xl font-bold tracking-tight text-slate-900 dark:text-white"
                       >
-                        {c.label}
-                      </button>
-                    ))}
+                        Course library
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                        Readings, slides, and files your instructors curate—updated here throughout the term.
+                        Use search and category chips below to zero in fast.
+                      </p>
+                      {!loading ? (
+                        <p className="mt-2 text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          {resources.length}{' '}
+                          {resources.length === 1 ? 'item' : 'items'} in this classroom
+                        </p>
+                      ) : (
+                        <p className="mt-2 inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                          Loading catalog…
+                        </p>
+                      )}
+                    </div>
                   </div>
-
-                  <button
-                    type="submit"
-                    disabled={!canManage || saving}
-                    className="btn-primary px-8 py-3 text-sm disabled:opacity-50"
-                  >
-                    {saving ? 'Publishing…' : 'Publish material'}
-                  </button>
-                </form>
-              </section>
+                </section>
+              )}
 
               <div className="relative mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
                 <div className="relative min-w-0 flex-1">
@@ -889,6 +1062,30 @@ function ClassroomResourcesContent({ chatId }) {
                   ) : null}
                 </div>
 
+                {assignmentsMeta.canManage && unpublishedDraftCount > 0 ? (
+                  <div
+                    className="rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50/95 to-white px-4 py-3 shadow-sm dark:border-amber-900/50 dark:from-amber-950/35 dark:to-slate-900/60"
+                    role="status"
+                  >
+                    <div className="flex gap-3">
+                      <AlertTriangle
+                        className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-400"
+                        aria-hidden
+                      />
+                      <div>
+                        <p className="text-sm font-bold text-amber-950 dark:text-amber-50">
+                          Students only see published assignments
+                        </p>
+                        <p className="mt-1 text-sm leading-relaxed text-amber-950/90 dark:text-amber-100/90">
+                          You have {unpublishedDraftCount} draft
+                          {unpublishedDraftCount === 1 ? '' : 's'} still marked Draft.
+                          Open each card and enable publishing when it should appear for the class.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {assignmentsLoading && assignments.length === 0 ? (
                   <p className="text-sm text-slate-500 dark:text-slate-400">Loading…</p>
                 ) : assignments.length === 0 ? (
@@ -896,7 +1093,7 @@ function ClassroomResourcesContent({ chatId }) {
                     <ClipboardList className="mx-auto h-10 w-10 text-slate-300 dark:text-slate-600" aria-hidden />
                     <p className="mx-auto mt-3 max-w-md text-sm text-slate-600 dark:text-slate-400">
                       {assignmentsMeta.canManage
-                        ? 'Publish your first assignment above—students will see cards with deadlines here.'
+                        ? 'Create an assignment above, then keep Published (visible to class) checked so students see it here. Drafts stay instructor-only until you publish.'
                         : 'Your instructors have not posted assignments yet.'}
                     </p>
                   </div>
@@ -965,7 +1162,7 @@ function ClassroomResourcesContent({ chatId }) {
                               </a>
                             ) : null}
                           </div>
-                          <div className="flex shrink-0 flex-col gap-2">
+                          <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:max-w-[min(100%,20rem)]">
                             {assignmentsMeta.canSubmitAssignments ? (
                               <>
                                 {graded || returned ? (
@@ -1000,15 +1197,30 @@ function ClassroomResourcesContent({ chatId }) {
                                 <button
                                   type="button"
                                   disabled={!a.canSubmit}
-                                  onClick={() => setSubmitModal(a)}
-                                  className="btn-primary px-4 py-2 text-xs disabled:cursor-not-allowed disabled:opacity-45"
+                                  onClick={() => openSummitStudent(a)}
+                                  title={
+                                    a.canSubmit
+                                      ? 'Guided turn-in with checklist and file checks'
+                                      : 'Submission is not available for this assignment'
+                                  }
+                                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 via-violet-600 to-cyan-600 px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-white shadow-lg shadow-violet-600/25 ring-1 ring-white/15 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none dark:shadow-violet-900/40"
                                 >
-                                  {submitted ? 'Replace file' : 'Submit work'}
+                                  <Mountain className="h-4 w-4 shrink-0 opacity-95" aria-hidden />
+                                  {submitted ? 'Summit · Replace' : 'Summit'}
                                 </button>
                               </>
                             ) : null}
                             {assignmentsMeta.canManage ? (
-                              <>
+                              <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-2 dark:border-slate-700 sm:border-t-0 sm:pt-0">
+                                <button
+                                  type="button"
+                                  onClick={() => openSummitInstructorPreview(a)}
+                                  className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-violet-300/90 bg-gradient-to-br from-violet-50 to-white px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-violet-950 shadow-sm ring-1 ring-violet-200/80 transition hover:border-violet-400 dark:border-violet-800 dark:from-violet-950/40 dark:to-slate-900 dark:text-violet-100 dark:ring-violet-900 sm:flex-none"
+                                  title="See the student Summit turn-in flow"
+                                >
+                                  <Mountain className="h-4 w-4 shrink-0" aria-hidden />
+                                  Summit
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -1018,7 +1230,7 @@ function ClassroomResourcesContent({ chatId }) {
                                       void openSubmissionPanel(a.id);
                                     }
                                   }}
-                                  className="btn-secondary px-4 py-2 text-xs"
+                                  className="btn-secondary min-h-[44px] flex-1 px-4 py-2 text-xs sm:flex-none"
                                 >
                                   {submissionPanel?.assignmentId === a.id
                                     ? 'Hide submissions'
@@ -1027,11 +1239,11 @@ function ClassroomResourcesContent({ chatId }) {
                                 <button
                                   type="button"
                                   onClick={() => deleteAssignment(a.id)}
-                                  className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-bold uppercase text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
+                                  className="min-h-[44px] rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-[11px] font-bold uppercase text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200 sm:flex-none"
                                 >
                                   Delete
                                 </button>
-                              </>
+                              </div>
                             ) : null}
                           </div>
                         </div>
@@ -1138,85 +1350,305 @@ function ClassroomResourcesContent({ chatId }) {
       </div>
 
       {submitModal ? (
-        <div className="fixed inset-0 z-[1300] flex items-end justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm sm:items-center">
+        <div
+          role="presentation"
+          className="fixed inset-0 z-[1300] flex items-end justify-center bg-slate-950/60 px-3 pb-0 pt-10 backdrop-blur-[10px] sm:items-center sm:p-6"
+          onClick={closeSummitModal}
+        >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="submit-modal-title"
-            className="fade-in-up w-full max-w-lg rounded-3xl border border-slate-200/90 bg-white p-6 shadow-2xl dark:border-slate-600 dark:bg-slate-900"
+            aria-labelledby="summit-modal-title"
+            className="fade-in-up max-h-[min(92vh,880px)] w-full max-w-2xl overflow-y-auto rounded-t-[28px] border border-slate-200/90 bg-white shadow-2xl sm:rounded-3xl dark:border-slate-600 dark:bg-slate-900"
+            onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 id="submit-modal-title" className="font-display text-lg font-bold text-slate-900 dark:text-white">
-                  Submit assignment
-                </h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  {submitModal.title}
-                </p>
+            <div
+              className={`h-1.5 w-full rounded-t-[28px] bg-gradient-to-r sm:rounded-t-3xl ${
+                summitMeta?.tone === 'closed'
+                  ? 'from-slate-500 via-slate-600 to-slate-700'
+                  : summitMeta?.tone === 'late'
+                    ? 'from-amber-500 via-orange-500 to-rose-600'
+                    : summitMeta?.tone === 'soon'
+                      ? 'from-rose-500 via-violet-600 to-cyan-500'
+                      : 'from-violet-600 via-fuchsia-500 to-cyan-500'
+              }`}
+            />
+            <div className="p-5 sm:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.2em] text-violet-600 dark:text-violet-400">
+                    <Mountain className="h-4 w-4" aria-hidden />
+                    Summit
+                  </p>
+                  <h3
+                    id="summit-modal-title"
+                    className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900 sm:text-2xl dark:text-white"
+                  >
+                    Turn in your work
+                  </h3>
+                  <p className="mt-1 text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {submitModal.title}
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ring-1 ${
+                        summitMeta?.tone === 'closed'
+                          ? 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-600'
+                          : summitMeta?.tone === 'late'
+                            ? 'bg-amber-50 text-amber-950 ring-amber-200 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-900'
+                            : summitMeta?.tone === 'soon'
+                              ? 'bg-rose-50 text-rose-950 ring-rose-200 dark:bg-rose-950/40 dark:text-rose-100 dark:ring-rose-900'
+                              : 'bg-emerald-50 text-emerald-950 ring-emerald-200 dark:bg-emerald-950/35 dark:text-emerald-100 dark:ring-emerald-900'
+                      }`}
+                    >
+                      <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                      {summitMeta?.headline}
+                    </span>
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      {summitMeta?.detail}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close Summit"
+                  className="shrink-0 rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={closeSummitModal}
+                >
+                  <X className="h-5 w-5" aria-hidden />
+                </button>
               </div>
-              <button
-                type="button"
-                aria-label="Close"
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
-                onClick={() => {
-                  setSubmitModal(null);
-                  setSubmitFile(null);
-                  setSubmitNote('');
-                  setSubmitAck(false);
-                }}
-              >
-                <X className="h-5 w-5" aria-hidden />
-              </button>
-            </div>
-            <label className="mt-5 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              File (required)
-              <input
-                type="file"
-                className="input-field mt-1 text-sm"
-                onChange={(e) => setSubmitFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
-            <label className="mt-4 block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              Note to instructor (optional)
-              <textarea
-                value={submitNote}
-                onChange={(e) => setSubmitNote(e.target.value)}
-                rows={3}
-                className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm dark:border-slate-600 dark:bg-slate-950/60"
-              />
-            </label>
-            <label className="mt-4 flex cursor-pointer items-start gap-2 text-sm text-slate-700 dark:text-slate-300">
-              <input
-                type="checkbox"
-                checked={submitAck}
-                onChange={(e) => setSubmitAck(e.target.checked)}
-                className="mt-1"
-              />
-              <span>
-                I confirm this is my own work and I understand late submissions may be flagged when applicable.
-              </span>
-            </label>
-            <div className="mt-6 flex flex-wrap justify-end gap-2">
-              <button
-                type="button"
-                className="btn-secondary px-5 py-2 text-sm"
-                onClick={() => {
-                  setSubmitModal(null);
-                  setSubmitFile(null);
-                  setSubmitNote('');
-                  setSubmitAck(false);
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={submitBusy || !submitFile || !submitAck}
-                className="btn-primary px-5 py-2 text-sm disabled:opacity-50"
-                onClick={submitAssignment}
-              >
-                {submitBusy ? 'Uploading…' : 'Submit'}
-              </button>
+
+              {submitSummitPreview ? (
+                <div className="mt-5 rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-white px-4 py-3 text-sm font-semibold text-violet-950 shadow-inner ring-1 ring-violet-100 dark:border-violet-800 dark:from-violet-950/50 dark:to-slate-900 dark:text-violet-100 dark:ring-violet-900">
+                  Instructor preview — you're seeing the exact Summit workspace students use.
+                  Uploading is disabled here so roster submissions stay untouched.
+                </div>
+              ) : null}
+
+              {!submitModal.canSubmit && !submitSummitPreview ? (
+                <div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-950 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-50">
+                  This assignment isn’t accepting uploads right now (closed window or already graded).
+                </div>
+              ) : null}
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-5">
+                <div className="space-y-3 lg:col-span-2">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Progress
+                  </p>
+                  <ol className="space-y-2">
+                    <li
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
+                        submitFile
+                          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
+                          : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300'
+                      }`}
+                    >
+                      <Paperclip className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      Attach final file
+                    </li>
+                    <li
+                      className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold ${
+                        submitAck
+                          ? 'border-emerald-200 bg-emerald-50/90 text-emerald-950 dark:border-emerald-900 dark:bg-emerald-950/30 dark:text-emerald-100'
+                          : 'border-slate-200 bg-white text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300'
+                      }`}
+                    >
+                      <ShieldCheck className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      Integrity acknowledgement
+                    </li>
+                    <li className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/90 px-3 py-2 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-300">
+                      <Upload className="h-4 w-4 shrink-0 opacity-80" aria-hidden />
+                      Send to instructor (one tap)
+                    </li>
+                  </ol>
+                  <p className="text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                    PDFs, Office docs, images, ZIP archives · max{' '}
+                    {formatFileSize(SUMMIT_MAX_BYTES)}
+                  </p>
+                  {submitModal.starterFileUrl ? (
+                    <a
+                      href={submitModal.starterFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl bg-violet-50 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-violet-900 ring-1 ring-violet-200 transition hover:bg-violet-100 dark:bg-violet-950/50 dark:text-violet-100 dark:ring-violet-900"
+                    >
+                      <FileText className="h-3.5 w-3.5" aria-hidden />
+                      Starter file from instructor
+                    </a>
+                  ) : null}
+                </div>
+
+                <div className="space-y-4 lg:col-span-3">
+                  {summitChecklistItems.length > 0 ? (
+                    <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white p-4 shadow-inner dark:border-slate-700 dark:from-slate-950/80 dark:to-slate-900/80">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                        Pulled from instructions
+                      </p>
+                      <ul className="mt-3 space-y-2">
+                        {summitChecklistItems.map((item, idx) => (
+                          <li
+                            key={`${idx}-${item.slice(0, 28)}`}
+                            className="flex gap-2 text-sm leading-snug text-slate-700 dark:text-slate-200"
+                          >
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-950/40 dark:text-slate-400">
+                      Tip: ask instructors to use bullets in instructions — Summit turns them into a live checklist here.
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                      Your submission file
+                    </p>
+                    <label
+                      className={`mt-2 flex cursor-pointer flex-col rounded-2xl border-2 border-dashed px-4 py-8 text-center transition ${
+                        summitDropHover
+                          ? 'border-violet-500 bg-violet-50/80 dark:border-violet-400 dark:bg-violet-950/30'
+                          : 'border-slate-300 bg-white hover:border-violet-300 dark:border-slate-600 dark:bg-slate-950/40 dark:hover:border-violet-700'
+                      } ${submitSummitPreview ? 'pointer-events-none opacity-60' : ''}`}
+                      htmlFor="summit-file-input"
+                      onDragEnter={(e) => {
+                        e.preventDefault();
+                        if (!submitSummitPreview) setSummitDropHover(true);
+                      }}
+                      onDragLeave={(e) => {
+                        e.preventDefault();
+                        setSummitDropHover(false);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        if (!submitSummitPreview) setSummitDropHover(true);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        setSummitDropHover(false);
+                        if (submitSummitPreview) return;
+                        const f = e.dataTransfer?.files?.[0];
+                        if (f) setSubmitFile(f);
+                      }}
+                    >
+                      <Upload className="mx-auto h-10 w-10 text-violet-600 dark:text-violet-400" aria-hidden />
+                      <span className="mt-3 text-sm font-bold text-slate-800 dark:text-slate-100">
+                        Drop your file or browse
+                      </span>
+                      <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Final version only — you can replace while the window stays open.
+                      </span>
+                      <input
+                        id="summit-file-input"
+                        type="file"
+                        className="sr-only"
+                        disabled={submitSummitPreview}
+                        onChange={(e) =>
+                          setSubmitFile(e.target.files?.[0] ?? null)
+                        }
+                      />
+                    </label>
+                    {submitFile ? (
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800/80">
+                        <span className="min-w-0 truncate font-semibold text-slate-800 dark:text-slate-100">
+                          {submitFile.name}
+                        </span>
+                        <span className="shrink-0 text-xs font-medium text-slate-500 dark:text-slate-400">
+                          {formatFileSize(submitFile.size)}
+                          {submitFile.size > SUMMIT_MAX_BYTES ? (
+                            <span className="ml-2 font-bold text-rose-600 dark:text-rose-400">
+                              Over limit
+                            </span>
+                          ) : null}
+                        </span>
+                        {!submitSummitPreview ? (
+                          <button
+                            type="button"
+                            className="text-[11px] font-bold uppercase tracking-wide text-rose-600 hover:underline dark:text-rose-400"
+                            onClick={() => setSubmitFile(null)}
+                          >
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                    Note to instructor (optional)
+                    <textarea
+                      value={submitNote}
+                      onChange={(e) => setSubmitNote(e.target.value)}
+                      rows={3}
+                      disabled={submitSummitPreview}
+                      placeholder="e.g. compiled report includes appendix B…"
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-sm disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950/60"
+                    />
+                  </label>
+
+                  <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40">
+                    <input
+                      type="checkbox"
+                      checked={submitAck}
+                      disabled={submitSummitPreview}
+                      onChange={(e) => setSubmitAck(e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500 disabled:opacity-50"
+                    />
+                    <span className="text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                      I confirm this submission is my own work. I understand late
+                      turn-ins may be flagged when applicable.
+                    </span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-6 dark:border-slate-700">
+                <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                  Keyboard:{' '}
+                  <kbd className="rounded-md border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+                    Esc
+                  </kbd>{' '}
+                  closes Summit
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary px-5 py-2.5 text-sm"
+                    onClick={closeSummitModal}
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      submitBusy ||
+                      submitSummitPreview ||
+                      !submitModal.canSubmit ||
+                      !submitFile ||
+                      !submitAck ||
+                      (submitFile?.size ?? 0) > SUMMIT_MAX_BYTES
+                    }
+                    className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 px-6 py-2.5 text-sm font-bold text-white shadow-lg shadow-violet-600/25 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none dark:shadow-violet-900/30"
+                    onClick={submitAssignment}
+                  >
+                    {submitBusy ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                        Uploading…
+                      </>
+                    ) : (
+                      <>
+                        <Mountain className="h-4 w-4" aria-hidden />
+                        Submit via Summit
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

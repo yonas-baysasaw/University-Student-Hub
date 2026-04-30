@@ -16,6 +16,23 @@ function escapeHtml(s) {
     .replace(/"/g, '&quot;');
 }
 
+function kindLabel(kind) {
+  const k = String(kind || 'statement').toLowerCase();
+  if (k === 'exam') return 'Exam';
+  if (k === 'assignment') return 'Assignment';
+  return 'Statement';
+}
+
+function expiresSummaryLine(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `Relevant until: ${d.toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })}`;
+}
+
 /**
  * @param {import('nodemailer').Transporter} transporter
  */
@@ -39,7 +56,7 @@ function getOrCreateTransporter(transporter) {
  * @param {string} params.chatId
  * @param {import('mongoose').Types.ObjectId} params.authorUserId
  * @param {import('mongoose').Types.ObjectId[]} params.memberIds
- * @param {{ title: string, body: string, authorName: string }} params.announcement
+ * @param {{ title: string, body: string, authorName: string, kind?: string, expiresAt?: string | null }} params.announcement
  * @param {import('nodemailer').Transporter | null} [params._transporter] — for tests
  * @returns {Promise<void>}
  */
@@ -89,8 +106,13 @@ export async function notifyClassroomMembersOfAnnouncement({
       0,
       MAX_SUBJECT_CHARS,
     );
+  const typeLine = `Type: ${kindLabel(announcement.kind)}`;
+  const expiryLine = expiresSummaryLine(announcement.expiresAt ?? null);
+
   const text = `A new announcement was posted in "${classroomName}" by ${announcement.authorName}.
 
+${typeLine}
+${expiryLine ? `${expiryLine}\n` : ''}
 Title: ${announcement.title}
 
 ${body}
@@ -98,7 +120,15 @@ ${body}
 Open in the app: ${appUrl}
 `;
 
+  const htmlMeta =
+    `<p style="margin:0.35em 0;font-size:0.92em;color:#475569;"><strong>Type:</strong> ${escapeHtml(kindLabel(announcement.kind))}` +
+    (expiryLine
+      ? `<br /><strong>${escapeHtml(expiryLine)}</strong>`
+      : '') +
+    '</p>';
+
   const html = `<p><strong>${escapeHtml(classroomName)}</strong> — new announcement by ${escapeHtml(announcement.authorName)}</p>
+${htmlMeta}
 <h2 style="font-size:1.1em;margin:0.75em 0 0.5em;">${escapeHtml(announcement.title)}</h2>
 <div style="white-space:pre-wrap;font-family:system-ui,sans-serif;">${escapeHtml(body)}</div>
 <p style="margin-top:1em;"><a href="${escapeHtml(appUrl)}">View in app</a></p>`;

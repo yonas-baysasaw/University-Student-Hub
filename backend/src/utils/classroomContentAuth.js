@@ -63,13 +63,13 @@ export function canManageClassroomContent(chat, userId) {
 }
 
 /**
- * Members who are not classroom admins may submit assignments.
+ * Any classroom member may upload assignment submissions (creators/admins included).
+ * Grading and roster actions remain limited to {@link canManageClassroomContent}.
  * @param {import('mongoose').Document} chat
  * @param {import('mongoose').Types.ObjectId} userId
  */
 export function canSubmitAssignments(chat, userId) {
-  if (!isChatMember(chat, userId)) return false;
-  return !canManageClassroomContent(chat, userId);
+  return isChatMember(chat, userId);
 }
 
 /**

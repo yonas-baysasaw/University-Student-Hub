@@ -52,7 +52,9 @@ function assertCanManage(chat, userId) {
 
 function assertCanSubmit(chat, userId) {
   if (!canSubmitAssignments(chat, userId)) {
-    const err = new Error('Only students in this class can submit assignments');
+    const err = new Error(
+      'Only classroom members can submit assignments',
+    );
     err.status = 403;
     throw err;
   }

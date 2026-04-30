@@ -139,6 +139,18 @@ function mapAnnouncementForModel(a, classroomName) {
     a.importance <= 2
       ? a.importance
       : 0;
+  const kind =
+    a.kind === 'exam' || a.kind === 'assignment' ? a.kind : 'statement';
+  let expiresAtIso = null;
+  let isExpired = false;
+  const now = Date.now();
+  if (a.expiresAt) {
+    const t = new Date(a.expiresAt).getTime();
+    if (!Number.isNaN(t)) {
+      expiresAtIso = new Date(a.expiresAt).toISOString();
+      isExpired = t < now;
+    }
+  }
   return {
     classroom: classroomName,
     title: a.title,
@@ -148,6 +160,12 @@ function mapAnnouncementForModel(a, classroomName) {
     importance: imp,
     importanceLabel:
       imp >= 2 ? 'urgent' : imp >= 1 ? 'highlight' : 'normal',
+    kind,
+    expiresAt: expiresAtIso,
+    expiresSummary: expiresAtIso
+      ? `${isExpired ? 'Expired (was relevant until)' : 'Relevant until'} ${formatWhen(a.expiresAt)}`
+      : null,
+    isExpired,
   };
 }
 
