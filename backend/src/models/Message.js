@@ -32,6 +32,13 @@ const messageSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    editedAt: {
+      type: Date,
+    },
+    /** Soft-delete; message stays for audit but content is cleared for clients. */
+    deletedAt: {
+      type: Date,
+    },
   },
   { timestamps: true },
 );

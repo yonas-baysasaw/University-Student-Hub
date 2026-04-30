@@ -60,6 +60,7 @@ University Student Hub is a collaborative platform that enables students to:
 - **File Sharing**: Upload and share resources (images, documents)
 - **Presence**: See who's online in real-time
 - **Library**: Manage and access shared books/materials
+- **Staff admin** (`/admin`, `STAFF_EMAILS`): Moderation UI for instructors/students (read-only locks) and library deletion; staff bypass write restrictions
 
 ## Prerequisites
 
@@ -92,12 +93,16 @@ AWS_REGION=your_aws_region
 AWS_BUCKET_NAME=your_s3_bucket_name
 AWS_ACCESS_KEY_ID=your_access_key_id
 AWS_SECRET_ACCESS_KEY=your_secret_access_key
+
+# Optional: comma-separated emails promoted to staff on each server start (no auto-demotion)
+# STAFF_EMAILS=admin@university.edu
 ```
 
 Optional (supported by code):
 
 - `MONGODB_URI` (alternative to `MONGODB_URL`)
 - `VITE_API_TARGET` in `frontend/.env` for Vite API proxy target
+- `STAFF_EMAILS` — comma-separated list of user emails (lowercase) promoted to the `staff` role on each server start (users are not demoted when removed from this list)
 
 ## Installation
 

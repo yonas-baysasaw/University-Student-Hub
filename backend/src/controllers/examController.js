@@ -12,11 +12,13 @@ import {
   hashContent,
 } from '../services/pdfService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 // ── Upload & Process ──────────────────────────────────────────────────────────
 
 async function uploadExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
@@ -217,6 +219,7 @@ async function getQuestionsController(req, res, next) {
 
 async function submitAttemptController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
     const { answers, flaggedQuestions = [] } = req.body;
@@ -303,6 +306,7 @@ async function getAttemptsController(req, res, next) {
 
 async function updateExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
     const { filename, subject } = req.body;
@@ -330,6 +334,7 @@ async function updateExamController(req, res, next) {
 
 async function deleteExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
 

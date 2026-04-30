@@ -63,14 +63,13 @@ function LandingNav() {
           >
             Register
           </Link>
-          <a
-            href="#"
+          <Link
+            to="/login?next=/admin"
             className="hidden rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 md:inline-flex dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
-            onClick={(e) => e.preventDefault()}
-            aria-label="Admin portal — sign in with staff credentials via Login"
+            aria-label="Admin portal — sign in with staff credentials, then open admin"
           >
             Admin Portal
-          </a>
+          </Link>
         </div>
       </div>
 

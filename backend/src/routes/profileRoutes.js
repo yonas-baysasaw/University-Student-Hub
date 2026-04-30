@@ -6,6 +6,8 @@ import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import { serializeCurrentUser } from '../utils/userSerializer.js';
+import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
 const router = express.Router();
 
@@ -77,6 +79,7 @@ router.get(
 router.post(
   '/public/:userId/subscribe',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
@@ -146,23 +149,7 @@ router.post(
 
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
-  const photo = req.user.avatar;
-  const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
-
-  res.json({
-    id: req.user._id,
-    username: req.user.username,
-    name: req.user.name,
-    email: req.user.email,
-    displayName: req.user.displayName,
-    provider: req.user.provider,
-    photo,
-    avatar: req.user.avatar || null,
-    lastSeen: req.user.lastSeen || null,
-    geminiConfigured,
-    geminiModelId: req.user.geminiModelId || '',
-    hasLocalPassword: !!req.user.password,
-  });
+  res.json(serializeCurrentUser(req.user));
 });
 
 /* ===== Get Current User Activity ===== */
@@ -292,6 +279,7 @@ router.get(
 router.put(
   '/password',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
@@ -333,6 +321,7 @@ router.put(
 router.put(
   '/',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { username, displayName } = req.body;
 
@@ -357,6 +346,7 @@ router.put(
 router.delete(
   '/',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res, next) => {
     await req.user.deleteOne();
 
@@ -371,6 +361,7 @@ router.delete(
 router.post(
   '/api-key',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { geminiApiKey = '', geminiModelId = '' } = req.body;
     req.user.geminiApiKey = geminiApiKey.trim();
@@ -384,6 +375,7 @@ router.post(
 router.delete(
   '/api-key',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     req.user.geminiApiKey = '';
     req.user.geminiModelId = '';

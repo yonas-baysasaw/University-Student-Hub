@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
 import BookReview from '../models/BookReview.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 function listFilterForRequest(req) {
   const canUsePrivateBooks = req.isAuthenticated?.();
@@ -92,6 +93,7 @@ export const listBookReviews = asyncHandler(async (req, res) => {
 });
 
 export const upsertBookReview = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
   const { body, rating } = req.body ?? {};
 
@@ -158,6 +160,7 @@ export const upsertBookReview = asyncHandler(async (req, res) => {
 });
 
 export const deleteBookReview = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId, reviewId } = req.params;
 
   if (

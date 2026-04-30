@@ -12,6 +12,7 @@ import {
   isChatMember,
   loadChatForClassroomRequest,
 } from '../utils/classroomContentAuth.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 function authorLabel(user) {
   return (
@@ -76,6 +77,7 @@ export const listAnnouncements = asyncHandler(async (req, res) => {
 });
 
 export const createAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -123,6 +125,7 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
 });
 
 export const deleteAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId, announcementId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -173,6 +176,7 @@ export const listResources = asyncHandler(async (req, res) => {
 });
 
 export const createResource = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -233,6 +237,7 @@ export const createResource = asyncHandler(async (req, res) => {
 });
 
 export const deleteResource = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId, resourceId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;

@@ -4,11 +4,13 @@ import {
   geminiService,
   getGeminiServiceForUser,
 } from '../services/geminiService.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 // ── Chat (REST, non-streaming) ─────────────────────────────────────────────────
 
 async function chatController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const { messages, sessionId, bookId } = req.body;
     const userId = req.user._id;
 
@@ -120,6 +122,7 @@ async function getSessionController(req, res, next) {
 
 async function deleteSessionController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const result = await ChatSession.findOneAndDelete({
       _id: req.params.sessionId,
       userId: req.user._id,

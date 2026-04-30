@@ -34,4 +34,14 @@ export const ENV = {
     );
     return Number.isFinite(n) && n >= 5_000 ? n : 90_000;
   })(),
+  /**
+   * Comma-separated emails promoted to staff on server start (no auto-demotion).
+   */
+  STAFF_EMAILS: (() => {
+    const raw = process.env.STAFF_EMAILS || '';
+    return raw
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+  })(),
 };

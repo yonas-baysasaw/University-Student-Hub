@@ -6,7 +6,45 @@ import ClassroomAnnouncement from '../models/ClassroomAnnouncement.js';
 import ClassroomResource from '../models/ClassroomResource.js';
 import Membership from '../models/Membership.js';
 import Message from '../models/Message.js';
-import { canManageClassroomContent } from '../utils/classroomContentAuth.js';
+import {
+  canManageClassroomContent,
+  canManageClassroomRoster,
+  isChatMember,
+  isClassroomCreator,
+} from '../utils/classroomContentAuth.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { getIo } from '../socket/index.js';
+
+const MAX_MESSAGE_BODY = 8000;
+
+function emitChatMessageEvent(chatId, event, payload) {
+  try {
+    const io = getIo();
+    io?.to(String(chatId)).emit(event, payload);
+  } catch {
+    /* socket may be uninitialized (tests / CLI) */
+  }
+}
+
+async function populateMessageLean(messageId) {
+  return Message.findById(messageId)
+    .populate('sender', 'username email avatar photo')
+    .lean();
+}
+
+async function repairChatLastMessage(chatId) {
+  const last = await Message.findOne({
+    chat: chatId,
+    $or: [{ deletedAt: null }, { deletedAt: { $exists: false } }],
+  })
+    .sort({ createdAt: -1 })
+    .select('_id')
+    .lean();
+  await Chat.updateOne(
+    { _id: chatId },
+    { lastMessage: last?._id ?? null },
+  );
+}
 
 const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -65,6 +103,18 @@ const forbidden = (message) => {
   return err;
 };
 
+function populateChatForClient(chatId) {
+  return Chat.findById(chatId).populate([
+    { path: 'members', select: 'username email avatar photo' },
+    { path: 'creator', select: 'username email avatar photo' },
+    { path: 'admins', select: 'username email avatar photo' },
+    {
+      path: 'lastMessage',
+      populate: { path: 'sender', select: 'username email avatar photo' },
+    },
+  ]);
+}
+
 const invitationGenerator = customAlphabet(
   'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
   8,
@@ -80,6 +130,7 @@ const ensureInvitationCode = async () => {
 };
 
 export const createChat = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   if (!req.body) {
     const error = new Error('Request body is missing');
     error.status = 400;
@@ -87,7 +138,6 @@ export const createChat = asyncHandler(async (req, res) => {
   }
 
   const { name } = req.body;
-  console.log('hi');
   if (!name?.trim()) {
     const error = new Error('Chat name is required');
     error.status = 400;
@@ -108,7 +158,7 @@ export const createChat = asyncHandler(async (req, res) => {
 });
 
 export const joinChatByCode = asyncHandler(async (req, res) => {
-  console.log(req.body);
+  assertCanWrite(req.user);
   if (!req.body) {
     const error = new Error('Request body is missing');
     error.status = 400;
@@ -157,6 +207,8 @@ export const getUserChats = asyncHandler(async (req, res) => {
       .limit(parsedLimit)
       .populate([
         { path: 'members', select: 'username email avatar photo' },
+        { path: 'creator', select: 'username email avatar photo' },
+        { path: 'admins', select: 'username email avatar photo' },
         {
           path: 'lastMessage',
           populate: { path: 'sender', select: 'username email avatar photo' },
@@ -174,6 +226,7 @@ export const getUserChats = asyncHandler(async (req, res) => {
 });
 
 export const patchChat = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(chatId)) {
@@ -221,18 +274,127 @@ export const patchChat = asyncHandler(async (req, res) => {
 
   await chat.save();
 
-  const populated = await Chat.findById(chat._id).populate([
-    { path: 'members', select: 'username email avatar photo' },
-    {
-      path: 'lastMessage',
-      populate: { path: 'sender', select: 'username email avatar photo' },
-    },
-  ]);
+  const populated = await populateChatForClient(chat._id);
 
   res.json(populated ?? chat);
 });
 
+export const leaveChat = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId } = req.params;
+
+  if (!mongoose.Types.ObjectId.isValid(chatId)) {
+    const e = new Error('Invalid classroom id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select('members admins creator');
+  if (!chat) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+
+  if (!isChatMember(chat, req.user._id)) {
+    throw forbidden('You are not part of this classroom');
+  }
+
+  if (isClassroomCreator(chat, req.user._id)) {
+    throw forbidden(
+      'Classroom owners cannot leave — archive or delete the classroom instead.',
+    );
+  }
+
+  const uid = req.user._id;
+  await Chat.updateOne(
+    { _id: chatId },
+    { $pull: { members: uid, admins: uid } },
+  );
+  await Membership.deleteMany({ chat: chatId, user: uid });
+
+  res.json({ message: 'You left the classroom' });
+});
+
+export const patchChatMember = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId, userId: targetUserId } = req.params;
+  const action = req.body?.action;
+
+  if (
+    !mongoose.Types.ObjectId.isValid(chatId) ||
+    !mongoose.Types.ObjectId.isValid(targetUserId)
+  ) {
+    const e = new Error('Invalid classroom or user id');
+    e.status = 400;
+    throw e;
+  }
+
+  const valid = ['promote_admin', 'demote_admin', 'remove'];
+  if (!valid.includes(action)) {
+    const e = new Error(
+      'Body must include action: promote_admin, demote_admin, or remove',
+    );
+    e.status = 400;
+    throw e;
+  }
+
+  const targetOid = new mongoose.Types.ObjectId(targetUserId);
+
+  const chat = await Chat.findById(chatId).select('members admins creator');
+  if (!chat) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+
+  if (!isChatMember(chat, req.user._id)) {
+    throw forbidden('You are not part of this classroom');
+  }
+  if (!canManageClassroomRoster(chat, req.user._id)) {
+    throw forbidden('Only the classroom creator can manage members');
+  }
+
+  if (!isChatMember(chat, targetOid)) {
+    const e = new Error('User is not a member of this classroom');
+    e.status = 400;
+    throw e;
+  }
+
+  if (isClassroomCreator(chat, targetOid)) {
+    if (action === 'demote_admin' || action === 'remove') {
+      throw forbidden('Cannot remove or demote the classroom creator');
+    }
+    const populatedCreator = await populateChatForClient(chatId);
+    return res.json(populatedCreator ?? chat);
+  }
+
+  if (action === 'remove' && targetOid.equals(req.user._id)) {
+    throw forbidden('You cannot remove yourself from the classroom');
+  }
+
+  if (action === 'promote_admin') {
+    await Chat.updateOne({ _id: chatId }, { $addToSet: { admins: targetOid } });
+  } else if (action === 'demote_admin') {
+    await Chat.updateOne({ _id: chatId }, { $pull: { admins: targetOid } });
+  } else {
+    await Chat.updateOne(
+      { _id: chatId },
+      { $pull: { members: targetOid, admins: targetOid } },
+    );
+  }
+
+  const populated = await populateChatForClient(chatId);
+  if (!populated) {
+    const e = new Error('Classroom not found');
+    e.status = 404;
+    throw e;
+  }
+  res.json(populated);
+});
+
 export const deleteChat = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(chatId)) {
@@ -267,6 +429,7 @@ export const deleteChat = asyncHandler(async (req, res) => {
 });
 
 export const patchChatSchedule = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
 
   if (!mongoose.Types.ObjectId.isValid(chatId)) {
@@ -306,9 +469,9 @@ export const patchChatSchedule = asyncHandler(async (req, res) => {
 
 export const getChatMessages = asyncHandler(async (req, res) => {
   const { chatId } = req.params;
-  const page = Math.max(Number(req.query.page) || 1, 1);
-  const limit = Math.min(Math.max(Number(req.query.limit) || 20, 5), 100);
-  const skip = (page - 1) * limit;
+  const limit = Math.min(Math.max(Number(req.query.limit) || 50, 5), 100);
+  const beforeRaw = req.query.before;
+  const afterRaw = req.query.after;
 
   const chat = await Chat.findById(chatId).select('members');
   if (!chat) {
@@ -320,26 +483,66 @@ export const getChatMessages = asyncHandler(async (req, res) => {
     throw forbidden('You are not part of this chat');
   }
 
-  const [messages, total] = await Promise.all([
-    Message.find({ chat: chatId })
+  const filter = { chat: chatId };
+
+  if (afterRaw && mongoose.Types.ObjectId.isValid(String(afterRaw))) {
+    const anchor = await Message.findById(afterRaw).select('createdAt').lean();
+    if (anchor?.createdAt) {
+      filter.createdAt = { $gt: anchor.createdAt };
+    }
+    const batchAsc = await Message.find(filter)
       .sort({ createdAt: 1 })
-      .skip(skip)
       .limit(limit)
       .populate('sender', 'username email avatar photo')
-      .lean(),
-    Message.countDocuments({ chat: chatId }),
-  ]);
+      .lean();
+
+    res.json({
+      limit,
+      mode: 'after',
+      messages: batchAsc,
+    });
+    return;
+  }
+
+  if (beforeRaw && mongoose.Types.ObjectId.isValid(String(beforeRaw))) {
+    const anchor = await Message.findById(beforeRaw).select('createdAt').lean();
+    if (anchor?.createdAt) {
+      filter.createdAt = { $lt: anchor.createdAt };
+    }
+  }
+
+  const batchDesc = await Message.find(filter)
+    .sort({ createdAt: -1 })
+    .limit(limit)
+    .populate('sender', 'username email avatar photo')
+    .lean();
+
+  const messages = batchDesc.reverse();
+
+  let hasMoreOlder = false;
+  if (messages.length > 0) {
+    const oldest = messages[0];
+    const oc = oldest?.createdAt;
+    if (oc) {
+      hasMoreOlder = !!(await Message.exists({
+        chat: chatId,
+        createdAt: { $lt: new Date(oc) },
+      }));
+    }
+  }
+
+  const total = await Message.countDocuments({ chat: chatId });
 
   res.json({
-    page,
     limit,
     total,
-    hasMore: page * limit < total,
+    hasMoreOlder,
     messages,
   });
 });
 
 export const sendMessage = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
   if (!chatId) {
     const error = new Error('Chat ID is required');
@@ -383,5 +586,121 @@ export const sendMessage = asyncHandler(async (req, res) => {
     'username email avatar photo',
   );
 
+  emitChatMessageEvent(chatId, 'message', {
+    chatId: String(chatId),
+    message: populated.toObject
+      ? populated.toObject()
+      : populated,
+  });
+
   res.status(201).json({ message: populated });
+});
+
+export const patchChatMessage = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId, messageId } = req.params;
+  if (
+    !mongoose.Types.ObjectId.isValid(chatId) ||
+    !mongoose.Types.ObjectId.isValid(messageId)
+  ) {
+    const e = new Error('Invalid classroom or message id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select('members admins creator');
+  if (!chat || !isChatMember(chat, req.user._id)) {
+    throw forbidden('You are not part of this classroom');
+  }
+
+  const msg = await Message.findOne({ _id: messageId, chat: chatId });
+  if (!msg) {
+    const e = new Error('Message not found');
+    e.status = 404;
+    throw e;
+  }
+  if (msg.deletedAt) {
+    const e = new Error('Message has been deleted');
+    e.status = 400;
+    throw e;
+  }
+
+  if (!msg.sender.equals(req.user._id)) {
+    throw forbidden('You can only edit your own messages');
+  }
+
+  const raw = req.body?.content;
+  const trimmed = typeof raw === 'string' ? raw.trim() : '';
+  if (!trimmed) {
+    const e = new Error('Message cannot be empty');
+    e.status = 400;
+    throw e;
+  }
+  if (trimmed.length > MAX_MESSAGE_BODY) {
+    const e = new Error('Message is too long');
+    e.status = 400;
+    throw e;
+  }
+
+  msg.content = trimmed;
+  msg.editedAt = new Date();
+  await msg.save();
+
+  const populated = await populateMessageLean(msg._id);
+  emitChatMessageEvent(chatId, 'messageUpdated', {
+    chatId: String(chatId),
+    message: populated,
+  });
+
+  res.json({ message: populated });
+});
+
+export const deleteChatMessage = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId, messageId } = req.params;
+  if (
+    !mongoose.Types.ObjectId.isValid(chatId) ||
+    !mongoose.Types.ObjectId.isValid(messageId)
+  ) {
+    const e = new Error('Invalid classroom or message id');
+    e.status = 400;
+    throw e;
+  }
+
+  const chat = await Chat.findById(chatId).select('members admins creator');
+  if (!chat || !isChatMember(chat, req.user._id)) {
+    throw forbidden('You are not part of this classroom');
+  }
+
+  const msg = await Message.findOne({ _id: messageId, chat: chatId });
+  if (!msg) {
+    const e = new Error('Message not found');
+    e.status = 404;
+    throw e;
+  }
+  if (msg.deletedAt) {
+    const e = new Error('Message already deleted');
+    e.status = 400;
+    throw e;
+  }
+
+  const isSender = msg.sender.equals(req.user._id);
+  const isModerator = canManageClassroomContent(chat, req.user._id);
+  if (!isSender && !isModerator) {
+    throw forbidden('You cannot delete this message');
+  }
+
+  msg.deletedAt = new Date();
+  msg.content = '';
+  await msg.save();
+
+  await repairChatLastMessage(chatId);
+
+  const populated = await populateMessageLean(msg._id);
+  emitChatMessageEvent(chatId, 'messageUpdated', {
+    chatId: String(chatId),
+    message: populated,
+  });
+
+  res.json({ ok: true, message: populated });
 });

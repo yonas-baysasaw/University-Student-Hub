@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { FaGoogle } from 'react-icons/fa';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
+import { safeInternalPath } from '../utils/safeRedirect';
 
 function SignIn() {
+  const [searchParams] = useSearchParams();
+  const nextRaw = searchParams.get('next');
+  const nextSafe = safeInternalPath(nextRaw);
+
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -36,8 +41,10 @@ function SignIn() {
       }
 
       setStatus('Signed in successfully. Redirecting...');
+      const user = payload.user;
+      const target = user?.isStaff && nextSafe ? nextSafe : '/';
       setTimeout(() => {
-        window.location.href = '/';
+        window.location.href = target;
       }, 450);
     } catch (submitError) {
       console.error(submitError);

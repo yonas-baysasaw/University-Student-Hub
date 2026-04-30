@@ -7,6 +7,7 @@ import {
   executeSupportTool,
   getSupportFunctionDeclarations,
 } from '../services/supportToolService.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 const SUPPORT_SYSTEM = `You are the University Student Hub support assistant. Answer using ONLY facts returned by the tools. If a tool returns an error or empty list, say so and suggest what the user can do (e.g. check the classroom name or open a specific page). Do not invent announcements, resource links, file names, messages, or exam details. Be concise, friendly, and use bullet points when listing items.
 
@@ -19,6 +20,7 @@ When the user asks about classrooms, resources, or announcements without naming 
 
 async function supportChatController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const { messages, sessionId } = req.body;
     const userId = req.user._id;
 

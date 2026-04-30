@@ -1,6 +1,7 @@
 import Book from '../models/Books.js';
 import { createPdfThumbnailBuffer } from '../services/pdfThumbnailService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 function createErrorResponse(message) {
   return { message };
@@ -69,6 +70,7 @@ function validateUploadMeta(meta) {
 
 async function uploadController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const id = req.user?._id;
     if (!id) {
       return res.status(401).json(createErrorResponse('Unauthorized'));
@@ -146,6 +148,7 @@ async function uploadController(req, res, next) {
 async function uploadProfileController(req, res, next) {
   const id = req.user?._id;
   try {
+    assertCanWrite(req.user);
     if (!id) {
       return res.status(401).json(createErrorResponse('Unauthorized'));
     }

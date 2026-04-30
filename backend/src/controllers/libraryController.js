@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 const listFilterForRequest = (req) => {
   const canUsePrivateBooks = req.isAuthenticated?.();
@@ -109,6 +110,7 @@ export const getBookById = asyncHandler(async (req, res) => {
 });
 
 export const createBook = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { title, description, bookUrl, thumbnailUrl, format, visibility } =
     req.body ?? {};
 
@@ -136,6 +138,7 @@ export const createBook = asyncHandler(async (req, res) => {
 });
 
 export const updateBook = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
 
   if (!ensureValidBookId(bookId)) {
@@ -178,6 +181,7 @@ export const updateBook = asyncHandler(async (req, res) => {
 });
 
 export const deleteBook = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
 
   if (!ensureValidBookId(bookId)) {
@@ -206,6 +210,7 @@ export const deleteBook = asyncHandler(async (req, res) => {
 });
 
 export const reactToBook = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
   const { reaction } = req.body ?? {};
 
@@ -259,6 +264,7 @@ export const reactToBook = asyncHandler(async (req, res) => {
 });
 
 export const toggleSaveBook = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
 
   if (!ensureValidBookId(bookId)) {
@@ -302,6 +308,10 @@ export const toggleSaveBook = asyncHandler(async (req, res) => {
 
 export const incrementBookDownload = asyncHandler(async (req, res) => {
   const { bookId } = req.params;
+
+  if (req.user?._id) {
+    assertCanWrite(req.user);
+  }
 
   if (!ensureValidBookId(bookId)) {
     return res.status(400).json({

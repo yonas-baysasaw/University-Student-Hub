@@ -6,10 +6,12 @@ import {
   MoreVertical,
   Pencil,
   RotateCcw,
+  Share2,
   Trash2,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 /**
  * Actions dropdown (“⋯”) for each classroom card.
@@ -17,6 +19,7 @@ import { Link } from 'react-router-dom';
 export default function ClassroomCardMenu({
   classroomId,
   classroomName,
+  invitationCode,
   archived,
   canManage,
   canSchedule,
@@ -27,6 +30,34 @@ export default function ClassroomCardMenu({
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
+
+  const handleShareClass = async () => {
+    const origin = window.location.origin;
+    try {
+      let url;
+      let message;
+      const code =
+        typeof invitationCode === 'string' ? invitationCode.trim() : '';
+      if (code) {
+        url = `${origin}/classroom?invite=${encodeURIComponent(code)}`;
+        message =
+          'Invite link copied — classmates open it, confirm the code, then join.';
+      } else if (classroomId) {
+        url = `${origin}/classroom/${classroomId}`;
+        message = 'Classroom link copied (members must already belong).';
+      } else {
+        toast.error('Nothing to share yet.');
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast.success(message);
+      setOpen(false);
+    } catch {
+      toast.error(
+        'Could not copy automatically — copy the invite code from the card instead.',
+      );
+    }
+  };
 
   useEffect(() => {
     const onDocDown = (e) => {
@@ -77,6 +108,17 @@ export default function ClassroomCardMenu({
             Open classroom
             <ArrowRight className="ml-auto h-3.5 w-3.5 opacity-60" aria-hidden />
           </Link>
+
+          <button
+            type="button"
+            role="menuitem"
+            disabled={!classroomId}
+            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-800"
+            onClick={() => void handleShareClass()}
+          >
+            <Share2 className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400" aria-hidden />
+            Share class
+          </button>
 
           {canSchedule ? (
             <button

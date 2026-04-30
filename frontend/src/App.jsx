@@ -8,11 +8,17 @@ import {
 import { Toaster } from 'sonner';
 import Nav from './components/Nav';
 import Navbar from './components/Navbar';
+import StaffRoute from './components/StaffRoute';
 import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
 import Landing from './pages/Landing';
+import AdminInstructors from './pages/admin/AdminInstructors.jsx';
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminLibrary from './pages/admin/AdminLibrary.jsx';
+import AdminStudents from './pages/admin/AdminStudents.jsx';
+import AdminWelcome from './pages/admin/AdminWelcome.jsx';
 import BookDetail from './pages/BookDetail';
 import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
@@ -24,6 +30,7 @@ import Home from './pages/Home';
 import Library from './pages/Library';
 import LiquAI from './pages/LiquAI';
 import Login from './pages/login';
+import Notifications from './pages/Notifications';
 import NotFound from './pages/NotFound';
 import PasswordReset from './pages/PasswordReset';
 import Profile from './pages/Profile';
@@ -72,6 +79,7 @@ function AppRoutes() {
               path="/classroom/:chatId/resources"
               element={<ClassroomResources />}
             />
+            <Route path="/notifications" element={<Notifications />} />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:bookId" element={<BookDetail />} />
             <Route path="/liqu-ai" element={<LiquAI />} />
@@ -83,6 +91,19 @@ function AppRoutes() {
             <Route path="/exams" element={<Exams />} />
             <Route path="/exams/:examId" element={<ExamPractice />} />
             <Route path="/profile" element={<Profile />} />
+            <Route
+              path="/admin"
+              element={
+                <StaffRoute>
+                  <AdminLayout />
+                </StaffRoute>
+              }
+            >
+              <Route index element={<AdminWelcome />} />
+              <Route path="instructors" element={<AdminInstructors />} />
+              <Route path="students" element={<AdminStudents />} />
+              <Route path="library" element={<AdminLibrary />} />
+            </Route>
             <Route path="/settings" element={<Settings />} />
             <Route path="/users/:userId" element={<PublicProfile />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
@@ -107,6 +128,10 @@ function AppRoutes() {
       <div key={location.pathname} className="route-fade">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route
+            path="/admin"
+            element={<Navigate to="/login?next=/admin" replace />}
+          />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/password/reset" element={<PasswordReset />} />
