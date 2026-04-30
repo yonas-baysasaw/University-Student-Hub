@@ -4,7 +4,6 @@ import {
   ChevronDown,
   Cloud,
   Copy,
-  History,
   Image,
   Menu,
   MessageSquare,
@@ -14,8 +13,6 @@ import {
   Plus,
   RefreshCw,
   Send,
-  Settings,
-  SlidersHorizontal,
   SquarePen,
   Sparkles,
   ThumbsDown,
@@ -61,29 +58,6 @@ function useIsMinWidth(px) {
   return matches;
 }
 
-function useFinePointerHover() {
-  const [ok, setOk] = useState(() =>
-    typeof window !== 'undefined' &&
-      window.matchMedia('(hover: hover)').matches &&
-      window.matchMedia('(pointer: fine)').matches,
-  );
-  useEffect(() => {
-    const mqHover = window.matchMedia('(hover: hover)');
-    const mqPointer = window.matchMedia('(pointer: fine)');
-    function sync() {
-      setOk(mqHover.matches && mqPointer.matches);
-    }
-    sync();
-    mqHover.addEventListener('change', sync);
-    mqPointer.addEventListener('change', sync);
-    return () => {
-      mqHover.removeEventListener('change', sync);
-      mqPointer.removeEventListener('change', sync);
-    };
-  }, []);
-  return ok;
-}
-
 const BASE_WELCOME =
   "Hi! I'm Liqu AI, powered by Google Gemini. I can help you study, explain concepts, answer questions, or discuss topics from your coursework. How can I help you today?";
 
@@ -119,7 +93,7 @@ function formatSessionUpdatedAt(iso) {
  * `starterPrompts` + optional `onQuickPrompt`: quick prompts below the welcome bubble (prefill elsewhere). Study Buddy omits `onQuickPrompt`; starters submit the message inline.
  * @param {'default' | 'gemini'} [variant] — `gemini` is a Gemini-style layout (light-first with `dark:` parity); default keeps card styling.
  * @param {null|'studyBuddy'} [workspacePresentation] — Study Buddy: Copilot-like greeting, pills, hero prompts + optional inline sidebar.
- * @param {'overlay'|'inline'|'rail'} [sessionSidebarMode] — `rail`: Gemini-style thin nav rail; `inline`: wide list beside chat.
+ * @param {'overlay'|'inline'|'rail'} [sessionSidebarMode] — `rail`: desktop floating menu opens a translucent slide-over history on the chat area; `inline`: wide list beside chat.
  */
 function LiquAiChatPanel({
   className = '',
@@ -142,13 +116,13 @@ function LiquAiChatPanel({
     workspacePresentation === 'studyBuddy' && variant === 'gemini';
   const studyDense = Boolean(denseStudyChrome) && isStudyWorkspace;
   const isLgUp = useIsMinWidth(1024);
-  const canFinePointerHover = useFinePointerHover();
   const useInlineSidebar =
     sessionSidebarMode === 'inline' && isGemini && isLgUp;
   const useRailSidebar = sessionSidebarMode === 'rail' && isGemini && isLgUp;
+  /** Study + rail: on small screens use header menu + slide-over only (no persistent rail strip). */
+  const useStudyMobileHistory =
+    sessionSidebarMode === 'rail' && isGemini && isStudyWorkspace && !isLgUp;
 
-  const railBtnClass =
-    'flex h-11 w-full items-center justify-center rounded-xl text-slate-200 transition hover:bg-slate-800/90 hover:text-white dark:text-slate-300 dark:hover:bg-slate-800';
   const { user } = useAuth();
   const socket = useSocket();
   const location = useLocation();
@@ -180,44 +154,11 @@ function LiquAiChatPanel({
   const [attachmentChipNames, setAttachmentChipNames] = useState([]);
   const attachMenuContainerRef = useRef(null);
   const fileInputRef = useRef(null);
-  const railCloseTimerRef = useRef(null);
 
-  const clearRailCloseTimer = useCallback(() => {
-    if (railCloseTimerRef.current != null) {
-      window.clearTimeout(railCloseTimerRef.current);
-      railCloseTimerRef.current = null;
-    }
+  const toggleRailSidebar = useCallback((event) => {
+    event?.stopPropagation?.();
+    setSidebarOpen((open) => !open);
   }, []);
-
-  const scheduleRailClose = useCallback(() => {
-    clearRailCloseTimer();
-    railCloseTimerRef.current = window.setTimeout(() => {
-      railCloseTimerRef.current = null;
-      setSidebarOpen(false);
-    }, 180);
-  }, [clearRailCloseTimer]);
-
-  useEffect(() => () => clearRailCloseTimer(), [clearRailCloseTimer]);
-
-  const onRailZoneEnter = useCallback(() => {
-    if (!useRailSidebar || !canFinePointerHover) return;
-    clearRailCloseTimer();
-    setSidebarOpen(true);
-  }, [useRailSidebar, canFinePointerHover, clearRailCloseTimer]);
-
-  const onRailZoneLeave = useCallback(() => {
-    if (!useRailSidebar || !canFinePointerHover) return;
-    scheduleRailClose();
-  }, [useRailSidebar, canFinePointerHover, scheduleRailClose]);
-
-  const toggleRailSidebar = useCallback(
-    (event) => {
-      event?.stopPropagation?.();
-      clearRailCloseTimer();
-      setSidebarOpen((open) => !open);
-    },
-    [clearRailCloseTimer],
-  );
 
   const scrollGeminiMessagesToBottom = useCallback(() => {
     const el = messagesScrollRef.current;
@@ -797,151 +738,58 @@ function LiquAiChatPanel({
           </aside>
         ) : null}
 
-        {useRailSidebar ? (
-          <div
-            className="relative z-[102] hidden h-full w-[3.25rem] shrink-0 lg:block"
-            onMouseEnter={onRailZoneEnter}
-            onMouseLeave={onRailZoneLeave}
-          >
-            <nav
-              className="relative z-[104] flex h-full w-[3.25rem] flex-col border-r border-slate-800 bg-slate-950 py-2"
-              aria-label="Liqu AI navigation"
-            >
-              <button
-                type="button"
-                className={railBtnClass}
-                aria-expanded={sidebarOpen}
-                aria-label={sidebarOpen ? 'Close chat history' : 'Open chat history'}
-                aria-controls="liqu-ai-conversations-drawer"
-                id="liqu-ai-conversations-trigger"
-                onClick={toggleRailSidebar}
-              >
-                <Menu className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
-              </button>
-              <button
-                type="button"
-                className={railBtnClass}
-                aria-label="New chat"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearRailCloseTimer();
-                  startNewChat();
-                }}
-              >
-                <SquarePen className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
-              </button>
-              <div className="min-h-6 flex-1" aria-hidden />
-              <button
-                type="button"
-                className={railBtnClass}
-                aria-expanded={sidebarOpen}
-                aria-controls="liqu-ai-conversations-drawer"
-                aria-label={sidebarOpen ? 'Close chat history' : 'Open chat history'}
-                onClick={toggleRailSidebar}
-              >
-                <History className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
-              </button>
-              <button
-                type="button"
-                className={`${railBtnClass} cursor-not-allowed opacity-40`}
-                disabled
-                title="Coming soon"
-                aria-label="Settings (coming soon)"
-              >
-                <Settings className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
-              </button>
-            </nav>
-            <div
-              id="liqu-ai-conversations-drawer"
-              aria-labelledby="liqu-ai-conversations-trigger"
-              aria-hidden={!sidebarOpen}
-              className={`absolute left-full top-0 z-[103] flex h-full w-[min(19rem,calc(100vw-5rem))] flex-col overflow-hidden border-r border-slate-800/90 bg-slate-950 shadow-[8px_0_32px_rgba(0,0,0,0.45)] motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out motion-reduce:transition-none ${
-                sidebarOpen
-                  ? 'translate-x-0'
-                  : 'pointer-events-none -translate-x-full'
-              }`}
-            >
-              <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-                <div className="shrink-0 px-3 pb-2 pt-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="font-display text-[15px] font-semibold tracking-tight text-slate-100">
-                        Conversations
-                      </h3>
-                      <p className="mt-0.5 text-[11px] text-slate-500">
-                        {sessions.length}{' '}
-                        {sessions.length === 1 ? 'chat' : 'chats'} saved
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        clearRailCloseTimer();
-                        setSidebarOpen(false);
-                      }}
-                      className="rounded-full p-2 text-slate-400 transition hover:bg-slate-800 hover:text-slate-200"
-                      aria-label="Close"
-                    >
-                      <X className="h-4 w-4" strokeWidth={2} />
-                    </button>
-                  </div>
-                </div>
-                <SessionSidebar
-                  sessions={sessions}
-                  activeSessionId={activeSessionId}
-                  onNew={startNewChat}
-                  onLoad={loadSession}
-                  onDelete={deleteSession}
-                  variant={variant}
-                  layout="railOverlay"
-                />
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {sidebarOpen && !useInlineSidebar && !useRailSidebar ? (
-          <div className="fixed inset-0 z-[130] flex">
+          <div className="fixed inset-0 z-[130] flex justify-start">
             <button
               type="button"
               className={
-                isGemini
-                  ? 'absolute inset-0 cursor-default bg-slate-900/30 backdrop-blur-[2px] dark:bg-black/60'
-                  : 'absolute inset-0 cursor-default bg-black/40 backdrop-blur-[2px] transition-opacity dark:bg-black/50'
+                useStudyMobileHistory
+                  ? 'absolute inset-0 cursor-default bg-slate-950/30 backdrop-blur-[2px]'
+                  : isGemini
+                    ? 'absolute inset-0 cursor-default bg-slate-900/30 backdrop-blur-[2px] dark:bg-black/60'
+                    : 'absolute inset-0 cursor-default bg-black/40 backdrop-blur-[2px] transition-opacity dark:bg-black/50'
               }
               onClick={() => setSidebarOpen(false)}
               aria-label="Close chat history"
             />
             <div
               className={
-                isGemini
-                  ? 'relative z-10 flex h-full w-full max-w-[min(100%,20rem)] flex-col border-r border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-none sm:w-72'
-                  : 'relative z-10 flex h-full w-full max-w-[min(100%,20rem)] flex-col border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] shadow-2xl dark:border-slate-700/90 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.99)_0%,rgba(15,23,42,0.97)_100%)] sm:max-w-none sm:w-72'
+                useStudyMobileHistory
+                  ? 'relative z-10 flex h-full w-[min(17.25rem,88vw)] shrink-0 flex-col overflow-hidden border border-white/10 bg-slate-950/40 shadow-[8px_0_40px_rgba(0,0,0,0.35)] backdrop-blur-2xl dark:bg-slate-950/45'
+                  : isGemini
+                    ? 'relative z-10 flex h-full w-full max-w-[min(100%,20rem)] flex-col border-r border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900 sm:max-w-none sm:w-72'
+                    : 'relative z-10 flex h-full w-full max-w-[min(100%,20rem)] flex-col border-r border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] shadow-2xl dark:border-slate-700/90 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.99)_0%,rgba(15,23,42,0.97)_100%)] sm:max-w-none sm:w-72'
               }
             >
               <div
                 className={
-                  isGemini
-                    ? 'shrink-0 border-b border-slate-200 px-4 py-3 dark:border-slate-700'
-                    : 'shrink-0 border-b border-slate-200/90 px-4 py-3 dark:border-slate-700/80'
+                  useStudyMobileHistory
+                    ? 'shrink-0 border-b border-white/10 px-3 py-3'
+                    : isGemini
+                      ? 'shrink-0 border-b border-slate-200 px-4 py-3 dark:border-slate-700'
+                      : 'shrink-0 border-b border-slate-200/90 px-4 py-3 dark:border-slate-700/80'
                 }
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <h3
                       className={
-                        isGemini
-                          ? 'font-display text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100'
-                          : 'font-display text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-50'
+                        useStudyMobileHistory
+                          ? 'font-display text-[15px] font-semibold tracking-tight text-slate-100'
+                          : isGemini
+                            ? 'font-display text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-100'
+                            : 'font-display text-[15px] font-semibold tracking-tight text-slate-900 dark:text-slate-50'
                       }
                     >
                       Conversations
                     </h3>
                     <p
                       className={
-                        isGemini
-                          ? 'mt-0.5 text-[11px] text-slate-500 dark:text-slate-400'
-                          : 'mt-0.5 text-[11px] text-slate-500 dark:text-slate-400'
+                        useStudyMobileHistory
+                          ? 'mt-0.5 text-[11px] text-slate-400'
+                          : isGemini
+                            ? 'mt-0.5 text-[11px] text-slate-500 dark:text-slate-400'
+                            : 'mt-0.5 text-[11px] text-slate-500 dark:text-slate-400'
                       }
                     >
                       {sessions.length}{' '}
@@ -952,23 +800,33 @@ function LiquAiChatPanel({
                     type="button"
                     onClick={() => setSidebarOpen(false)}
                     className={
-                      isGemini
-                        ? 'rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                        : 'rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800'
+                      useStudyMobileHistory
+                        ? 'rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-200'
+                        : isGemini
+                          ? 'rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                          : 'rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800'
                     }
                     aria-label="Close"
                   >
-                    <X className="h-4 w-4" />
+                    <X className="h-4 w-4" strokeWidth={2} />
                   </button>
                 </div>
               </div>
               <SessionSidebar
                 sessions={sessions}
                 activeSessionId={activeSessionId}
-                onNew={startNewChat}
-                onLoad={loadSession}
+                onNew={() => {
+                  startNewChat();
+                  if (useStudyMobileHistory) setSidebarOpen(false);
+                }}
+                onLoad={(sessionId, opts) => {
+                  loadSession(sessionId, opts);
+                  if (useStudyMobileHistory) setSidebarOpen(false);
+                }}
                 onDelete={deleteSession}
                 variant={variant}
+                layout={useStudyMobileHistory ? 'railOverlay' : 'default'}
+                deleteButtonsAlwaysVisible={useStudyMobileHistory}
               />
             </div>
           </div>
@@ -979,11 +837,103 @@ function LiquAiChatPanel({
             isGemini
               ? `flex w-full min-w-0 flex-1 flex-col px-0 pb-0 pt-1 md:px-1 ${
                   isStudyWorkspace ? 'min-h-0' : 'min-h-[20rem]'
-                } ${useRailSidebar ? 'relative' : ''}`
+                } ${useRailSidebar ? 'relative min-h-0 overflow-hidden' : ''}`
               : 'flex min-h-[20rem] w-full min-w-0 flex-1 flex-col p-3 md:p-4'
           }
         >
-          {!(isGemini && useRailSidebar) ? (
+          {useRailSidebar ? (
+            <>
+              <button
+                type="button"
+                aria-expanded={sidebarOpen}
+                aria-controls="liqu-ai-rail-slide"
+                id="liqu-ai-rail-trigger"
+                onClick={toggleRailSidebar}
+                className="pointer-events-auto absolute left-2.5 top-[max(0.25rem,env(safe-area-inset-top))] z-[112] flex h-10 w-10 items-center justify-center rounded-xl border border-white/20 bg-white/15 text-slate-900 shadow-[0_8px_32px_-6px_rgba(0,0,0,0.35)] backdrop-blur-2xl transition hover:bg-white/25 active:scale-[0.97] dark:border-white/12 dark:bg-slate-950/25 dark:text-slate-50 dark:shadow-black/40 dark:hover:bg-slate-900/40"
+                aria-label={
+                  sidebarOpen ? 'Close chat history' : 'Open chat history'
+                }
+              >
+                <Menu className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
+              </button>
+              {sidebarOpen ? (
+                <>
+                  <button
+                    type="button"
+                    className="absolute inset-0 z-[110] cursor-default bg-slate-950/[0.08] backdrop-blur-[2px] dark:bg-black/15"
+                    aria-label="Close chat history"
+                    onClick={() => setSidebarOpen(false)}
+                  />
+                  <aside
+                    id="liqu-ai-rail-slide"
+                    aria-labelledby="liqu-ai-rail-trigger"
+                    className="absolute left-0 top-0 z-[111] flex h-full w-[min(19rem,calc(100%-2.5rem))] max-w-[21rem] flex-col overflow-hidden border-r border-white/12 bg-slate-950/25 shadow-[16px_0_60px_-12px_rgba(0,0,0,0.35)] backdrop-blur-3xl dark:border-white/10 dark:bg-slate-950/35 dark:shadow-black/50"
+                  >
+                    <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+                      <div className="shrink-0 border-b border-white/10 px-3 pb-2 pt-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <h3 className="font-display text-[15px] font-semibold tracking-tight text-slate-50">
+                              Conversations
+                            </h3>
+                            <p className="mt-0.5 text-[11px] text-slate-400">
+                              {sessions.length}{' '}
+                              {sessions.length === 1 ? 'chat' : 'chats'} saved
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSidebarOpen(false)}
+                            className="rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
+                            aria-label="Close"
+                          >
+                            <X className="h-4 w-4" strokeWidth={2} />
+                          </button>
+                        </div>
+                      </div>
+                      <SessionSidebar
+                        sessions={sessions}
+                        activeSessionId={activeSessionId}
+                        onNew={() => {
+                          startNewChat();
+                          setSidebarOpen(false);
+                        }}
+                        onLoad={loadSession}
+                        onDelete={deleteSession}
+                        variant={variant}
+                        layout="railOverlay"
+                      />
+                    </div>
+                  </aside>
+                </>
+              ) : null}
+            </>
+          ) : null}
+          {isGemini && isStudyWorkspace && !isLgUp && !useRailSidebar ? (
+            <div className="mb-1.5 flex items-center justify-between gap-2 px-1 py-0.5">
+              <button
+                type="button"
+                onClick={() => setSidebarOpen(true)}
+                className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+                aria-label="Chat history"
+              >
+                <Menu className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
+              </button>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">
+                Liqu AI
+              </span>
+              <button
+                type="button"
+                onClick={startNewChat}
+                className="inline-flex shrink-0 items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
+                aria-label="New chat"
+              >
+                <SquarePen className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          ) : null}
+          {!(isGemini && useRailSidebar) &&
+          !(isGemini && isStudyWorkspace && !isLgUp) ? (
             <div
               className={
                 isGemini
@@ -1161,8 +1111,12 @@ function LiquAiChatPanel({
                 ? `min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
                     studyDense
                       ? 'p-1.5 pb-28 md:p-1 md:pb-28'
-                      : 'p-2 pb-28 md:p-1 md:pb-28'
-                  }`
+                      : `${
+                          isStudyWorkspace && !isLgUp
+                            ? 'p-2 pb-[calc(10rem+env(safe-area-inset-bottom))] md:p-1 md:pb-28'
+                            : 'p-2 pb-28 md:p-1 md:pb-28'
+                        }`
+                  }${useRailSidebar ? ' pt-11' : ''}`
                 : 'min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,250,252,0.85)_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.65)_0%,rgba(15,23,42,0.45)_100%)]'
             }
           >
@@ -1170,7 +1124,13 @@ function LiquAiChatPanel({
               {isStarterState && hasQuickPrompts ? (
                 <>
                   {isStudyWorkspace ? (
-                    <div className="mx-auto w-full max-w-lg space-y-4 px-0.5">
+                    <div
+                      className={`mx-auto w-full max-w-lg space-y-4 px-2 sm:px-0.5 ${
+                        !isLgUp && isStarterState
+                          ? 'flex min-h-[min(58dvh,30rem)] flex-col justify-center py-6 sm:py-10 lg:min-h-0 lg:justify-start lg:py-0'
+                          : ''
+                      }`}
+                    >
                       <div className="flex flex-wrap items-end justify-between gap-3">
                         <div className="min-w-0 space-y-1">
                           <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-500">
@@ -1351,14 +1311,30 @@ function LiquAiChatPanel({
           </div>
 
           <div
-            className={`relative shrink-0 ${isGemini ? 'z-10 px-3 pb-3 pt-1' : ''}`}
+            className={`relative shrink-0 ${
+              isGemini
+                ? isStudyWorkspace && !isLgUp
+                  ? 'z-10 border-t border-slate-200/25 bg-white/50 px-1 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-lg dark:border-white/[0.07] dark:bg-slate-950/45'
+                  : 'z-10 px-3 pb-3 pt-1'
+                : ''
+            }`}
           >
           <form onSubmit={sendMessage} className={isGemini ? 'mt-0 w-full' : 'mt-3'}>
             {isGemini ? (
-              <div className="mx-auto w-full max-w-md px-2 sm:px-3">
+              <div
+                className={
+                  isStudyWorkspace && !isLgUp
+                    ? 'mx-auto w-full max-w-none px-2 sm:px-3'
+                    : 'mx-auto w-full max-w-md px-2 sm:px-3'
+                }
+              >
                 <div
                   ref={attachMenuContainerRef}
-                  className="relative rounded-full border border-slate-200/50 bg-white/55 px-2 py-1.5 shadow-md shadow-slate-900/[0.07] ring-1 ring-slate-900/[0.04] backdrop-blur-md dark:border-slate-600/30 dark:bg-slate-950/40 dark:shadow-black/20 dark:ring-white/[0.05]"
+                  className={
+                    isStudyWorkspace && !isLgUp
+                      ? 'relative rounded-2xl border border-slate-200/55 bg-white/70 px-2 py-2 shadow-lg shadow-slate-900/[0.08] ring-1 ring-slate-900/[0.05] backdrop-blur-md dark:border-slate-600/35 dark:bg-slate-950/50 dark:shadow-black/25 dark:ring-white/[0.06]'
+                      : 'relative rounded-full border border-slate-200/50 bg-white/55 px-2 py-1.5 shadow-md shadow-slate-900/[0.07] ring-1 ring-slate-900/[0.04] backdrop-blur-md dark:border-slate-600/30 dark:bg-slate-950/40 dark:shadow-black/20 dark:ring-white/[0.05]'
+                  }
                 >
                   {attachmentChipNames.length > 0 ? (
                     <div className="mb-1 flex flex-wrap gap-1 border-b border-slate-200/40 pb-1.5 dark:border-white/[0.06]">
@@ -1462,19 +1438,6 @@ function LiquAiChatPanel({
                         </button>
                       </div>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming soon"
-                      className="flex shrink-0 cursor-not-allowed rounded-full p-1.5 text-slate-400 opacity-65 dark:text-slate-500"
-                      aria-label="Tools (coming soon)"
-                    >
-                      <SlidersHorizontal
-                        className="h-[14px] w-[14px]"
-                        strokeWidth={2}
-                        aria-hidden
-                      />
-                    </button>
                     <textarea
                       ref={inputRef}
                       value={draft}
@@ -1571,22 +1534,6 @@ function LiquAiChatPanel({
           ) : null}
           </div>
           </div>
-
-          {useRailSidebar && sidebarOpen ? (
-            <button
-              type="button"
-              className={
-                isGemini
-                  ? 'absolute inset-0 z-[101] cursor-default bg-slate-900/35 backdrop-blur-[1.5px] dark:bg-black/50'
-                  : ''
-              }
-              aria-label="Close chat history"
-              onClick={() => {
-                clearRailCloseTimer();
-                setSidebarOpen(false);
-              }}
-            />
-          ) : null}
         </div>
       </div>
     </div>
@@ -1671,6 +1618,7 @@ function SessionSidebar({
   onDelete,
   variant = 'default',
   layout = 'default',
+  deleteButtonsAlwaysVisible = false,
 }) {
   const isGemini = variant === 'gemini';
   const isRailOverlay = layout === 'railOverlay';
@@ -1818,10 +1766,22 @@ function SessionSidebar({
                       }}
                       className={
                         isRailOverlay
-                          ? 'absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-500 opacity-0 transition hover:bg-rose-500/15 hover:text-rose-300 group-hover:opacity-100'
+                          ? `absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1.5 text-slate-400 transition hover:bg-rose-500/15 hover:text-rose-300 ${
+                              deleteButtonsAlwaysVisible
+                                ? 'opacity-100'
+                                : 'opacity-0 group-hover:opacity-100 lg:opacity-0 lg:group-hover:opacity-100'
+                            }`
                           : isGemini
-                            ? 'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-rose-100 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-500/15 dark:hover:text-rose-300'
-                            : 'absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 dark:hover:bg-rose-950/40 dark:hover:text-rose-400'
+                            ? `absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 transition hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-500/15 dark:hover:text-rose-300 ${
+                                deleteButtonsAlwaysVisible
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              }`
+                            : `absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/40 dark:hover:text-rose-400 ${
+                                deleteButtonsAlwaysVisible
+                                  ? 'opacity-100'
+                                  : 'opacity-0 group-hover:opacity-100'
+                              }`
                       }
                       aria-label="Delete session"
                     >

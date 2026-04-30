@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, ChevronDown, Sparkles } from 'lucide-react';
+import { ArrowLeft, BookOpen, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
@@ -7,8 +7,6 @@ import { HUB_QUICK_PROMPTS } from '../constants/supportPrompts';
 import { fetchLibraryBooks } from '../utils/books';
 
 const SPLIT_LEFT_PCT_KEY = 'studyBuddy.splitLeftPct';
-const MOBILE_READER_OPEN_KEY = 'studyBuddy.mobileReaderOpen';
-
 const DEFAULT_SPLIT_PCT = 52;
 const SPLIT_MIN = 22;
 const SPLIT_MAX = 72;
@@ -31,17 +29,6 @@ function readSplitPct() {
     return Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, n));
   } catch {
     return DEFAULT_SPLIT_PCT;
-  }
-}
-
-function readMobileReaderOpen() {
-  if (typeof window === 'undefined') return true;
-  try {
-    const v = window.localStorage.getItem(MOBILE_READER_OPEN_KEY);
-    if (v === null) return true;
-    return v === '1';
-  } catch {
-    return true;
   }
 }
 
@@ -68,7 +55,7 @@ function StudyBuddy() {
   const [error, setError] = useState('');
   const [selectedBookId, setSelectedBookId] = useState('');
   const [splitLeftPct, setSplitLeftPct] = useState(readSplitPct);
-  const [mobileReaderOpen, setMobileReaderOpen] = useState(readMobileReaderOpen);
+  const [mobileMaterialOpen, setMobileMaterialOpen] = useState(false);
   const [readerFocusRead, setReaderFocusRead] = useState(false);
   const splitBeforeFocusRef = useRef(null);
   const readerFocusReadRef = useRef(false);
@@ -139,15 +126,6 @@ function StudyBuddy() {
   const persistSplit = useCallback((pct) => {
     try {
       window.localStorage.setItem(SPLIT_LEFT_PCT_KEY, String(Math.round(pct)));
-    } catch {
-      /* ignore */
-    }
-  }, []);
-
-  const setMobileReaderOpenPersist = useCallback((value) => {
-    setMobileReaderOpen(value);
-    try {
-      window.localStorage.setItem(MOBILE_READER_OPEN_KEY, value ? '1' : '0');
     } catch {
       /* ignore */
     }
@@ -243,7 +221,7 @@ function StudyBuddy() {
       className={`liqu-ai-ambient page-surface relative z-10 flex h-[calc(100dvh-5.5rem)] max-h-[calc(100dvh-5.5rem)] min-h-0 flex-col overflow-hidden text-slate-900 dark:text-slate-100 ${
         readerFocusRead && isLg
           ? 'px-2 pb-4 pt-2 md:px-3 md:pt-3'
-          : 'px-4 pb-8 pt-6 md:px-6 md:pt-8'
+          : 'px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-4 md:px-6 md:pb-8 md:pt-8 lg:px-6 lg:pb-8 lg:pt-8'
       }`}
     >
       <section
@@ -273,6 +251,7 @@ function StudyBuddy() {
             </div>
           ) : (
             <>
+              <div className="flex w-full flex-wrap items-end justify-between gap-3 lg:contents">
               <div className="flex min-w-0 flex-1 items-center gap-3">
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-600 shadow-sm ring-1 ring-slate-200 dark:bg-slate-900 dark:text-blue-400 dark:ring-slate-700">
                   <Sparkles className="h-5 w-5" strokeWidth={2} aria-hidden />
@@ -295,6 +274,15 @@ function StudyBuddy() {
                   </div>
                 </div>
               </div>
+              <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:w-auto sm:justify-normal">
+              <button
+                type="button"
+                onClick={() => setMobileMaterialOpen(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800 lg:hidden"
+              >
+                <BookOpen className="h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                Material
+              </button>
               <Link
                 to="/liqu-ai"
                 className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-800 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
@@ -302,6 +290,8 @@ function StudyBuddy() {
                 <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden />
                 Back to Liqu AI
               </Link>
+              </div>
+              </div>
             </>
           )}
         </header>
@@ -333,14 +323,14 @@ function StudyBuddy() {
             className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden lg:flex-row lg:items-stretch"
           >
             <article
-              className="flex min-h-0 w-full shrink-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-950 lg:min-w-0"
+              className="flex min-h-0 w-full shrink-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent shadow-none lg:min-w-0 lg:rounded-2xl lg:border lg:border-slate-200 lg:bg-white lg:shadow-sm dark:bg-transparent dark:lg:border-slate-700 dark:lg:bg-slate-950"
               style={
                 isLg
                   ? { flex: `0 0 ${splitLeftPct}%`, maxWidth: '100%', minWidth: 0 }
                   : undefined
               }
             >
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 px-2 pb-3 pt-2 dark:bg-slate-950 md:px-3 md:pb-4">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-50 pb-[max(0.25rem,env(safe-area-inset-bottom))] pt-0 dark:bg-slate-950 lg:px-3 lg:pb-4 lg:pt-2">
                 <LiquAiChatPanel
                   variant="gemini"
                   bookTitle={selectedBook?.title ?? ''}
@@ -385,35 +375,9 @@ function StudyBuddy() {
               <span className="my-3 w-px flex-1 bg-slate-200 transition group-hover:bg-blue-400/80 dark:bg-slate-600 dark:group-hover:bg-blue-500/80" />
             </div>
 
-            <div className="mt-4 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:mt-0">
+            <div className="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex lg:mt-0">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <button
-                  type="button"
-                  aria-expanded={mobileReaderOpen}
-                  onClick={() =>
-                    setMobileReaderOpenPersist(!mobileReaderOpen)
-                  }
-                  className="flex w-full items-center justify-between gap-2 border-b border-slate-200 bg-slate-50/90 px-4 py-3 text-left dark:border-slate-700 dark:bg-slate-900 lg:hidden"
-                >
-                  <span className="flex items-center gap-2 font-display text-sm font-semibold text-slate-900 dark:text-slate-100">
-                    <BookOpen className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    Study material
-                  </span>
-                  <ChevronDown
-                    className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${
-                      mobileReaderOpen ? 'rotate-180' : ''
-                    }`}
-                    aria-hidden
-                  />
-                </button>
-
-                <div
-                  className={
-                    mobileReaderOpen
-                      ? 'flex min-h-0 min-h-[min(60vh,32rem)] flex-1 flex-col p-4 lg:min-h-0 lg:flex-1 lg:p-5'
-                      : 'hidden min-h-0 flex-1 flex-col p-4 lg:flex lg:min-h-0 lg:flex-1 lg:p-5'
-                  }
-                >
+                <div className="flex min-h-0 flex-1 flex-col p-5">
                   <ReadAlongPanel
                     {...readAlongPanelProps}
                     showPageTitle={false}
@@ -423,6 +387,34 @@ function StudyBuddy() {
             </div>
           </div>
         )}
+        {!isLg && mobileMaterialOpen && !loading && !error ? (
+          <div
+            className="fixed inset-0 z-[200] flex flex-col bg-black/35 backdrop-blur-[3px]"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Study material"
+          >
+            <div className="flex items-center justify-between gap-3 border-b border-white/15 bg-slate-950/55 px-4 py-3 backdrop-blur-md">
+              <span className="font-display text-sm font-semibold text-white">
+                Study material
+              </span>
+              <button
+                type="button"
+                onClick={() => setMobileMaterialOpen(false)}
+                className="rounded-full p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                aria-label="Close study material"
+              >
+                <X className="h-5 w-5" strokeWidth={2} />
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto bg-slate-950/75 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
+              <ReadAlongPanel
+                {...readAlongPanelProps}
+                showPageTitle={false}
+              />
+            </div>
+          </div>
+        ) : null}
       </section>
     </div>
   );
