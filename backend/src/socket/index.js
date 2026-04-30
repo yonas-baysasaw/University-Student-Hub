@@ -8,6 +8,7 @@ import {
   markOffline,
   markOnline,
 } from '../services/presenceService.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 import { authenticateSocket } from './middleware/jwt.js';
 
 const _getMemberIds = (chat) => chat.members.map((member) => member.toString());
@@ -112,6 +113,8 @@ export const initSocketServer = async (server, sessionMiddleware) => {
             throw new Error('You are not a member of this chat');
           }
 
+          assertCanWrite(user);
+
           const message = await Message.create({
             chat: chatId,
             sender: user._id,
@@ -190,6 +193,7 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     // ── AI streaming chat ────────────────────────────────────────────────────
     socket.on('ai:chat', async ({ messages, sessionId, bookId }) => {
       try {
+        assertCanWrite(user);
         if (!Array.isArray(messages) || messages.length === 0) {
           socket.emit('ai:error', { message: 'messages array is required' });
           return;

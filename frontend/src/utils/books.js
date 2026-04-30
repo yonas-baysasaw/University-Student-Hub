@@ -22,6 +22,7 @@ export function mapBookToResource(book, index = 0) {
     bookUrl: book?.bookUrl ?? '',
     thumbnailUrl: book?.thumbnailUrl ?? '',
     likesCount: Number.isFinite(book?.likesCount) ? book.likesCount : 0,
+    ragIndexStatus: book?.ragIndexStatus ?? 'idle',
     downloadsCount: Number.isFinite(book?.downloadsCount)
       ? book.downloadsCount
       : Number.isFinite(book?.downloadCount)
@@ -48,8 +49,20 @@ export function mapBookToResource(book, index = 0) {
   };
 }
 
-export async function fetchLibraryBooks(signal) {
-  const res = await fetch('/api/books', { credentials: 'include', signal });
+export async function fetchLibraryBooks(signal, queryParams) {
+  const qs = new URLSearchParams();
+  if (queryParams && typeof queryParams === 'object') {
+    for (const [k, v] of Object.entries(queryParams)) {
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        qs.set(k, String(v));
+      }
+    }
+  }
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  const res = await fetch(`/api/books${suffix}`, {
+    credentials: 'include',
+    signal,
+  });
   if (!res.ok) {
     throw new Error('Failed to fetch books.');
   }

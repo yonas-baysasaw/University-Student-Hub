@@ -6,6 +6,8 @@ import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import { serializeCurrentUser } from '../utils/userSerializer.js';
+import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
 const router = express.Router();
 
@@ -77,6 +79,7 @@ router.get(
 router.post(
   '/public/:userId/subscribe',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { userId } = req.params;
 
@@ -148,14 +151,13 @@ router.post(
 router.get('/', ensureAuth, (req, res) => {
   const photo = req.user.avatar;
   const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
-  const displayName = req.user.name || req.user.username || '';
 
   res.json({
     id: req.user._id,
     username: req.user.username,
     name: req.user.name,
     email: req.user.email,
-    displayName,
+    displayName: req.user.displayName,
     provider: req.user.provider,
     photo,
     avatar: req.user.avatar || null,
@@ -293,6 +295,7 @@ router.get(
 router.put(
   '/password',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { currentPassword, newPassword } = req.body;
 
@@ -334,6 +337,7 @@ router.put(
 router.put(
   '/',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { username, name, displayName, avatar } = req.body || {};
 
@@ -409,6 +413,7 @@ router.put(
 router.delete(
   '/',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res, next) => {
     await req.user.deleteOne();
 
@@ -423,6 +428,7 @@ router.delete(
 router.post(
   '/api-key',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { geminiApiKey = '', geminiModelId = '' } = req.body;
     req.user.geminiApiKey = geminiApiKey.trim();
@@ -436,6 +442,7 @@ router.post(
 router.delete(
   '/api-key',
   ensureAuth,
+  blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     req.user.geminiApiKey = '';
     req.user.geminiModelId = '';

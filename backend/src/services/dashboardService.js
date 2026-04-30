@@ -52,17 +52,35 @@ export async function getRecentAnnouncementsForUser(userId, limit) {
     .limit(limit)
     .lean();
 
-  return rows.map((a) => ({
-    id: String(a._id),
-    title: a.title,
-    bodyPreview: truncateBody(a.body),
-    classroomName: nameById.get(String(a.chat)) || 'Classroom',
-    chatId: String(a.chat),
-    author: a.authorName || 'Instructor',
-    createdAt: a.createdAt
-      ? new Date(a.createdAt).toISOString()
-      : new Date().toISOString(),
-  }));
+  return rows.map((a) => {
+    const imp =
+      typeof a.importance === 'number' &&
+      a.importance >= 0 &&
+      a.importance <= 2
+        ? a.importance
+        : 0;
+    const kind =
+      a.kind === 'exam' || a.kind === 'assignment' ? a.kind : 'statement';
+    let expiresAtIso = null;
+    if (a.expiresAt) {
+      const t = new Date(a.expiresAt).getTime();
+      if (!Number.isNaN(t)) expiresAtIso = new Date(a.expiresAt).toISOString();
+    }
+    return {
+      id: String(a._id),
+      title: a.title,
+      bodyPreview: truncateBody(a.body),
+      classroomName: nameById.get(String(a.chat)) || 'Classroom',
+      chatId: String(a.chat),
+      author: a.authorName || 'Instructor',
+      importance: imp,
+      kind,
+      expiresAt: expiresAtIso,
+      createdAt: a.createdAt
+        ? new Date(a.createdAt).toISOString()
+        : new Date().toISOString(),
+    };
+  });
 }
 
 /**

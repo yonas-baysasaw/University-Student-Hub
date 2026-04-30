@@ -1,9 +1,9 @@
-/** Study buddy (no book) — longer starters. */
+/** Study buddy (no book) — horizontal quick-start pills (short labels). */
 export const HUB_QUICK_PROMPTS = [
-  'Help me catch up: what to look for in new classroom announcements and what to do first.',
-  'A new file or resource was added in class—how should I skim it, take notes, and what should I ask?',
-  'Puzzle together announcements, new uploads, and due dates for my classes this week in one plan.',
-  'I might have missed an update: what should I double-check in announcements, resources, and assignments?',
+  'New announcements — catch me up.',
+  "What's new in my resources?",
+  'This week: deadlines & uploads.',
+  'Did I miss anything important?',
 ];
 
 /**

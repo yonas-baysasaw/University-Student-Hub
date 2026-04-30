@@ -8,7 +8,7 @@ import {
   Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import ClassroomCardMenu from '../components/ClassroomCardMenu.jsx';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
@@ -34,6 +34,8 @@ async function copyInvitationCode(code) {
 
 function ClassRoom() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -75,6 +77,19 @@ function ClassRoom() {
   useEffect(() => {
     fetchChats();
   }, [fetchChats]);
+
+  useEffect(() => {
+    const raw =
+      searchParams.get('invite')?.trim() ||
+      searchParams.get('code')?.trim();
+    if (!raw) return;
+    setJoinCode(raw);
+    setShowJoinModal(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('invite');
+    next.delete('code');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   useEffect(() => {
     if (editClassroom) setEditName(editClassroom.name);
@@ -154,13 +169,20 @@ function ClassRoom() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ invitationCode: trimmedCode }),
       });
-      await readJsonOrThrow(response, 'Unable to join classroom');
+      const joinedChat = await readJsonOrThrow(
+        response,
+        'Unable to join classroom',
+      );
 
       setShowJoinModal(false);
       setJoinCode('');
       toast.success('You joined the classroom.');
       await fetchChats();
       notifyClassroomsChanged();
+      const joinedId = joinedChat?._id ?? joinedChat?.id;
+      if (joinedId) {
+        navigate(`/classroom/${joinedId}`, { replace: true });
+      }
     } catch (submitError) {
       setJoinError(submitError.message);
     } finally {
@@ -261,6 +283,7 @@ function ClassRoom() {
           <ClassroomCardMenu
             classroomId={id}
             classroomName={classroom.name}
+            invitationCode={classroom.invitationCode}
             archived={archived}
             canManage={manage}
             canSchedule={canSchedule}
@@ -706,7 +729,8 @@ function ClassRoom() {
                   Join with code
                 </h3>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Paste the invitation from your instructor or group chat.
+                  Enter the invitation code from your instructor (invite links
+                  open this screen with the code filled in — confirm and tap Join).
                 </p>
               </div>
             </div>

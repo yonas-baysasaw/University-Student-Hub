@@ -6,7 +6,9 @@ import {
   getExamController,
   getQuestionsController,
   listExamsController,
+  reactToExamController,
   submitAttemptController,
+  toggleSaveExamController,
   updateExamController,
   uploadExamController,
 } from '../controllers/examController.js';
@@ -26,6 +28,8 @@ const router = Router();
 router.use(isAuthenticated);
 
 router.post('/upload', pdfUpload.single('pdf'), uploadExamController);
+router.post('/:examId/react', reactToExamController);
+router.post('/:examId/save', toggleSaveExamController);
 router.get('/', listExamsController);
 router.get('/:examId', getExamController);
 router.patch('/:examId', updateExamController);

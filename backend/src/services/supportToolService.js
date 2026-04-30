@@ -121,6 +121,10 @@ function mapResourceForModel(r, classroomName) {
   return {
     classroom: classroomName,
     title: r.title,
+    category: r.category || 'other',
+    descriptionSnippet: r.description
+      ? trimSnippet(String(r.description), 160)
+      : null,
     by,
     when,
     linkText,
@@ -129,12 +133,39 @@ function mapResourceForModel(r, classroomName) {
 }
 
 function mapAnnouncementForModel(a, classroomName) {
+  const imp =
+    typeof a.importance === 'number' &&
+    a.importance >= 0 &&
+    a.importance <= 2
+      ? a.importance
+      : 0;
+  const kind =
+    a.kind === 'exam' || a.kind === 'assignment' ? a.kind : 'statement';
+  let expiresAtIso = null;
+  let isExpired = false;
+  const now = Date.now();
+  if (a.expiresAt) {
+    const t = new Date(a.expiresAt).getTime();
+    if (!Number.isNaN(t)) {
+      expiresAtIso = new Date(a.expiresAt).toISOString();
+      isExpired = t < now;
+    }
+  }
   return {
     classroom: classroomName,
     title: a.title,
     by: a.authorName || 'Instructor',
     when: formatWhen(a.createdAt),
     preview: trimSnippet(a.body || '', MAX_ANN_SNIPPET),
+    importance: imp,
+    importanceLabel:
+      imp >= 2 ? 'urgent' : imp >= 1 ? 'highlight' : 'normal',
+    kind,
+    expiresAt: expiresAtIso,
+    expiresSummary: expiresAtIso
+      ? `${isExpired ? 'Expired (was relevant until)' : 'Relevant until'} ${formatWhen(a.expiresAt)}`
+      : null,
+    isExpired,
   };
 }
 

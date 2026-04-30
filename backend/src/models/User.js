@@ -59,6 +59,26 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    role: {
+      type: String,
+      enum: ['user', 'staff'],
+      default: 'user',
+      index: true,
+    },
+    accountType: {
+      type: String,
+      enum: ['student', 'instructor'],
+      default: 'student',
+      index: true,
+    },
+    platformReadOnly: {
+      type: Boolean,
+      default: false,
+    },
+    instructorPostingSuspended: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );

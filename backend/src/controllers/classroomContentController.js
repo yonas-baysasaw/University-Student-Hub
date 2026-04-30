@@ -12,6 +12,7 @@ import {
   isChatMember,
   loadChatForClassroomRequest,
 } from '../utils/classroomContentAuth.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 function authorLabel(user) {
   return (
@@ -50,6 +51,82 @@ function assertCanManage(chat, userId) {
   }
 }
 
+const RESOURCE_CATEGORIES = new Set([
+  'syllabus',
+  'reading',
+  'lecture',
+  'lab',
+  'reference',
+  'other',
+]);
+
+function normalizeResourceCategory(raw) {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  return RESOURCE_CATEGORIES.has(s) ? s : 'other';
+}
+
+function normalizeResourceDescription(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.trim().slice(0, 2000);
+}
+
+function clampAnnouncementImportance(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(2, Math.max(0, Math.floor(n)));
+}
+
+const ANNOUNCEMENT_KINDS = new Set(['statement', 'assignment', 'exam']);
+
+function clampAnnouncementKind(raw) {
+  const s = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return ANNOUNCEMENT_KINDS.has(s) ? s : 'statement';
+}
+
+function announcementToDto(a, now = Date.now()) {
+  const kind = clampAnnouncementKind(a.kind);
+  const importance =
+    typeof a.importance === 'number' &&
+    a.importance >= 0 &&
+    a.importance <= 2
+      ? a.importance
+      : 0;
+  let expiresAtIso = null;
+  let isExpired = false;
+  if (a.expiresAt) {
+    const t = new Date(a.expiresAt).getTime();
+    if (!Number.isNaN(t)) {
+      expiresAtIso = new Date(a.expiresAt).toISOString();
+      isExpired = t < now;
+    }
+  }
+  return {
+    id: String(a._id),
+    title: a.title,
+    body: a.body,
+    author: a.authorName || 'Instructor',
+    importance,
+    kind,
+    expiresAt: expiresAtIso,
+    isExpired,
+    createdAt: a.createdAt
+      ? new Date(a.createdAt).toISOString()
+      : new Date().toISOString(),
+  };
+}
+
+/**
+ * Parse expiresAt from JSON body: undefined = omit field on create; null/'' = clear.
+ * @returns {{ value?: Date | null, error?: string }}
+ */
+function coerceExpiresAtFromBody(raw) {
+  if (raw === undefined) return {};
+  if (raw === null || raw === '') return { value: null };
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return { error: 'Invalid expiresAt' };
+  return { value: d };
+}
+
 // ── Announcements ───────────────────────────────────────────────────────────
 
 export const listAnnouncements = asyncHandler(async (req, res) => {
@@ -59,23 +136,17 @@ export const listAnnouncements = asyncHandler(async (req, res) => {
   assertMember(chat, req.user._id);
 
   const rows = await ClassroomAnnouncement.find({ chat: chatId })
-    .sort({ createdAt: -1 })
+    .sort({ importance: -1, createdAt: -1 })
     .lean();
 
-  const announcements = rows.map((a) => ({
-    id: String(a._id),
-    title: a.title,
-    body: a.body,
-    author: a.authorName || 'Instructor',
-    createdAt: a.createdAt
-      ? new Date(a.createdAt).toISOString()
-      : new Date().toISOString(),
-  }));
+  const now = Date.now();
+  const announcements = rows.map((a) => announcementToDto(a, now));
   const canManage = canManageClassroomContent(chat, req.user._id);
   return res.json({ announcements, canManage });
 });
 
 export const createAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -89,14 +160,26 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'title and body are required' });
   }
 
+  const importance = clampAnnouncementImportance(req.body?.importance);
+  const kind = clampAnnouncementKind(req.body?.kind);
+
+  const expCoerced = coerceExpiresAtFromBody(req.body?.expiresAt);
+  if (expCoerced.error) {
+    return res.status(400).json({ message: expCoerced.error });
+  }
+
   const created = await ClassroomAnnouncement.create({
     chat: chatId,
     title,
     body,
+    importance,
+    kind,
     createdBy: req.user._id,
     authorName: authorLabel(req.user),
+    ...(expCoerced.value !== undefined ? { expiresAt: expCoerced.value } : {}),
   });
 
+  /** Email members only on create—not on PATCH edits (avoid notify spam). */
   void notifyClassroomMembersOfAnnouncement({
     classroomName: chat.name,
     chatId: String(chatId),
@@ -106,23 +189,74 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
       title: created.title,
       body: created.body,
       authorName: created.authorName,
+      kind: created.kind,
+      expiresAt: created.expiresAt
+        ? new Date(created.expiresAt).toISOString()
+        : null,
     },
   }).catch((err) => {
     console.error('[createAnnouncement] announcement email notify failed', err);
   });
 
   return res.status(201).json({
-    announcement: {
-      id: String(created._id),
-      title: created.title,
-      body: created.body,
-      author: created.authorName,
-      createdAt: created.createdAt.toISOString(),
-    },
+    announcement: announcementToDto(created),
+  });
+});
+
+export const patchAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId, announcementId } = req.params;
+  const chat = await loadChatForClassroomRequest(chatId, res);
+  if (!chat) return;
+  assertMember(chat, req.user._id);
+  assertCanManage(chat, req.user._id);
+
+  if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+    return res.status(400).json({ message: 'Invalid announcement id' });
+  }
+
+  const doc = await ClassroomAnnouncement.findOne({
+    _id: announcementId,
+    chat: chatId,
+  });
+  if (!doc) {
+    return res.status(404).json({ message: 'Announcement not found' });
+  }
+
+  const b = req.body || {};
+  if (b.title !== undefined) {
+    const t = typeof b.title === 'string' ? b.title.trim() : '';
+    if (!t) return res.status(400).json({ message: 'title cannot be empty' });
+    doc.title = t;
+  }
+  if (b.body !== undefined) {
+    const bd = typeof b.body === 'string' ? b.body.trim() : '';
+    if (!bd) return res.status(400).json({ message: 'body cannot be empty' });
+    doc.body = bd;
+  }
+  if (b.importance !== undefined) {
+    doc.importance = clampAnnouncementImportance(b.importance);
+  }
+  if (b.kind !== undefined) {
+    doc.kind = clampAnnouncementKind(b.kind);
+  }
+  if (b.expiresAt !== undefined) {
+    const expCoerced = coerceExpiresAtFromBody(b.expiresAt);
+    if (expCoerced.error) {
+      return res.status(400).json({ message: expCoerced.error });
+    }
+    doc.expiresAt = expCoerced.value;
+  }
+
+  await doc.save();
+
+  return res.json({
+    announcement: announcementToDto(doc),
   });
 });
 
 export const deleteAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId, announcementId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -164,6 +298,8 @@ export const listResources = asyncHandler(async (req, res) => {
     fileName: r.fileName || '',
     fileUrl: r.fileUrl || '',
     author: r.authorName || 'Instructor',
+    category: r.category || 'other',
+    description: r.description || '',
     createdAt: r.createdAt
       ? new Date(r.createdAt).toISOString()
       : new Date().toISOString(),
@@ -173,6 +309,7 @@ export const listResources = asyncHandler(async (req, res) => {
 });
 
 export const createResource = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;
@@ -182,6 +319,8 @@ export const createResource = asyncHandler(async (req, res) => {
   const title =
     typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const link = typeof req.body?.link === 'string' ? req.body.link.trim() : '';
+  const category = normalizeResourceCategory(req.body?.category);
+  const description = normalizeResourceDescription(req.body?.description);
   if (!title) {
     return res.status(400).json({ message: 'title is required' });
   }
@@ -211,6 +350,8 @@ export const createResource = asyncHandler(async (req, res) => {
     chat: chatId,
     title,
     link,
+    category,
+    description,
     fileKey,
     fileUrl,
     fileName,
@@ -227,12 +368,15 @@ export const createResource = asyncHandler(async (req, res) => {
       fileName: created.fileName,
       fileUrl: created.fileUrl,
       author: created.authorName,
+      category: created.category || 'other',
+      description: created.description || '',
       createdAt: created.createdAt.toISOString(),
     },
   });
 });
 
 export const deleteResource = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { chatId, resourceId } = req.params;
   const chat = await loadChatForClassroomRequest(chatId, res);
   if (!chat) return;

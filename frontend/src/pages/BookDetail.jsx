@@ -9,6 +9,7 @@ import {
   Heart,
   Library,
   MessageSquare,
+  Pencil,
   Share2,
   Sparkles,
   Star,
@@ -17,8 +18,8 @@ import {
   Trash2,
   UserRound,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -28,7 +29,9 @@ import {
   visibilityLabel,
   visibilityTone,
 } from '../utils/formatLabels';
+import EditBookMetaModal from '../components/EditBookMetaModal';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
+import { safeInternalPath } from '../utils/safeRedirect';
 
 function formatReviewTimestamp(iso) {
   if (!iso) return '';
@@ -51,10 +54,13 @@ function formatReviewTimestamp(iso) {
 
 function BookDetail() {
   const { bookId } = useParams();
+  const { pathname } = useLocation();
   const { user } = useAuth();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [authRequired, setAuthRequired] = useState(false);
+  const [editMetaOpen, setEditMetaOpen] = useState(false);
   const [userReaction, setUserReaction] = useState(null);
   const [likesCount, setLikesCount] = useState(0);
   const [dislikesCount, setDislikesCount] = useState(0);
@@ -74,6 +80,15 @@ function BookDetail() {
   const [reviewDeletingId, setReviewDeletingId] = useState(null);
   const [reviewNotice, setReviewNotice] = useState('');
   const reviewDraftLoaded = useRef(false);
+
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentsError, setCommentsError] = useState('');
+  const [commentBody, setCommentBody] = useState('');
+  const [replyToId, setReplyToId] = useState(null);
+  const [commentSubmitting, setCommentSubmitting] = useState(false);
+  const [commentDeletingId, setCommentDeletingId] = useState(null);
+  const [commentNotice, setCommentNotice] = useState('');
 
   const applyBookState = useCallback((loadedBook) => {
     setBook(loadedBook);
@@ -109,6 +124,7 @@ function BookDetail() {
       try {
         setLoading(true);
         setError('');
+        setAuthRequired(false);
 
         const res = await fetch(`/api/books/${bookId}`, {
           credentials: 'include',
@@ -116,6 +132,12 @@ function BookDetail() {
         const data = await res.json().catch(() => ({}));
 
         if (!res.ok) {
+          if (res.status === 401 && data?.code === 'AUTH_REQUIRED') {
+            if (!active) return;
+            setAuthRequired(true);
+            setLoading(false);
+            return;
+          }
           throw new Error(data?.message || 'Failed to load book details');
         }
 
@@ -163,17 +185,41 @@ function BookDetail() {
     }
   }, [bookId]);
 
+  const fetchComments = useCallback(async () => {
+    if (!bookId) return;
+    try {
+      setCommentsLoading(true);
+      setCommentsError('');
+      const res = await fetch(`/api/books/${bookId}/comments`, {
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not load discussion');
+      }
+      setComments(Array.isArray(data.comments) ? data.comments : []);
+    } catch (err) {
+      setCommentsError(err?.message || 'Could not load discussion');
+      setComments([]);
+    } finally {
+      setCommentsLoading(false);
+    }
+  }, [bookId]);
+
   useEffect(() => {
     reviewDraftLoaded.current = false;
     setReviewBody('');
     setReviewRating(null);
     setReviewNotice('');
+    setCommentBody('');
+    setReplyToId(null);
+    setCommentNotice('');
   }, [bookId]);
 
   useEffect(() => {
-    if (!bookId || loading || error || !book) return;
-    fetchReviews();
-  }, [bookId, loading, error, book, fetchReviews]);
+    if (!bookId || loading || error || authRequired || !book) return;
+    fetchComments();
+  }, [bookId, loading, error, authRequired, book, fetchComments]);
 
   useEffect(() => {
     if (reviewsLoading || reviewDraftLoaded.current) return;
@@ -415,10 +461,90 @@ function BookDetail() {
     }
   };
 
+  const handleCommentSubmit = async (e) => {
+    e.preventDefault();
+    setCommentNotice('');
+    if (!book?._id) return;
+    if (!user) {
+      setCommentNotice('Sign in to join the discussion.');
+      return;
+    }
+    const text = commentBody.trim();
+    if (!text) {
+      setCommentNotice('Write something before posting.');
+      return;
+    }
+    setCommentSubmitting(true);
+    try {
+      const res = await fetch(`/api/books/${book._id}/comments`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: text,
+          parentCommentId: replyToId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not post comment.');
+      }
+      setCommentBody('');
+      setReplyToId(null);
+      setCommentNotice('Posted.');
+      await fetchComments();
+    } catch (err) {
+      setCommentNotice(err?.message || 'Could not post comment.');
+    } finally {
+      setCommentSubmitting(false);
+    }
+  };
+
+  const handleDeleteComment = async (cid) => {
+    if (!book?._id || !cid) return;
+    setCommentDeletingId(cid);
+    setCommentNotice('');
+    try {
+      const res = await fetch(`/api/books/${book._id}/comments/${cid}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not delete comment.');
+      }
+      await fetchComments();
+    } catch (err) {
+      setCommentNotice(err?.message || 'Could not delete.');
+    } finally {
+      setCommentDeletingId(null);
+    }
+  };
+
   const formatLabel = book ? humanizeFormat(book.format) : '';
   const topicFromBook =
     book &&
     topicIfDistinct(book.category ?? book.genre, book.format);
+
+  const ownerId = book?.uploader?.id || book?.userId?._id || book?.userId;
+  const isOwner =
+    Boolean(user && ownerId && String(user._id || user.id) === String(ownerId));
+
+  const topComments = useMemo(
+    () => comments.filter((c) => !c.parentCommentId),
+    [comments],
+  );
+  const repliesByParent = useMemo(() => {
+    const m = {};
+    for (const c of comments) {
+      if (c.parentCommentId) {
+        const k = String(c.parentCommentId);
+        if (!m[k]) m[k] = [];
+        m[k].push(c);
+      }
+    }
+    return m;
+  }, [comments]);
 
   return (
     <div className="library-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-12 pt-3 text-slate-900 md:px-6 md:pb-16 md:pt-5 dark:text-slate-100">
@@ -453,6 +579,31 @@ function BookDetail() {
                 ))}
               </div>
               <div className="h-28 animate-pulse rounded-2xl bg-slate-100 dark:bg-slate-800/90" />
+            </div>
+          </div>
+        ) : authRequired ? (
+          <div className="rounded-3xl border border-cyan-200/90 bg-gradient-to-br from-cyan-50 to-white p-8 text-center shadow-lg dark:border-cyan-500/30 dark:from-cyan-950/50 dark:to-slate-900/90">
+            <p className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Sign in to view this resource
+            </p>
+            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+              {user
+                ? 'Your session may have expired. Sign in again to continue.'
+                : 'This title is only visible to signed-in users who have access.'}
+            </p>
+            <Link
+              to={`/login?next=${encodeURIComponent(safeInternalPath(pathname) || pathname)}`}
+              className="mt-6 inline-flex rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:brightness-110 dark:bg-cyan-600"
+            >
+              Sign in
+            </Link>
+            <div className="mt-4">
+              <Link
+                to="/"
+                className="text-sm font-medium text-cyan-700 hover:underline dark:text-cyan-400"
+              >
+                Back to home
+              </Link>
             </div>
           </div>
         ) : error ? (
@@ -634,7 +785,23 @@ function BookDetail() {
                         Academic metadata supplied when this title was uploaded.
                       </p>
                     </div>
+                    {isOwner ? (
+                      <button
+                        type="button"
+                        onClick={() => setEditMetaOpen(true)}
+                        className="ml-auto inline-flex items-center gap-2 rounded-2xl border border-cyan-200/80 bg-white/90 px-3 py-2 text-xs font-bold text-cyan-900 shadow-sm transition hover:border-cyan-400 dark:border-cyan-800 dark:bg-slate-800 dark:text-cyan-100"
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden />
+                        Edit details
+                      </button>
+                    ) : null}
                   </div>
+                  {isOwner && book.visibility === 'unlisted' ? (
+                    <p className="mt-3 rounded-xl border border-indigo-200/80 bg-indigo-50/80 px-3 py-2 text-xs font-medium text-indigo-950 dark:border-indigo-500/30 dark:bg-indigo-950/40 dark:text-indigo-100">
+                      Anyone with this link can open this title. It stays out of
+                      the main library browse.
+                    </p>
+                  ) : null}
                   <dl className="mt-6 grid gap-4 sm:grid-cols-2">
                     <div className="rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/70">
                       <dt className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
@@ -1002,6 +1169,183 @@ function BookDetail() {
                   </div>
                 </section>
 
+                <section
+                  aria-labelledby="discussion-heading"
+                  className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white/90 shadow-lg dark:border-slate-700 dark:bg-slate-900/75"
+                >
+                  <div className="border-b border-slate-100 px-6 py-4 dark:border-slate-700">
+                    <h2
+                      id="discussion-heading"
+                      className="font-display text-lg font-bold text-slate-900 dark:text-white"
+                    >
+                      Discussion
+                    </h2>
+                    <p className="mt-0.5 text-xs text-slate-600 dark:text-slate-400">
+                      Quick questions and clarifications — separate from starred
+                      reviews above.
+                    </p>
+                  </div>
+                  <div className="p-6">
+                    {user ? (
+                      <form
+                        onSubmit={handleCommentSubmit}
+                        className="mb-6 rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 dark:border-slate-600 dark:bg-slate-800/40"
+                      >
+                        {replyToId ? (
+                          <p className="mb-2 text-xs font-semibold text-cyan-800 dark:text-cyan-200">
+                            Replying to thread ·{' '}
+                            <button
+                              type="button"
+                              className="underline"
+                              onClick={() => setReplyToId(null)}
+                            >
+                              Cancel
+                            </button>
+                          </p>
+                        ) : null}
+                        <textarea
+                          maxLength={2000}
+                          rows={3}
+                          value={commentBody}
+                          onChange={(e) => setCommentBody(e.target.value)}
+                          placeholder="Ask a question or share a quick note…"
+                          className="input-field w-full resize-y text-sm dark:bg-slate-900/60"
+                        />
+                        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-xs text-slate-500">
+                            {commentBody.length}/2000
+                          </span>
+                          <button
+                            type="submit"
+                            disabled={commentSubmitting}
+                            className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-cyan-700"
+                          >
+                            {commentSubmitting ? 'Posting…' : 'Post'}
+                          </button>
+                        </div>
+                        {commentNotice ? (
+                          <p className="mt-2 text-xs font-medium text-cyan-800 dark:text-cyan-200">
+                            {commentNotice}
+                          </p>
+                        ) : null}
+                      </form>
+                    ) : (
+                      <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">
+                        <Link
+                          to={`/login?next=${encodeURIComponent(pathname)}`}
+                          className="font-semibold text-cyan-700 underline dark:text-cyan-400"
+                        >
+                          Sign in
+                        </Link>{' '}
+                        to take part in the discussion.
+                      </p>
+                    )}
+                    {commentsError ? (
+                      <p className="text-sm text-rose-600">{commentsError}</p>
+                    ) : null}
+                    {commentsLoading && topComments.length === 0 ? (
+                      <p className="text-sm text-slate-500">Loading discussion…</p>
+                    ) : null}
+                    {!commentsLoading && topComments.length === 0 ? (
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        No comments yet.
+                      </p>
+                    ) : null}
+                    <ul className="space-y-4">
+                      {topComments.map((c) => (
+                        <li
+                          key={c.id}
+                          className="rounded-2xl border border-slate-100 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/40"
+                        >
+                          <div className="flex gap-3">
+                            <img
+                              src={c.author?.avatar || defaultProfile}
+                              alt=""
+                              className="h-9 w-9 shrink-0 rounded-full object-cover"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                  {c.author?.name || 'Reader'}
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                  {user ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyToId(c.id);
+                                        setCommentNotice('');
+                                      }}
+                                      className="text-[11px] font-bold uppercase tracking-wide text-cyan-700 dark:text-cyan-400"
+                                    >
+                                      Reply
+                                    </button>
+                                  ) : null}
+                                  {(c.viewerOwns || isOwner) && (
+                                    <button
+                                      type="button"
+                                      disabled={commentDeletingId === c.id}
+                                      onClick={() => handleDeleteComment(c.id)}
+                                      className="text-[11px] font-bold uppercase tracking-wide text-rose-600"
+                                    >
+                                      Delete
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">
+                                {formatReviewTimestamp(c.createdAt)}
+                              </p>
+                              <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-200">
+                                {c.body}
+                              </p>
+                              {(repliesByParent[c.id] || []).length > 0 ? (
+                                <ul className="mt-3 space-y-2 border-l-2 border-cyan-200/60 pl-4 dark:border-cyan-800">
+                                  {(repliesByParent[c.id] || []).map((r) => (
+                                    <li key={r.id}>
+                                      <div className="flex gap-2">
+                                        <img
+                                          src={r.author?.avatar || defaultProfile}
+                                          alt=""
+                                          className="h-7 w-7 rounded-full object-cover"
+                                        />
+                                        <div className="min-w-0 flex-1">
+                                          <div className="flex flex-wrap items-center justify-between gap-1">
+                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                                              {r.author?.name}
+                                            </span>
+                                            {(r.viewerOwns || isOwner) && (
+                                              <button
+                                                type="button"
+                                                disabled={
+                                                  commentDeletingId === r.id
+                                                }
+                                                onClick={() =>
+                                                  handleDeleteComment(r.id)
+                                                }
+                                                className="text-[10px] font-bold uppercase text-rose-600"
+                                              >
+                                                Delete
+                                              </button>
+                                            )}
+                                          </div>
+                                          <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
+                                            {r.body}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : null}
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </section>
+
                 <section className="space-y-4">
                   <Link
                     to={`/liqu-ai/study-buddy?bookId=${book._id}`}
@@ -1075,6 +1419,15 @@ function BookDetail() {
                 </section>
               </article>
             </div>
+
+            <EditBookMetaModal
+              open={editMetaOpen}
+              book={book}
+              onClose={() => setEditMetaOpen(false)}
+              onSaved={(updated) => {
+                if (updated) applyBookState(updated);
+              }}
+            />
           </>
         )}
       </div>

@@ -1,6 +1,8 @@
 import Book from '../models/Books.js';
 import { createPdfThumbnailBuffer } from '../services/pdfThumbnailService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
+import { validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 function createErrorResponse(message) {
   return { message };
@@ -40,35 +42,9 @@ function parseUploadMeta(req) {
   };
 }
 
-function validateUploadMeta(meta) {
-  const tracks = ['engineering', 'social', 'natural'];
-  if (!tracks.includes(meta.academicTrack)) {
-    return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
-  }
-  if (!meta.department || meta.department.length > 160) {
-    return 'Department or discipline is required.';
-  }
-  if (meta.department === 'Other') {
-    return 'Specify your department when selecting Other.';
-  }
-  if (!meta.title || meta.title.length > 120) {
-    return 'Book name is required (max 120 characters).';
-  }
-  if (
-    !Number.isFinite(meta.publishYear) ||
-    meta.publishYear < 1950 ||
-    meta.publishYear > 2035
-  ) {
-    return 'Enter a valid publish year (1950–2035).';
-  }
-  if (!meta.courseSubject) {
-    return 'Course or subject is required (e.g. Operating Systems, Java).';
-  }
-  return null;
-}
-
 async function uploadController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const id = req.user?._id;
     if (!id) {
       return res.status(401).json(createErrorResponse('Unauthorized'));
@@ -81,7 +57,13 @@ async function uploadController(req, res, next) {
     }
 
     const meta = parseUploadMeta(req);
-    const metaError = validateUploadMeta(meta);
+    const metaError = validateBookCatalogMeta({
+      academicTrack: meta.academicTrack,
+      department: meta.department,
+      title: meta.title,
+      publishYear: meta.publishYear,
+      courseSubject: meta.courseSubject,
+    });
     if (metaError) {
       return res.status(400).json(createErrorResponse(metaError));
     }
@@ -146,6 +128,7 @@ async function uploadController(req, res, next) {
 async function uploadProfileController(req, res, next) {
   const id = req.user?._id;
   try {
+    assertCanWrite(req.user);
     if (!id) {
       return res.status(401).json(createErrorResponse('Unauthorized'));
     }

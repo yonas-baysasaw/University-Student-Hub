@@ -1,4 +1,4 @@
-import { ChevronDown, LogOut, Settings, User } from 'lucide-react';
+import { ChevronDown, LogOut, Settings, Shield, User } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, NavLink } from 'react-router-dom';
@@ -7,9 +7,10 @@ import { useAuth } from '../contexts/AuthContext';
 
 const menuWidth = 272;
 
-const navLinks = [
+const baseNavLinks = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/classroom', label: 'Classroom', end: false },
+  { to: '/notifications', label: 'Notifications', end: false },
   { to: '/library', label: 'Library', end: false },
   { to: '/liqu-ai', label: 'Liqu AI', end: false },
   { to: '/profile', label: 'Profile', end: false },
@@ -28,6 +29,13 @@ function Navbar({ children }) {
   const email = user?.email ?? '';
 
   const byokActive = !!user?.geminiConfigured;
+
+  const navLinks = user?.isStaff
+    ? [
+        ...baseNavLinks,
+        { to: '/admin', label: 'Admin', end: false, icon: Shield },
+      ]
+    : baseNavLinks;
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -101,7 +109,7 @@ function Navbar({ children }) {
             aria-label="Primary"
           >
             <div className="nav-segment-track flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {navLinks.map(({ to, label, end }) => (
+              {navLinks.map(({ to, label, end, icon: Icon }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -114,7 +122,12 @@ function Navbar({ children }) {
                     }`
                   }
                 >
-                  {label}
+                  <span className="inline-flex items-center gap-1.5">
+                    {Icon ? (
+                      <Icon className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                    ) : null}
+                    {label}
+                  </span>
                 </NavLink>
               ))}
             </div>

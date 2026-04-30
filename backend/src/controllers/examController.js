@@ -12,11 +12,38 @@ import {
   hashContent,
 } from '../services/pdfService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
+import {
+  EXAM_PAPER_TYPES,
+  validateExamPdfCatalogMeta,
+} from '../utils/examCatalogMeta.js';
+import { formatExamForClient } from '../utils/examJson.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
+
+/**
+ * Prefer JSON errors for API clients; Express 5 may invoke handlers without `next`.
+ */
+function controllerError(res, next, error, label = 'examController') {
+  console.error(`[${label}]`, error);
+  const statusRaw = error.status ?? error.statusCode ?? 500;
+  const status =
+    typeof statusRaw === 'number' && Number.isFinite(statusRaw) && statusRaw >= 400
+      ? statusRaw
+      : 500;
+  const message = error.message || 'Request failed';
+  if (!res.headersSent) {
+    return res.status(status).json({ message });
+  }
+  if (typeof next === 'function') {
+    return next(error);
+  }
+  return undefined;
+}
 
 // ── Upload & Process ──────────────────────────────────────────────────────────
 
 async function uploadExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
@@ -54,11 +81,34 @@ async function uploadExamController(req, res, next) {
       });
     }
 
+    const visibilityArg = req.body?.visibility;
+    const visibility = visibilityArg === 'public' ? 'public' : 'private';
+
+    const catalogErr = validateExamPdfCatalogMeta(req.body ?? {});
+    if (catalogErr) return res.status(400).json({ message: catalogErr });
+
+    const displayTitle = String(req.body?.displayTitle || '').trim();
+    const titleForRecord =
+      displayTitle ||
+      String(file.originalname || 'exam.pdf').replace(/\.pdf$/i, '').trim() ||
+      file.originalname ||
+      'Untitled exam';
+
+    const catalogFields = {
+      academicTrack: String(req.body?.academicTrack || '')
+        .trim()
+        .toLowerCase(),
+      department: String(req.body?.department || '').trim(),
+      courseSubject: String(req.body?.courseSubject || '').trim(),
+      paperType: String(req.body?.paperType || '').trim() || 'other',
+    };
+
     if (existingExam) {
       // Create a lightweight duplicate record pointing to original's questions
       const dupExam = await Exam.create({
         uploadedBy: userId,
-        filename: file.originalname,
+        examKind: 'pdf',
+        filename: titleForRecord,
         fileSize: file.size,
         fileUrl: s3Result.location,
         fileKey: s3Result.key,
@@ -68,25 +118,32 @@ async function uploadExamController(req, res, next) {
         processingStatus: 'complete',
         isDuplicate: true,
         originalExamId: existingExam._id,
+        visibility,
+        ...catalogFields,
       });
 
-      return res.status(201).json(formatExam(dupExam));
+      const dupPopulated = await Exam.findById(dupExam._id).populate(
+        'uploadedBy',
+        'username name avatar subscribers',
+      );
+      return res.status(201).json(formatExamForClient(req, dupPopulated));
     }
 
     // Create a new exam record (status: pending)
     const exam = await Exam.create({
       uploadedBy: userId,
-      filename: file.originalname,
+      examKind: 'pdf',
+      filename: titleForRecord,
       fileSize: file.size,
       fileUrl: s3Result.location,
       fileKey: s3Result.key,
       contentHash,
       textContent,
       processingStatus: 'pending',
+      visibility,
+      ...catalogFields,
     });
 
-    // Kick off background batch processing — do not await
-    // We keep a reference to file.buffer here; pass it into the closure so it isn't GC'd
     const pdfBuffer = file.buffer;
     (async () => {
       try {
@@ -109,9 +166,13 @@ async function uploadExamController(req, res, next) {
       }
     })();
 
-    return res.status(201).json(formatExam(exam));
+    const populatedNew = await Exam.findById(exam._id).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.status(201).json(formatExamForClient(req, populatedNew));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'uploadExam');
   }
 }
 
@@ -122,23 +183,55 @@ async function listExamsController(req, res, next) {
     const userId = req.user._id;
     const { subject, status, search, page = 1, limit = 20 } = req.query;
 
-    const filter = {
-      $or: [{ uploadedBy: userId }, { visibility: 'public' }],
-    };
+    /** `browse` (default): your papers + community public. `mine`: only uploads you own. */
+    const scope = String(req.query.scope ?? 'browse')
+      .trim()
+      .toLowerCase();
+    /** `all` | `private` | `public` — narrows visibility within scope. */
+    const visibility = String(req.query.visibility ?? 'all')
+      .trim()
+      .toLowerCase();
+
+    const andParts = [];
+
+    if (scope === 'mine') {
+      andParts.push({ uploadedBy: userId });
+      if (visibility === 'private') andParts.push({ visibility: 'private' });
+      else if (visibility === 'public') andParts.push({ visibility: 'public' });
+    } else if (visibility === 'private') {
+      andParts.push({ uploadedBy: userId, visibility: 'private' });
+    } else if (visibility === 'public') {
+      andParts.push({ visibility: 'public' });
+    } else {
+      andParts.push({
+        $or: [{ uploadedBy: userId }, { visibility: 'public' }],
+      });
+    }
+
+    if (search) {
+      const q = String(search).trim();
+      if (q) {
+        andParts.push({
+          $or: [
+            { filename: new RegExp(q, 'i') },
+            { topic: new RegExp(q, 'i') },
+            { subject: new RegExp(q, 'i') },
+            { department: new RegExp(q, 'i') },
+            { courseSubject: new RegExp(q, 'i') },
+          ],
+        });
+      }
+    }
+
+    const filter =
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? { ...andParts[0] }
+          : { $and: andParts };
 
     if (status) filter.processingStatus = status;
     if (subject) filter.subject = new RegExp(subject, 'i');
-    if (search) {
-      filter.$and = [
-        filter.$and ?? [],
-        {
-          $or: [
-            { filename: new RegExp(search, 'i') },
-            { topic: new RegExp(search, 'i') },
-          ],
-        },
-      ].flat();
-    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [exams, total] = await Promise.all([
@@ -146,18 +239,18 @@ async function listExamsController(req, res, next) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
-        .populate('uploadedBy', 'username name avatar'),
+        .populate('uploadedBy', 'username name avatar subscribers'),
       Exam.countDocuments(filter),
     ]);
 
     return res.json({
-      exams: exams.map(formatExam),
+      exams: exams.map((ex) => formatExamForClient(req, ex)),
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'listExams');
   }
 }
 
@@ -168,7 +261,7 @@ async function getExamController(req, res, next) {
     const userId = req.user._id;
     const exam = await Exam.findById(req.params.examId).populate(
       'uploadedBy',
-      'username name avatar',
+      'username name avatar subscribers',
     );
 
     if (!exam) return res.status(404).json({ message: 'Exam not found.' });
@@ -176,9 +269,9 @@ async function getExamController(req, res, next) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
-    return res.json(formatExam(exam));
+    return res.json(formatExamForClient(req, exam));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getExam');
   }
 }
 
@@ -209,7 +302,7 @@ async function getQuestionsController(req, res, next) {
       total: questions.length,
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getQuestions');
   }
 }
 
@@ -217,6 +310,7 @@ async function getQuestionsController(req, res, next) {
 
 async function submitAttemptController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
     const { answers, flaggedQuestions = [] } = req.body;
@@ -281,7 +375,7 @@ async function submitAttemptController(req, res, next) {
       details,
     });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'submitAttempt');
   }
 }
 
@@ -295,7 +389,7 @@ async function getAttemptsController(req, res, next) {
       .limit(10);
     return res.json({ attempts });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'getAttempts');
   }
 }
 
@@ -303,9 +397,19 @@ async function getAttemptsController(req, res, next) {
 
 async function updateExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
-    const { filename, subject } = req.body;
+    const {
+      filename,
+      subject,
+      topic,
+      visibility,
+      academicTrack,
+      department,
+      courseSubject,
+      paperType,
+    } = req.body;
 
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found.' });
@@ -317,12 +421,40 @@ async function updateExamController(req, res, next) {
 
     if (filename !== undefined)
       exam.filename = filename.trim() || exam.filename;
-    if (subject !== undefined) exam.subject = subject.trim();
+    if (subject !== undefined) exam.subject = String(subject ?? '').trim();
+    if (topic !== undefined) exam.topic = String(topic ?? '').trim();
+    if (visibility !== undefined) {
+      if (visibility !== 'public' && visibility !== 'private') {
+        return res.status(400).json({ message: 'Invalid visibility value.' });
+      }
+      exam.visibility = visibility;
+    }
+    const PAPER_ENUM = EXAM_PAPER_TYPES;
+    if (academicTrack !== undefined) {
+      exam.academicTrack = String(academicTrack ?? '').trim().toLowerCase();
+    }
+    if (department !== undefined) {
+      exam.department = String(department ?? '').trim();
+    }
+    if (courseSubject !== undefined) {
+      exam.courseSubject = String(courseSubject ?? '').trim();
+    }
+    if (paperType !== undefined) {
+      const pt = String(paperType ?? '').trim();
+      if (!PAPER_ENUM.includes(pt)) {
+        return res.status(400).json({ message: 'Invalid paper type.' });
+      }
+      exam.paperType = pt;
+    }
     await exam.save();
 
-    return res.json(formatExam(exam));
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, refreshed));
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'updateExam');
   }
 }
 
@@ -330,6 +462,7 @@ async function updateExamController(req, res, next) {
 
 async function deleteExamController(req, res, next) {
   try {
+    assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
 
@@ -341,8 +474,8 @@ async function deleteExamController(req, res, next) {
         .json({ message: 'Only the uploader can delete this exam.' });
     }
 
-    // Delete S3 object
-    if (exam.fileKey) {
+    // Delete S3 object (PDF uploads only; composed papers have no file)
+    if ((!exam.examKind || exam.examKind === 'pdf') && exam.fileKey?.trim()) {
       try {
         await s3Client.send(
           new DeleteObjectCommand({
@@ -370,35 +503,97 @@ async function deleteExamController(req, res, next) {
 
     return res.json({ message: 'Exam deleted.' });
   } catch (error) {
-    return next(error);
+    return controllerError(res, next, error, 'deleteExam');
+  }
+}
+
+// ── Social: reactions & saved shelf (parity with Library) ───────────────────────
+
+async function reactToExamController(req, res, next) {
+  try {
+    assertCanWrite(req.user);
+    const userId = req.user._id;
+    const { examId } = req.params;
+    const { reaction } = req.body ?? {};
+
+    if (!['like', 'dislike', null, 'none'].includes(reaction)) {
+      return res.status(400).json({
+        message: 'reaction must be like, dislike, or none',
+      });
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (!canAccessExam(exam, userId)) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const uid = String(userId);
+    exam.likedBy = (exam.likedBy || []).filter((id) => String(id) !== uid);
+    exam.dislikedBy = (exam.dislikedBy || []).filter(
+      (id) => String(id) !== uid,
+    );
+
+    if (reaction === 'like') exam.likedBy.push(userId);
+    else if (reaction === 'dislike') exam.dislikedBy.push(userId);
+
+    exam.likesCount = exam.likedBy.length;
+    exam.dislikesCount = exam.dislikedBy.length;
+    await exam.save();
+
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, refreshed));
+  } catch (err) {
+    return controllerError(res, next, err, 'reactToExam');
+  }
+}
+
+async function toggleSaveExamController(req, res, next) {
+  try {
+    assertCanWrite(req.user);
+    const userId = req.user._id;
+    const { examId } = req.params;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (!canAccessExam(exam, userId)) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const uid = String(userId);
+    const savedBy = Array.isArray(exam.savedBy) ? exam.savedBy : [];
+    const hasSaved = savedBy.some((id) => String(id) === uid);
+
+    if (hasSaved) {
+      exam.savedBy = savedBy.filter((id) => String(id) !== uid);
+    } else {
+      exam.savedBy = [...savedBy, userId];
+    }
+
+    exam.savesCount = exam.savedBy.length;
+    await exam.save();
+
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, refreshed));
+  } catch (err) {
+    return controllerError(res, next, err, 'toggleSaveExam');
   }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function canAccessExam(exam, userId) {
-  return (
-    exam.visibility === 'public' ||
-    exam.uploadedBy._id?.toString() === userId.toString()
-  );
-}
-
-function formatExam(exam) {
-  return {
-    id: exam._id,
-    filename: exam.filename,
-    fileSize: exam.fileSize,
-    fileUrl: exam.fileUrl,
-    processingStatus: exam.processingStatus,
-    totalQuestions: exam.totalQuestions,
-    subject: exam.subject,
-    topic: exam.topic,
-    visibility: exam.visibility,
-    isDuplicate: exam.isDuplicate,
-    uploadedBy: exam.uploadedBy,
-    createdAt: exam.createdAt,
-    updatedAt: exam.updatedAt,
-  };
+  const ownerId =
+    exam.uploadedBy?._id != null
+      ? exam.uploadedBy._id.toString()
+      : (exam.uploadedBy?.toString?.() ?? String(exam.uploadedBy));
+  return exam.visibility === 'public' || ownerId === userId.toString();
 }
 
 function formatQuestion(q) {
@@ -418,7 +613,9 @@ export {
   getExamController,
   getQuestionsController,
   listExamsController,
+  reactToExamController,
   submitAttemptController,
+  toggleSaveExamController,
   updateExamController,
   uploadExamController,
 };

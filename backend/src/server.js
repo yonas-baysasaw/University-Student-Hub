@@ -12,6 +12,7 @@ import { ENV } from './config/env.js';
 import configurePassport from './config/passport.js';
 import { getAllBooks, getBookById } from './controllers/libraryController.js';
 import { errorHandler, notFound } from './middlewares/errorHandler.js';
+import adminRoutes from './routes/adminRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import authRoutes from './routes/authRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
@@ -19,12 +20,16 @@ import dashboardRoutes from './routes/dashboardRoutes.js';
 import examRoutes from './routes/examRoutes.js';
 import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
 import booksRoutes from './routes/libraryRoutes.js';
+import notificationsRoutes from './routes/notificationsRoutes.js';
 import presenceRoutes from './routes/presenceRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
+import readingListRoutes from './routes/readingListRoutes.js';
 import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
 import signUpRouter from './routes/signUpRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import vaultRoutes from './routes/vaultRoutes.js';
+import { syncStaffRolesFromEnv } from './services/syncStaffRoles.js';
 import { initSocketServer } from './socket/index.js';
 
 const __dirname = path.resolve();
@@ -83,6 +88,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
 app.use('/api/profile', profileRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/notifications', notificationsRoutes);
 app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
 app.use('/api/chats', chatRoutes);
@@ -91,6 +97,9 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/exams', examRoutes);
+app.use('/api/vault', vaultRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/reading-lists', readingListRoutes);
 app.get('/api/books', getAllBooks);
 app.get('/api/books/:bookId', getBookById);
 app.use('/api/books', booksRoutes);
@@ -110,6 +119,7 @@ const server = http.createServer(app);
 
 const start = async () => {
   await connectDB();
+  await syncStaffRolesFromEnv();
 
   await initSocketServer(server, sessionMiddleware);
   server.listen(ENV.PORT, () => {

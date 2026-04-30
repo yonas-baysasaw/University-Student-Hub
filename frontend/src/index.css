@@ -790,6 +790,128 @@ a {
   background: rgba(6, 182, 212, 0.35);
 }
 
+/* Classroom discussion — Telegram-style bubbles */
+:root {
+  --classroom-bubble-in-bg: #e4eaf4;
+  --classroom-bubble-out-bg: #d7effa;
+  --classroom-bubble-text: #0f172a;
+  --classroom-bubble-meta: #64748b;
+  --classroom-chat-thread-bg: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.92) 0%,
+      rgba(248, 250, 252, 0.96) 50%,
+      rgba(241, 245, 249, 0.98) 100%
+    ),
+    radial-gradient(
+      circle at 1px 1px,
+      rgba(15, 23, 42, 0.06) 1px,
+      transparent 0
+    );
+  --classroom-chat-thread-bg-size: auto, 14px 14px;
+}
+
+.dark {
+  --classroom-bubble-in-bg: #202b24;
+  --classroom-bubble-out-bg: #134056;
+  --classroom-bubble-text: #f1f5f9;
+  --classroom-bubble-meta: #94a3b8;
+  --classroom-chat-thread-bg: linear-gradient(
+      180deg,
+      rgba(15, 23, 42, 0.96) 0%,
+      rgba(15, 23, 42, 0.92) 45%,
+      rgba(2, 6, 23, 0.94) 100%
+    ),
+    radial-gradient(
+      circle at 1px 1px,
+      rgba(248, 250, 252, 0.06) 1px,
+      transparent 0
+    );
+}
+
+.classroom-chat-thread-pane {
+  background: var(--classroom-chat-thread-bg);
+  background-size: var(--classroom-chat-thread-bg-size);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .classroom-chat-thread-pane {
+    background-size: auto;
+    background: rgba(248, 250, 252, 0.98);
+  }
+
+  .dark .classroom-chat-thread-pane {
+    background: rgba(15, 23, 42, 0.98);
+  }
+}
+
+.classroom-bubble-shell {
+  position: relative;
+  max-width: min(92vw, 28rem);
+  border-radius: 14px;
+  padding: 0.55rem 0.75rem 0.45rem;
+  color: var(--classroom-bubble-text);
+  box-shadow:
+    0 1px 0 rgba(15, 23, 42, 0.06),
+    0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.dark .classroom-bubble-shell {
+  box-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.35),
+    0 10px 28px rgba(0, 0, 0, 0.28);
+}
+
+.classroom-bubble-shell--in {
+  background: var(--classroom-bubble-in-bg);
+}
+
+.classroom-bubble-shell--out {
+  background: var(--classroom-bubble-out-bg);
+}
+
+/* Tail toward avatar (left side = incoming) */
+.classroom-bubble-shell--in::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 18px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 8px 6px 0;
+  border-color: transparent var(--classroom-bubble-in-bg) transparent transparent;
+  filter: drop-shadow(-1px 1px 0 rgba(15, 23, 42, 0.06));
+}
+
+.dark .classroom-bubble-shell--in::before {
+  filter: drop-shadow(-1px 1px 0 rgba(0, 0, 0, 0.25));
+}
+
+.classroom-bubble-shell--out::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 18px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 8px;
+  border-color: transparent transparent transparent var(--classroom-bubble-out-bg);
+  filter: drop-shadow(1px 1px 0 rgba(15, 23, 42, 0.06));
+}
+
+.dark .classroom-bubble-shell--out::after {
+  filter: drop-shadow(1px 1px 0 rgba(0, 0, 0, 0.25));
+}
+
+.classroom-bubble-meta {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--classroom-bubble-meta);
+}
+
 .classroom-live-dot {
   animation: classroomPulse 2.4s ease-in-out infinite;
 }

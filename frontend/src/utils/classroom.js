@@ -19,6 +19,48 @@ export function getMemberName(member) {
 }
 
 /**
+ * @param {{ creator?: unknown } | null | undefined} chat
+ * @returns {string | undefined}
+ */
+export function getCreatorId(chat) {
+  if (!chat?.creator) return undefined;
+  return String(chat.creator._id ?? chat.creator);
+}
+
+/**
+ * @param {{ creator?: unknown } | null | undefined} chat
+ * @param {unknown} userId
+ */
+export function isUserClassOwner(chat, userId) {
+  const uid =
+    userId != null && userId !== "" ? String(userId) : "";
+  const cid = getCreatorId(chat);
+  return !!(uid && cid && uid === cid);
+}
+
+/**
+ * In `admins` but not the classroom creator (for "Admin" badge).
+ * @param {{ creator?: unknown, admins?: unknown[] } | null | undefined} chat
+ * @param {unknown} userId
+ */
+export function isUserClassAdmin(chat, userId) {
+  if (!userId || isUserClassOwner(chat, userId)) return false;
+  const uid = String(userId);
+  const admins = Array.isArray(chat?.admins) ? chat.admins : [];
+  return admins.some((a) => String(a?._id ?? a) === uid);
+}
+
+/**
+ * @param {{ _id?: string, id?: string } | null} user
+ * @param {{ creator?: unknown } | null | undefined} chat
+ */
+export function isClassroomCreator(user, chat) {
+  const uid = user?._id ?? user?.id;
+  if (!uid || !chat) return false;
+  return isUserClassOwner(chat, uid);
+}
+
+/**
  * Creator or listed admins can manage classroom schedule / announcements.
  * @param {{ id?: string } | null} user
  * @param {{ creator?: unknown, admins?: unknown[] } | null | undefined} chat
@@ -55,7 +97,9 @@ export async function fetchClassroomMeta(chatId, signal) {
     response,
     "Unable to load classroom details",
   );
-  const chat = (payload?.chats ?? []).find((item) => item._id === chatId);
+  const chat = (payload?.chats ?? []).find(
+    (item) => String(item._id) === String(chatId),
+  );
   if (!chat) {
     throw new Error("Classroom not found");
   }

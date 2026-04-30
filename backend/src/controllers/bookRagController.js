@@ -1,10 +1,12 @@
 import asyncHandler from '../middlewares/asyncHandler.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 import {
   getRagIndexStatus,
   scheduleRagIndexForBook,
 } from '../services/bookRagService.js';
 
 export const postIndexBookRag = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
   const { bookId } = req.params;
   const out = await scheduleRagIndexForBook(bookId, req.user._id, req.user);
   if (out.error) {

@@ -48,10 +48,30 @@ const classroomResourceSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    category: {
+      type: String,
+      enum: [
+        'syllabus',
+        'reading',
+        'lecture',
+        'lab',
+        'reference',
+        'other',
+      ],
+      default: 'other',
+      index: true,
+    },
+    description: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 2000,
+    },
   },
   { timestamps: true },
 );
 
 classroomResourceSchema.index({ chat: 1, createdAt: -1 });
+classroomResourceSchema.index({ chat: 1, category: 1 });
 
 export default mongoose.model('ClassroomResource', classroomResourceSchema);
