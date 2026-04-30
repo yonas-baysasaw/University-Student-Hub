@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
+import BookComment from '../models/BookComment.js';
 import BookReview from '../models/BookReview.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
@@ -200,6 +201,7 @@ export const deleteAdminBook = asyncHandler(async (req, res) => {
   }
 
   await BookReview.deleteMany({ bookId: deleted._id });
+  await BookComment.deleteMany({ bookId: deleted._id });
   await Book.findByIdAndDelete(bookId);
 
   res.json({ success: true, message: 'Book deleted' });

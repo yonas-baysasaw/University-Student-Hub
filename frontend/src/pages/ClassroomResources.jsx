@@ -16,16 +16,18 @@ import {
   Paperclip,
   Search,
   ShieldCheck,
+  Sparkles,
   Trash2,
   Upload,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import ClassroomHero from '../components/ClassroomHero';
 import ClassroomParticipantsDrawer from '../components/ClassroomParticipantsDrawer';
 import ClassroomTabs from '../components/ClassroomTabs';
+import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import { useAuth } from '../contexts/AuthContext';
 import {
   canManageClassroom,
@@ -146,6 +148,8 @@ function summitTurnInMeta(assignment, now = new Date()) {
 
 function ClassroomResourcesContent({ chatId }) {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [chatName, setChatName] = useState('Class Resources');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceDescription, setResourceDescription] = useState('');
@@ -202,11 +206,110 @@ function ClassroomResourcesContent({ chatId }) {
   const [membersError, setMembersError] = useState('');
   const [invitationCode, setInvitationCode] = useState('');
 
+  const [liquDrawerOpen, setLiquDrawerOpen] = useState(false);
+  const [liquFocusMaterialId, setLiquFocusMaterialId] = useState(null);
+  const [assignmentPaste, setAssignmentPaste] = useState('');
+
+  const liquContextBlurb = useMemo(() => {
+    const parts = [];
+    const focus = resources.find((r) => r.id === liquFocusMaterialId);
+    if (focus) {
+      const kind = focus.fileName
+        ? guessKindFromFileName(focus.fileName)
+        : focus.link
+          ? 'link'
+          : 'material';
+      const nameBit = focus.fileName || focus.title || 'Resource';
+      parts.push(
+        `**Highlighted material:** ${nameBit} (${kind})`,
+      );
+      if (focus.description?.trim()) {
+        parts.push(
+          `Short description: ${focus.description.trim().slice(0, 500)}`,
+        );
+      }
+    }
+    const paste = assignmentPaste.trim();
+    if (paste) {
+      parts.push(
+        `**Assignment / instructions (instructor paste):**\n${paste.slice(0, 4000)}`,
+      );
+    }
+    return parts.join('\n\n');
+  }, [resources, liquFocusMaterialId, assignmentPaste]);
+
   const viewerIsCreator = isClassroomCreator(user, { creator });
   const viewerCanManageClassroom = canManageClassroom(user, {
     creator,
     admins,
   });
+
+  const resourceNamesContext = useMemo(() => {
+    const names = resources
+      .slice(0, 6)
+      .map((r) => r.title || r.name)
+      .filter(Boolean);
+    if (!names.length) return '';
+    return `Materials in this classroom include: ${names.join(', ')}.`;
+  }, [resources]);
+
+  const liquQuickPrompts = useMemo(
+    () => [
+      'Summarize for students',
+      'Draft a class announcement',
+      'Generate study questions',
+    ],
+    [],
+  );
+
+  const onLiquQuickPrompt = useCallback(
+    (label) => {
+      const mat = resources.find((r) => r.id === liquFocusMaterialId);
+      const matLine = mat
+        ? `Highlighted material: ${mat.fileName || mat.title} (${mat.fileName ? guessKindFromFileName(mat.fileName) : mat.link ? 'link' : 'material'}).\n`
+        : '';
+      const pasteBlock = assignmentPaste.trim()
+        ? `Instructor pasted context:\n${assignmentPaste.trim().slice(0, 4000)}\n\n`
+        : '';
+      const ctx = `Class: ${chatName}. ${resourceNamesContext}\n${matLine}${pasteBlock}\n`;
+      const map = {
+        'Summarize for students':
+          ctx +
+          'Write a short, friendly summary of the key ideas students should take away from the current materials. Use clear bullet points.',
+        'Draft a class announcement':
+          ctx +
+          'Draft a concise LMS-style announcement (2–4 sentences) highlighting what students should focus on this week.',
+        'Generate study questions':
+          ctx +
+          'Suggest 8 thoughtful study or exam-style questions based on the materials described. Mix comprehension and application.',
+      };
+      const prefill = map[label] || `${ctx}${label}`;
+      navigate(
+        {
+          pathname: location.pathname,
+          search: location.search,
+        },
+        { state: { prefill }, replace: true },
+      );
+    },
+    [
+      chatName,
+      resourceNamesContext,
+      resources,
+      liquFocusMaterialId,
+      assignmentPaste,
+      navigate,
+      location.pathname,
+      location.search,
+    ],
+  );
+
+  useEffect(() => {
+    if (!liquFocusMaterialId) return;
+    if (!resources.some((r) => r.id === liquFocusMaterialId)) {
+      setLiquFocusMaterialId(null);
+    }
+  }, [resources, liquFocusMaterialId]);
 
   const closeSummitModal = useCallback(() => {
     setSubmitModal(null);
@@ -665,6 +768,16 @@ function ClassroomResourcesContent({ chatId }) {
                 Assignments
               </span>
             </button>
+            {viewerCanManageClassroom ? (
+              <button
+                type="button"
+                className={`${tabBtn} ml-auto inline-flex items-center gap-2 border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 text-white shadow-lg shadow-cyan-900/20 hover:brightness-110 dark:from-cyan-700 dark:to-indigo-950`}
+                onClick={() => setLiquDrawerOpen(true)}
+              >
+                <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
+                Liqu AI
+              </button>
+            ) : null}
           </div>
 
           {workspaceTab === 'materials' ? (
@@ -877,7 +990,12 @@ function ClassroomResourcesContent({ chatId }) {
                     return (
                       <article
                         key={item.id}
-                        className="fade-in-up flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-cyan-200/90 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-cyan-900"
+                        className={`fade-in-up flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-cyan-200/90 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-cyan-900 ${
+                          viewerCanManageClassroom &&
+                          liquFocusMaterialId === item.id
+                            ? 'ring-2 ring-cyan-500/40'
+                            : ''
+                        }`}
                       >
                         <div className="flex items-start gap-3">
                           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/18 to-indigo-500/12 text-cyan-700 dark:text-cyan-300">
@@ -904,6 +1022,31 @@ function ClassroomResourcesContent({ chatId }) {
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-700/80">
+                          {viewerCanManageClassroom ? (
+                            <button
+                              type="button"
+                              title={
+                                liquFocusMaterialId === item.id
+                                  ? 'Remove Liqu AI highlight'
+                                  : 'Use this file in Liqu AI context'
+                              }
+                              onClick={() =>
+                                setLiquFocusMaterialId((cur) =>
+                                  cur === item.id ? null : item.id,
+                                )
+                              }
+                              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wide ring-1 transition min-[380px]:flex-none ${
+                                liquFocusMaterialId === item.id
+                                  ? 'bg-cyan-600 text-white ring-cyan-500'
+                                  : 'bg-white text-cyan-800 ring-cyan-200/80 hover:bg-cyan-50 dark:bg-slate-800 dark:text-cyan-200 dark:ring-cyan-900'
+                              }`}
+                            >
+                              <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              {liquFocusMaterialId === item.id
+                                ? 'Liqu focus'
+                                : 'For Liqu'}
+                            </button>
+                          ) : null}
                           {item.link ? (
                             <a
                               href={item.link}
@@ -1698,6 +1841,68 @@ function ClassroomResourcesContent({ chatId }) {
             </div>
           </div>
         </div>
+      ) : null}
+
+      {viewerCanManageClassroom && liquDrawerOpen ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[199] bg-slate-950/50 backdrop-blur-[2px]"
+            aria-label="Close Liqu AI"
+            onClick={() => setLiquDrawerOpen(false)}
+          />
+          <div
+            className="fixed inset-y-0 right-0 z-[200] flex w-full max-w-lg flex-col border-l border-slate-200/90 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Liqu AI for instructors"
+          >
+            <div className="flex shrink-0 items-center justify-between border-b border-slate-200/90 px-4 py-3 dark:border-slate-700">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
+                  Instructor · {chatName}
+                </p>
+                <p className="font-display text-lg font-bold text-slate-900 dark:text-white">
+                  Liqu AI
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLiquDrawerOpen(false)}
+                className="rounded-xl border border-slate-200 p-2 text-slate-600 dark:border-slate-600 dark:text-slate-300"
+                aria-label="Close"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200/90 px-4 py-3 dark:border-slate-700">
+              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Assignment context (optional paste)
+              </label>
+              <textarea
+                value={assignmentPaste}
+                onChange={(e) => setAssignmentPaste(e.target.value)}
+                rows={3}
+                placeholder="Paste assignment instructions or a rubric excerpt — included in Liqu context and quick actions."
+                className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50/90 p-2.5 text-xs text-slate-800 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/60 dark:text-slate-100"
+              />
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                Use “For Liqu” on a material card to include that file in context
+                and quick actions.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-2">
+              <LiquAiChatPanel
+                variant="gemini"
+                className="h-[calc(100vh-8rem)] min-h-[420px]"
+                bookTitle={`Classroom: ${chatName}`}
+                contextBlurb={liquContextBlurb}
+                starterPrompts={liquQuickPrompts}
+                onQuickPrompt={onLiquQuickPrompt}
+              />
+            </div>
+          </div>
+        </>
       ) : null}
 
       <ClassroomParticipantsDrawer

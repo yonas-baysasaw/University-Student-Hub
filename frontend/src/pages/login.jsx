@@ -41,8 +41,7 @@ function SignIn() {
       }
 
       setStatus('Signed in successfully. Redirecting...');
-      const user = payload.user;
-      const target = user?.isStaff && nextSafe ? nextSafe : '/';
+      const target = nextSafe ?? '/';
       setTimeout(() => {
         window.location.href = target;
       }, 450);
@@ -119,7 +118,11 @@ function SignIn() {
           Forgot password?
         </Link>
         <Link
-          to="/signup"
+          to={
+            nextSafe
+              ? `/signup?next=${encodeURIComponent(nextSafe)}`
+              : '/signup'
+          }
           className="font-medium transition hover:text-slate-700 hover:underline"
         >
           Create account

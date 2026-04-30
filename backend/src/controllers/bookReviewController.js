@@ -2,18 +2,18 @@ import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
 import BookReview from '../models/BookReview.js';
+import {
+  directAccessOutcome,
+  sendBookAccessDenied,
+} from '../utils/bookAccess.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
-function listFilterForRequest(req) {
-  const canUsePrivateBooks = req.isAuthenticated?.();
-
-  if (!canUsePrivateBooks) {
-    return { visibility: 'public' };
-  }
-
-  return {
-    $or: [{ visibility: 'public' }, { userId: req.user?._id }],
-  };
+async function findBookForReader(req, bookId) {
+  const book = await Book.findById(bookId)
+    .select('userId visibility')
+    .lean();
+  const access = directAccessOutcome(book, req);
+  return { book, access };
 }
 
 function formatReviewDoc(doc, req) {
@@ -48,12 +48,11 @@ export const listBookReviews = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid book id' });
   }
 
-  const book = await Book.findOne({
-    _id: bookId,
-    ...listFilterForRequest(req),
-  })
-    .select('_id')
-    .lean();
+  const { book, access } = await findBookForReader(req, bookId);
+
+  if (!access.ok) {
+    return sendBookAccessDenied(res, access);
+  }
 
   if (!book) {
     return res.status(404).json({ success: false, message: 'Book not found' });
@@ -101,12 +100,11 @@ export const upsertBookReview = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid book id' });
   }
 
-  const book = await Book.findOne({
-    _id: bookId,
-    ...listFilterForRequest(req),
-  })
-    .select('_id')
-    .lean();
+  const { book, access } = await findBookForReader(req, bookId);
+
+  if (!access.ok) {
+    return sendBookAccessDenied(res, access);
+  }
 
   if (!book) {
     return res.status(404).json({ success: false, message: 'Book not found' });
@@ -170,12 +168,11 @@ export const deleteBookReview = asyncHandler(async (req, res) => {
     return res.status(400).json({ success: false, message: 'Invalid id' });
   }
 
-  const book = await Book.findOne({
-    _id: bookId,
-    ...listFilterForRequest(req),
-  })
-    .select('_id')
-    .lean();
+  const { book, access } = await findBookForReader(req, bookId);
+
+  if (!access.ok) {
+    return sendBookAccessDenied(res, access);
+  }
 
   if (!book) {
     return res.status(404).json({ success: false, message: 'Book not found' });

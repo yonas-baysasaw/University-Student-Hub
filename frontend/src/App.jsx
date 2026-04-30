@@ -40,6 +40,12 @@ import Settings from './pages/Settings';
 import Signup from './pages/Signup';
 import StudyBuddy from './pages/StudyBuddy';
 
+function RedirectToLogin() {
+  const { pathname, search } = useLocation();
+  const next = encodeURIComponent(`${pathname}${search}`);
+  return <Navigate to={`/login?next=${next}`} replace />;
+}
+
 function AppRoutes() {
   const { user, checkingAuth } = useAuth();
   const location = useLocation();
@@ -136,37 +142,25 @@ function AppRoutes() {
           <Route path="/signup" element={<Signup />} />
           <Route path="/password/reset" element={<PasswordReset />} />
           <Route path="/reset-password/:token" element={<Reset />} />
-          <Route path="/classroom" element={<Navigate to="/login" replace />} />
-          <Route
-            path="/classroom/:chatId"
-            element={<Navigate to="/login" replace />}
-          />
+          <Route path="/classroom" element={<RedirectToLogin />} />
+          <Route path="/classroom/:chatId" element={<RedirectToLogin />} />
           <Route
             path="/classroom/:chatId/announcements"
-            element={<Navigate to="/login" replace />}
+            element={<RedirectToLogin />}
           />
           <Route
             path="/classroom/:chatId/resources"
-            element={<Navigate to="/login" replace />}
+            element={<RedirectToLogin />}
           />
-          <Route path="/library" element={<Navigate to="/login" replace />} />
+          <Route path="/library" element={<RedirectToLogin />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
-          <Route path="/liqu-ai" element={<Navigate to="/login" replace />} />
-          <Route
-            path="/liqu-ai/study-buddy"
-            element={<Navigate to="/login" replace />}
-          />
-          <Route
-            path="/liqu-ai/did-exit"
-            element={<Navigate to="/login" replace />}
-          />
-          <Route path="/profile" element={<Navigate to="/login" replace />} />
+          <Route path="/liqu-ai" element={<RedirectToLogin />} />
+          <Route path="/liqu-ai/study-buddy" element={<RedirectToLogin />} />
+          <Route path="/liqu-ai/did-exit" element={<RedirectToLogin />} />
+          <Route path="/profile" element={<RedirectToLogin />} />
           <Route path="/users/:userId" element={<PublicProfile />} />
-          <Route path="/exams" element={<Navigate to="/login" replace />} />
-          <Route
-            path="/exams/:examId"
-            element={<Navigate to="/login" replace />}
-          />
+          <Route path="/exams" element={<RedirectToLogin />} />
+          <Route path="/exams/:examId" element={<RedirectToLogin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>

@@ -34,10 +34,13 @@ const GEMINI_TXT_ATTACH_MAX = 12000;
 const BASE_WELCOME =
   "Hi! I'm Liqu AI, powered by Google Gemini. I can help you study, explain concepts, answer questions, or discuss topics from your coursework. How can I help you today?";
 
-function makeWelcome(bookTitle) {
-  const content = bookTitle
+function makeWelcome(bookTitle, contextBlurb = '') {
+  let content = bookTitle
     ? `${BASE_WELCOME}\n\nYou're working with: **${bookTitle}** — ask about this book, your notes, or anything else.`
     : BASE_WELCOME;
+  if (contextBlurb?.trim()) {
+    content = `${content}\n\n${contextBlurb.trim()}`;
+  }
   return { id: 'welcome', role: 'assistant', content };
 }
 
@@ -59,13 +62,16 @@ function formatSessionUpdatedAt(iso) {
 /**
  * Gemini chat with sessions, socket streaming, and REST fallback — for Study buddy.
  * When `bookId` changes, the panel clears the active session and `session` URL param.
- * `bookTitle` tunes the welcome message. `starterPrompts` + `onQuickPrompt`: quick prompts below the welcome bubble.
+ * `bookTitle` tunes the welcome message. `contextBlurb` adds extra context (e.g. classroom material) below that line.
+ * `starterPrompts` + `onQuickPrompt`: quick prompts below the welcome bubble.
  * @param {'default' | 'gemini'} [variant] — `gemini` is a Gemini-style layout (light-first with `dark:` parity); default keeps card styling.
  */
 function LiquAiChatPanel({
   className = '',
   variant = 'default',
   bookTitle = '',
+  /** Extra markdown/plain context appended to the welcome bubble (class materials, pasted assignment text, etc.). */
+  contextBlurb = '',
   /** When set (e.g. Study buddy), server augments Liqu AI with RAG from this book if indexed. */
   bookId = '',
   starterPrompts,
@@ -83,7 +89,7 @@ function LiquAiChatPanel({
 
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [messages, setMessages] = useState([makeWelcome(bookTitle)]);
+  const [messages, setMessages] = useState([makeWelcome(bookTitle, contextBlurb)]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -182,7 +188,7 @@ function LiquAiChatPanel({
     if (prevBookIdRef.current === bookId) return;
     prevBookIdRef.current = bookId;
     setActiveSessionId(null);
-    setMessages([makeWelcome(bookTitle)]);
+    setMessages([makeWelcome(bookTitle, contextBlurb)]);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -191,17 +197,17 @@ function LiquAiChatPanel({
       },
       { replace: true },
     );
-  }, [bookId, bookTitle, setSearchParams]);
+  }, [bookId, bookTitle, contextBlurb, setSearchParams]);
 
   useEffect(() => {
     setMessages((prev) => {
       if (activeSessionId) return prev;
       if (prev.length === 1 && prev[0]?.id === 'welcome') {
-        return [makeWelcome(bookTitle)];
+        return [makeWelcome(bookTitle, contextBlurb)];
       }
       return prev;
     });
-  }, [bookTitle, activeSessionId]);
+  }, [bookTitle, contextBlurb, activeSessionId]);
 
   const loadSession = useCallback(
     async (sessionId, options = {}) => {
@@ -219,7 +225,7 @@ function LiquAiChatPanel({
           role: m.role,
           content: m.content,
         }));
-        setMessages(msgs.length ? msgs : [makeWelcome(bookTitle)]);
+        setMessages(msgs.length ? msgs : [makeWelcome(bookTitle, contextBlurb)]);
         replaceSessionInUrl(String(data._id));
       } catch (err) {
         if (signal?.aborted || err?.name === 'AbortError') return;
@@ -235,7 +241,7 @@ function LiquAiChatPanel({
       }
       if (closeSidebar && !signal?.aborted) setSidebarOpen(false);
     },
-    [bookTitle, replaceSessionInUrl, setSearchParams],
+    [bookTitle, contextBlurb, replaceSessionInUrl, setSearchParams],
   );
 
   useEffect(() => {
@@ -426,7 +432,7 @@ function LiquAiChatPanel({
       { replace: false },
     );
     setActiveSessionId(null);
-    setMessages([makeWelcome(bookTitle)]);
+    setMessages([makeWelcome(bookTitle, contextBlurb)]);
     setError('');
     setSidebarOpen(false);
     setAttachmentChipNames([]);
@@ -450,7 +456,7 @@ function LiquAiChatPanel({
           { replace: true },
         );
         setActiveSessionId(null);
-        setMessages([makeWelcome(bookTitle)]);
+        setMessages([makeWelcome(bookTitle, contextBlurb)]);
       }
     } catch (_) {
       toast.error('Failed to delete session');

@@ -1,9 +1,12 @@
 import {
   ArrowRight,
+  ArrowDownUp,
   BookOpen,
   BookUp,
   Check,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Clock,
   Copy,
   Eye,
@@ -11,9 +14,12 @@ import {
   Heart,
   LayoutGrid,
   Library,
+  List,
   MessageSquare,
+  Pencil,
   Settings,
   Sparkles,
+  Trash2,
   Upload,
   Users,
   Zap,
@@ -164,6 +170,103 @@ function Profile() {
   const [copyFeedback, setCopyFeedback] = useState(false);
   const [copyNotice, setCopyNotice] = useState('');
 
+  const [readingLists, setReadingLists] = useState([]);
+  const [listReorder, setListReorder] = useState(null);
+  const [listReorderBusy, setListReorderBusy] = useState(false);
+
+  const refreshReadingLists = useCallback(async () => {
+    try {
+      const res = await fetch('/api/reading-lists', {
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      setReadingLists(Array.isArray(data.lists) ? data.lists : []);
+    } catch {
+      setReadingLists([]);
+    }
+  }, []);
+
+  const openListReorder = async (listId) => {
+    try {
+      const res = await fetch(`/api/reading-lists/${encodeURIComponent(listId)}`, {
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return;
+      const items = Array.isArray(data.list?.booksPreview) ? data.list.booksPreview : [];
+      setListReorder({ id: listId, items });
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const moveInReorder = (index, delta) => {
+    setListReorder((prev) => {
+      if (!prev?.items?.length) return prev;
+      const j = index + delta;
+      if (j < 0 || j >= prev.items.length) return prev;
+      const items = [...prev.items];
+      [items[index], items[j]] = [items[j], items[index]];
+      return { ...prev, items };
+    });
+  };
+
+  const saveListReorder = async () => {
+    if (!listReorder?.id || !listReorder.items?.length) {
+      setListReorder(null);
+      return;
+    }
+    setListReorderBusy(true);
+    try {
+      await fetch(`/api/reading-lists/${encodeURIComponent(listReorder.id)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          bookIds: listReorder.items.map((b) => b.id),
+        }),
+      });
+      setListReorder(null);
+      await refreshReadingLists();
+    } finally {
+      setListReorderBusy(false);
+    }
+  };
+
+  const renameReadingList = async (listId, currentName) => {
+    const name = window.prompt('Reading list name', currentName);
+    if (!name?.trim()) return;
+    try {
+      const res = await fetch(`/api/reading-lists/${encodeURIComponent(listId)}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim() }),
+      });
+      if (!res.ok) return;
+      await refreshReadingLists();
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const deleteReadingList = async (listId) => {
+    if (!window.confirm('Delete this reading list? Titles stay in the library.')) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/reading-lists/${encodeURIComponent(listId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!res.ok) return;
+      await refreshReadingLists();
+    } catch {
+      /* ignore */
+    }
+  };
+
   const [uploadForm, setUploadForm] = useState(() => ({
     title: '',
     description: '',
@@ -223,6 +326,10 @@ function Profile() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    void refreshReadingLists();
+  }, [refreshReadingLists]);
 
   useEffect(() => {
     if (!isUploadModalOpen) return undefined;
@@ -834,6 +941,106 @@ function Profile() {
               </p>
             ) : null}
 
+            <div className="panel-card mb-6 scroll-mt-28 rounded-3xl p-6 md:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-700 ring-1 ring-indigo-500/25 dark:bg-indigo-500/12 dark:text-indigo-200">
+                    <List className="h-5 w-5" aria-hidden />
+                  </span>
+                  <div>
+                    <h2 className="font-display text-xl font-bold text-slate-900 dark:text-white">
+                      Reading lists
+                    </h2>
+                    <p className="mt-1 max-w-lg text-sm text-slate-600 dark:text-slate-400">
+                      Curate sets of library titles. Add from any book card
+                      (lists icon), then open here.
+                    </p>
+                  </div>
+                </div>
+                <Link
+                  to="/library"
+                  className="text-xs font-bold uppercase tracking-wide text-cyan-700 hover:underline dark:text-cyan-400"
+                >
+                  Open library
+                </Link>
+              </div>
+              {readingLists.length === 0 ? (
+                <p className="mt-5 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-center text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
+                  No lists yet. On the library, use “Add to reading list” on a
+                  card.
+                </p>
+              ) : (
+                <ul className="mt-5 space-y-3">
+                  {readingLists.map((L) => (
+                    <li key={L.id}>
+                      <div className="flex items-center gap-3 rounded-2xl border border-slate-200/90 bg-white px-3 py-3 dark:border-slate-600 dark:bg-slate-900/50">
+                        <div className="flex shrink-0 -space-x-2" aria-hidden>
+                          {(L.previewThumbnails || [])
+                            .slice(0, 3)
+                            .map((url, idx) => (
+                              <div
+                                key={`${L.id}-cov-${idx}`}
+                                className="relative h-11 w-9 overflow-hidden rounded-lg ring-2 ring-white dark:ring-slate-900"
+                              >
+                                {url ? (
+                                  <img
+                                    src={url}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="h-full w-full bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800" />
+                                )}
+                              </div>
+                            ))}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            to={`/library?list=${encodeURIComponent(L.id)}`}
+                            className="block truncate font-semibold text-slate-900 hover:text-cyan-700 dark:text-slate-100 dark:hover:text-cyan-400"
+                          >
+                            {L.name}
+                          </Link>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {L.bookIds?.length ?? 0} titles
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 flex-wrap gap-1">
+                          <button
+                            type="button"
+                            title="Rename list"
+                            aria-label={`Rename ${L.name}`}
+                            onClick={() => renameReadingList(L.id, L.name)}
+                            className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            <Pencil className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            title="Reorder titles"
+                            aria-label={`Reorder ${L.name}`}
+                            onClick={() => openListReorder(L.id)}
+                            className="rounded-xl border border-slate-200 p-2 text-slate-600 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                          >
+                            <ArrowDownUp className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            title="Delete list"
+                            aria-label={`Delete ${L.name}`}
+                            onClick={() => deleteReadingList(L.id)}
+                            className="rounded-xl border border-rose-200 p-2 text-rose-700 hover:bg-rose-50 dark:border-rose-900 dark:text-rose-300 dark:hover:bg-rose-950/50"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </button>
+                        </div>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
             <div
               id="profile-shared-books"
               className="panel-card scroll-mt-28 rounded-3xl p-6 md:p-8"
@@ -976,6 +1183,76 @@ function Profile() {
           </div>
         </div>
       </section>
+
+      {listReorder ? (
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-sm">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="list-reorder-title"
+            className="fade-in-up max-h-[min(90vh,640px)] w-full max-w-md overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-2xl dark:border-slate-600 dark:bg-slate-900"
+          >
+            <div className="border-b border-slate-100 px-5 py-4 dark:border-slate-700">
+              <h3
+                id="list-reorder-title"
+                className="font-display text-lg font-bold text-slate-900 dark:text-white"
+              >
+                Reorder list
+              </h3>
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                Top item appears first in your filtered library view.
+              </p>
+            </div>
+            <ul className="max-h-[min(52vh,380px)] space-y-2 overflow-y-auto px-4 py-4">
+              {(listReorder.items || []).map((b, idx) => (
+                <li
+                  key={b.id}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3 py-2.5 dark:border-slate-600 dark:bg-slate-800/60"
+                >
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-slate-100">
+                    {b.title}
+                  </span>
+                  <button
+                    type="button"
+                    aria-label={`Move ${b.title} up`}
+                    disabled={idx === 0}
+                    onClick={() => moveInReorder(idx, -1)}
+                    className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-40 dark:border-slate-600"
+                  >
+                    <ChevronUp className="h-4 w-4" aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={`Move ${b.title} down`}
+                    disabled={idx >= (listReorder.items?.length ?? 0) - 1}
+                    onClick={() => moveInReorder(idx, 1)}
+                    className="rounded-lg border border-slate-200 p-1.5 disabled:opacity-40 dark:border-slate-600"
+                  >
+                    <ChevronDown className="h-4 w-4" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex justify-end gap-2 border-t border-slate-100 px-4 py-4 dark:border-slate-700">
+              <button
+                type="button"
+                className="btn-secondary px-4 py-2 text-sm"
+                onClick={() => setListReorder(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={listReorderBusy}
+                className="btn-primary px-4 py-2 text-sm disabled:opacity-50"
+                onClick={() => void saveListReorder()}
+              >
+                {listReorderBusy ? 'Saving…' : 'Save order'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* Upload modal — portaled above layout/nav stacking contexts */}
       <UploadBookModal

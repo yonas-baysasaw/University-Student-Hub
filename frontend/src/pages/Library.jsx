@@ -6,13 +6,15 @@ import {
   Download,
   Heart,
   LayoutGrid,
+  ListPlus,
   Library as LibraryIcon,
   Search,
   Sparkles,
   Upload,
+  X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { fetchLibraryBooks } from '../utils/books';
@@ -27,6 +29,36 @@ import {
 
 const GUEST_SAVED_KEY = 'library.guestSavedIds';
 
+/** Maps URL search params to `/api/books` query (server-side filters). */
+function buildBooksApiQuery(searchParams) {
+  const o = {};
+  const q = (searchParams.get('q') || '').trim();
+  if (q) o.q = q;
+  const dept = (searchParams.get('dept') || '').trim();
+  if (dept) o.department = dept;
+  const yearFrom = (searchParams.get('yearFrom') || '').trim();
+  const yearTo = (searchParams.get('yearTo') || '').trim();
+  const year = (searchParams.get('year') || '').trim();
+  if (yearFrom || yearTo) {
+    if (yearFrom) o.yearFrom = yearFrom;
+    if (yearTo) o.yearTo = yearTo;
+  } else if (year) {
+    o.year = year;
+  }
+  const added = (searchParams.get('added') || '').trim();
+  if (added === '7d' || added === '30d' || added === '90d' || added === 'term') {
+    const end = new Date();
+    const start = new Date();
+    if (added === '7d') start.setDate(start.getDate() - 7);
+    else if (added === '30d') start.setDate(start.getDate() - 30);
+    else if (added === '90d') start.setDate(start.getDate() - 90);
+    else start.setDate(start.getDate() - 120);
+    o.from = start.toISOString();
+    o.to = end.toISOString();
+  }
+  return o;
+}
+
 function readGuestSavedIds() {
   if (typeof window === 'undefined') return [];
   try {
@@ -39,21 +71,39 @@ function readGuestSavedIds() {
   }
 }
 
-const useResources = () => {
+const useResources = (listFetchKey, listBookIdsSerialized) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
+    const sp = new URLSearchParams(listFetchKey);
+    const apiQuery = buildBooksApiQuery(sp);
+
+    const listBookIds =
+      listBookIdsSerialized === '' || listBookIdsSerialized == null
+        ? null
+        : JSON.parse(listBookIdsSerialized);
 
     const loadBooks = async () => {
       try {
         setLoading(true);
         setError('');
 
-        const books = await fetchLibraryBooks();
-        if (active) setResources(books);
+        const books = await fetchLibraryBooks(undefined, apiQuery);
+        if (!active) return;
+        let next = books;
+        if (Array.isArray(listBookIds)) {
+          if (listBookIds.length === 0) next = [];
+          else {
+            const allow = new Set(listBookIds.map(String));
+            next = books.filter((b) =>
+              allow.has(String(b.bookId || b.id)),
+            );
+          }
+        }
+        setResources(next);
       } catch (err) {
         if (active) {
           setResources([]);
@@ -68,23 +118,122 @@ const useResources = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [listFetchKey, listBookIdsSerialized]);
 
   return { resources, setResources, loading, error };
 };
 
 function Library() {
   const { user } = useAuth();
-  const { resources, setResources, loading, error } = useResources();
-  const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState('All');
-  const [savedOnly, setSavedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState('recent');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const listFetchKey = searchParams.toString();
+  const listId = (searchParams.get('list') || '').trim();
+
+  const [listBookIdsSerialized, setListBookIdsSerialized] = useState('');
+
+  useEffect(() => {
+    if (!listId) {
+      setListBookIdsSerialized('');
+      return;
+    }
+    if (!user) {
+      setListBookIdsSerialized(JSON.stringify([]));
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/reading-lists/${listId}`, {
+          credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error('list');
+        const ids = data?.list?.bookIds;
+        const arr = Array.isArray(ids) ? ids : [];
+        if (!cancelled) setListBookIdsSerialized(JSON.stringify(arr));
+      } catch {
+        if (!cancelled) setListBookIdsSerialized(JSON.stringify([]));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listId, user]);
+
+  const { resources, setResources, loading, error } = useResources(
+    listFetchKey,
+    listBookIdsSerialized,
+  );
+
+  const patchParams = useCallback(
+    (updates) => {
+      const next = new URLSearchParams(searchParams);
+      Object.entries(updates).forEach(([k, v]) => {
+        if (
+          v === null ||
+          v === undefined ||
+          v === '' ||
+          (k === 'topic' && v === 'All') ||
+          (k === 'sort' && v === 'recent') ||
+          (k === 'saved' && (v === '0' || v === false))
+        ) {
+          next.delete(k);
+        } else {
+          next.set(k, String(v));
+        }
+      });
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const sortBy = searchParams.get('sort') || 'recent';
+  const savedOnly = searchParams.get('saved') === '1';
+  const filter = searchParams.get('topic') || 'All';
+
+  const qFromUrl = searchParams.get('q') || '';
+  const [queryInput, setQueryInput] = useState(qFromUrl);
+  const queryDebounceRef = useRef();
+
+  useEffect(() => {
+    setQueryInput(qFromUrl);
+  }, [qFromUrl]);
+
+  const onQueryInputChange = (val) => {
+    setQueryInput(val);
+    if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
+    queryDebounceRef.current = window.setTimeout(() => {
+      patchParams({ q: val.trim() || null });
+    }, 320);
+  };
+
   const [guestSavedIds, setGuestSavedIds] = useState(
     () => new Set(readGuestSavedIds()),
   );
   const [savingId, setSavingId] = useState(null);
   const [saveToast, setSaveToast] = useState('');
+  const [listPickerFor, setListPickerFor] = useState(null);
+  const [readingLists, setReadingLists] = useState([]);
+  const [listsLoading, setListsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user || !listPickerFor) return;
+    let active = true;
+    (async () => {
+      setListsLoading(true);
+      try {
+        const res = await fetch('/api/reading-lists', { credentials: 'include' });
+        const data = await res.json().catch(() => ({}));
+        if (!active || !res.ok) return;
+        setReadingLists(Array.isArray(data.lists) ? data.lists : []);
+      } finally {
+        if (active) setListsLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user, listPickerFor]);
 
   useEffect(() => {
     if (!user) {
@@ -167,36 +316,12 @@ function Library() {
   }, [resources]);
 
   const filteredResources = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
     return resources.filter((item) => {
-      const fmt = humanizeFormat(item.type).toLowerCase();
-      const topic = topicIfDistinct(item.category, item.type);
-      const topicStr = topic ? topic.toLowerCase() : '';
       const categoryMatch = filter === 'All' || item.category === filter;
       const savedMatch = !savedOnly || isItemSaved(item);
-      const trackLbl = academicTrackLabel(item.academicTrack).toLowerCase();
-      const deptStr = String(item.department || '').toLowerCase();
-      const courseStr = String(item.courseSubject || '').toLowerCase();
-      const yearStr =
-        item.publishYear != null && Number.isFinite(Number(item.publishYear))
-          ? String(item.publishYear)
-          : '';
-      const queryMatch =
-        !normalized ||
-        item.title.toLowerCase().includes(normalized) ||
-        item.type.toLowerCase().includes(normalized) ||
-        fmt.includes(normalized) ||
-        item.level.toLowerCase().includes(normalized) ||
-        (item.description &&
-          item.description.toLowerCase().includes(normalized)) ||
-        topicStr.includes(normalized) ||
-        trackLbl.includes(normalized) ||
-        deptStr.includes(normalized) ||
-        courseStr.includes(normalized) ||
-        yearStr.includes(normalized);
-      return categoryMatch && queryMatch && savedMatch;
+      return categoryMatch && savedMatch;
     });
-  }, [filter, query, resources, savedOnly, isItemSaved]);
+  }, [filter, resources, savedOnly, isItemSaved]);
 
   const sortedResources = useMemo(() => {
     const list = [...filteredResources];
@@ -219,6 +344,68 @@ function Library() {
     }
     return list;
   }, [filteredResources, sortBy]);
+
+  const distinctDepartments = useMemo(() => {
+    const s = new Set();
+    for (const item of resources) {
+      const d = String(item.department || '').trim();
+      if (d) s.add(d);
+    }
+    return [...s].sort((a, b) => a.localeCompare(b));
+  }, [resources]);
+
+  const distinctYears = useMemo(() => {
+    const s = new Set();
+    for (const item of resources) {
+      const y = item.publishYear;
+      if (y != null && Number.isFinite(Number(y))) s.add(Number(y));
+    }
+    return [...s].sort((a, b) => b - a);
+  }, [resources]);
+
+  const addBookToList = async (readingListId, bookId) => {
+    try {
+      const res = await fetch(`/api/reading-lists/${readingListId}/books`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookId }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Request failed');
+      }
+      setSaveToast('Added to your list.');
+      setListPickerFor(null);
+      window.setTimeout(() => setSaveToast(''), 2400);
+    } catch {
+      setSaveToast('Could not add to that list.');
+      window.setTimeout(() => setSaveToast(''), 3200);
+    }
+  };
+
+  const createListAndAdd = async (bookId) => {
+    const name = window.prompt('Name for this reading list', 'My reading list');
+    if (!name || !name.trim()) return;
+    try {
+      const res = await fetch('/api/reading-lists', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), bookIds: [bookId] }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not create list');
+      }
+      setSaveToast('List created and book added.');
+      setListPickerFor(null);
+      window.setTimeout(() => setSaveToast(''), 2400);
+    } catch (e) {
+      setSaveToast(e?.message || 'Could not create list.');
+      window.setTimeout(() => setSaveToast(''), 4000);
+    }
+  };
 
   const savedCount = useMemo(
     () => resources.filter((item) => isItemSaved(item)).length,
@@ -275,7 +462,7 @@ function Library() {
               </Link>
             ) : (
               <Link
-                to="/login"
+                to={`/login?next=${encodeURIComponent('/library')}`}
                 className="inline-flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-md dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-100"
               >
                 Sign in to sync
@@ -292,6 +479,21 @@ function Library() {
           </div>
         </header>
 
+        {listId ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-200/80 bg-indigo-50/90 px-4 py-3 text-sm text-indigo-950 dark:border-indigo-500/35 dark:bg-indigo-950/40 dark:text-indigo-100">
+            <span className="font-semibold">
+              Reading list view — sharing URL keeps these filters.
+            </span>
+            <button
+              type="button"
+              className="rounded-xl bg-indigo-700 px-3 py-1.5 text-xs font-bold text-white hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-500"
+              onClick={() => patchParams({ list: null })}
+            >
+              Show all library titles
+            </button>
+          </div>
+        ) : null}
+
         {saveToast ? (
           <div
             role="status"
@@ -303,55 +505,83 @@ function Library() {
 
         <div className="rounded-3xl border border-slate-200/90 bg-white/75 p-5 shadow-xl shadow-slate-900/[0.06] backdrop-blur-md dark:border-slate-700/90 dark:bg-slate-900/65 md:p-6">
           <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 dark:border-slate-700/80 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Library view filters">
               <button
                 type="button"
-                onClick={() => setSavedOnly(false)}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition ${
+                title="Show all books"
+                aria-label="Show all books"
+                aria-pressed={!savedOnly}
+                onClick={() => patchParams({ saved: null })}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-full px-3.5 text-xs font-bold transition sm:px-4 ${
                   !savedOnly
                     ? 'bg-slate-900 text-white shadow-md dark:bg-cyan-600'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
                 }`}
               >
-                <LayoutGrid className="h-3.5 w-3.5" aria-hidden />
-                All books
+                <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                <span className="max-sm:sr-only">All books</span>
               </button>
               <button
                 type="button"
-                onClick={() => setSavedOnly(true)}
-                className={`inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition ${
+                title={`Saved only (${savedCount})`}
+                aria-label={`Saved books only, ${savedCount} saved`}
+                aria-pressed={savedOnly}
+                onClick={() => patchParams({ saved: '1' })}
+                className={`inline-flex h-10 items-center justify-center gap-2 rounded-full px-3.5 text-xs font-bold transition sm:px-4 ${
                   savedOnly
                     ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-400/30 dark:bg-amber-500/20 dark:text-amber-100'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
                 }`}
               >
                 <Bookmark
-                  className={`h-3.5 w-3.5 ${savedOnly ? 'fill-current' : ''}`}
+                  className={`h-3.5 w-3.5 shrink-0 ${savedOnly ? 'fill-current' : ''}`}
                   aria-hidden
                 />
-                Saved · {savedCount}
+                <span className="tabular-nums max-sm:sr-only">{savedCount}</span>
               </button>
             </div>
 
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
-              <ArrowUpDown className="h-4 w-4 opacity-70" aria-hidden />
-              <label htmlFor="library-sort" className="sr-only">
-                Sort list
-              </label>
-              <select
-                id="library-sort"
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white/90 py-2 pl-3 pr-8 text-xs font-bold text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-              >
-                <option value="recent">Newest first</option>
-                <option value="title">Title A–Z</option>
-                <option value="likes">Most liked</option>
-              </select>
+            <div
+              className="flex w-full flex-col gap-2 min-[420px]:w-auto min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-end md:max-w-md"
+              title="Sort order"
+            >
+              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 min-[420px]:sr-only">
+                Sort:{' '}
+                {sortBy === 'recent'
+                  ? 'newest first'
+                  : sortBy === 'title'
+                    ? 'title A–Z'
+                    : 'most liked'}
+              </span>
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                <ArrowUpDown className="h-4 w-4 shrink-0 opacity-70" aria-hidden />
+                <label htmlFor="library-sort" className="sr-only">
+                  Sort list —{' '}
+                  {sortBy === 'recent'
+                    ? 'newest first'
+                    : sortBy === 'title'
+                      ? 'title A–Z'
+                      : 'most liked'}
+                </label>
+                <select
+                  id="library-sort"
+                  title="Sort list"
+                  className="min-h-[44px] w-full min-w-[10rem] cursor-pointer rounded-xl border border-slate-200 bg-white/90 py-2 pl-3 pr-8 text-xs font-bold text-slate-800 shadow-sm focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                  value={sortBy}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    patchParams({ sort: v === 'recent' ? null : v });
+                  }}
+                >
+                  <option value="recent">Newest first</option>
+                  <option value="title">Title A–Z</option>
+                  <option value="likes">Most liked</option>
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-[1fr_minmax(0,220px)]">
+          <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_180px]">
             <div className="relative">
               <Search
                 className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
@@ -361,25 +591,191 @@ function Library() {
                 type="search"
                 autoComplete="off"
                 className="input-field h-11 w-full border-slate-200/90 bg-white/90 pl-10 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
-                placeholder="Search title, department, course, year, format…"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search title, department, course…"
+                value={queryInput}
+                onChange={(e) => onQueryInputChange(e.target.value)}
                 aria-label="Search library"
+                title="Search title, department, course"
               />
             </div>
             <select
               className="input-field h-11 border-slate-200/90 bg-white/90 text-sm font-medium dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
               value={filter}
-              onChange={(e) => setFilter(e.target.value)}
-              aria-label="Filter by category or topic"
+              onChange={(e) => patchParams({ topic: e.target.value })}
+              aria-label="Filter by material type"
+              title="Material type"
             >
               {categories.map((category) => (
                 <option key={category} value={category}>
-                  {category === 'All' ? 'All topics' : category}
+                  {category === 'All' ? 'All material types' : category}
                 </option>
               ))}
             </select>
           </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Department
+              </label>
+              <select
+                className="input-field h-10 w-full border-slate-200/90 bg-white/90 text-sm dark:border-slate-600 dark:bg-slate-950/80"
+                value={searchParams.get('dept') || ''}
+                onChange={(e) =>
+                  patchParams({ dept: e.target.value || null })
+                }
+              >
+                <option value="">All departments</option>
+                {distinctDepartments.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Publish year (exact)
+              </label>
+              <select
+                className="input-field h-10 w-full border-slate-200/90 bg-white/90 text-sm dark:border-slate-600 dark:bg-slate-950/80"
+                value={searchParams.get('year') || ''}
+                title="Exact year (clears year range)"
+                onChange={(e) => {
+                  const v = e.target.value;
+                  patchParams({
+                    year: v || null,
+                    yearFrom: null,
+                    yearTo: null,
+                  });
+                }}
+              >
+                <option value="">Any year</option>
+                {distinctYears.map((y) => (
+                  <option key={y} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Added to library
+              </label>
+              <select
+                className="input-field h-10 w-full border-slate-200/90 bg-white/90 text-sm dark:border-slate-600 dark:bg-slate-950/80"
+                value={searchParams.get('added') || ''}
+                onChange={(e) =>
+                  patchParams({ added: e.target.value || null })
+                }
+              >
+                <option value="">Any time</option>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="term">Last ~4 months</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Year from (range)
+              </label>
+              <select
+                className="input-field h-10 w-full border-slate-200/90 bg-white/90 text-sm dark:border-slate-600 dark:bg-slate-950/80"
+                title="Minimum publish year; clears exact year filter"
+                value={searchParams.get('yearFrom') || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  patchParams({ yearFrom: v || null, year: null });
+                }}
+              >
+                <option value="">Any</option>
+                {distinctYears.map((y) => (
+                  <option key={`from-${y}`} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                Year to (range)
+              </label>
+              <select
+                className="input-field h-10 w-full border-slate-200/90 bg-white/90 text-sm dark:border-slate-600 dark:bg-slate-950/80"
+                title="Maximum publish year; clears exact year filter"
+                value={searchParams.get('yearTo') || ''}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  patchParams({ yearTo: v || null, year: null });
+                }}
+              >
+                <option value="">Any</option>
+                {distinctYears.map((y) => (
+                  <option key={`to-${y}`} value={String(y)}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {searchParams.get('dept') ||
+          searchParams.get('year') ||
+          searchParams.get('yearFrom') ||
+          searchParams.get('yearTo') ||
+          searchParams.get('added') ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {searchParams.get('dept') ? (
+                <button
+                  type="button"
+                  onClick={() => patchParams({ dept: null })}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  title="Remove department filter"
+                >
+                  {searchParams.get('dept')}
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              ) : null}
+              {searchParams.get('year') ? (
+                <button
+                  type="button"
+                  onClick={() => patchParams({ year: null })}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  title="Remove year filter"
+                >
+                  Year {searchParams.get('year')}
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              ) : null}
+              {searchParams.get('yearFrom') || searchParams.get('yearTo') ? (
+                <button
+                  type="button"
+                  onClick={() => patchParams({ yearFrom: null, yearTo: null })}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  title="Clear year range"
+                >
+                  {searchParams.get('yearFrom') || '…'}–
+                  {searchParams.get('yearTo') || '…'}
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              ) : null}
+              {searchParams.get('added') ? (
+                <button
+                  type="button"
+                  onClick={() => patchParams({ added: null })}
+                  className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  title="Remove recency filter"
+                >
+                  Recent uploads
+                  <X className="h-3 w-3" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
@@ -438,7 +834,7 @@ function Library() {
                 <article
                   key={item.id}
                   style={{ animationDelay: `${Math.min(index * 45, 400)}ms` }}
-                  className="library-book-card fade-in-up panel-card group flex flex-col overflow-hidden rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-b from-white to-slate-50/90 dark:border-slate-700/90 dark:from-slate-900 dark:to-slate-950/95"
+                  className="relative library-book-card fade-in-up panel-card group flex flex-col overflow-hidden rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-b from-white to-slate-50/90 dark:border-slate-700/90 dark:from-slate-900 dark:to-slate-950/95"
                 >
                   <div className="relative mb-4 overflow-hidden rounded-2xl bg-slate-200/90 ring-1 ring-slate-200/90 dark:bg-slate-800 dark:ring-slate-700">
                     <div className="aspect-[4/5] w-full overflow-hidden sm:aspect-[3/4]">
@@ -483,6 +879,20 @@ function Library() {
                       </span>
                     </div>
 
+                    {user && key ? (
+                      <button
+                        type="button"
+                        className="absolute right-14 top-3 z-[3] inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/90 text-slate-600 shadow-lg ring-1 ring-white/60 backdrop-blur-md transition hover:scale-105 hover:bg-white dark:bg-slate-900/90 dark:text-slate-200 dark:ring-slate-600"
+                        title="Add to reading list"
+                        onClick={() =>
+                          setListPickerFor((v) => (v === key ? null : key))
+                        }
+                      >
+                        <ListPlus className="h-[18px] w-[18px]" aria-hidden />
+                        <span className="sr-only">Add to reading list</span>
+                      </button>
+                    ) : null}
+
                     <button
                       type="button"
                       disabled={busy}
@@ -515,6 +925,28 @@ function Library() {
                         {item.title}
                       </Link>
                     </h2>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                      <span>{formatLabel}</span>
+                      {item.publishYear != null &&
+                      Number.isFinite(Number(item.publishYear)) ? (
+                        <>
+                          <span aria-hidden className="text-slate-300 dark:text-slate-600">
+                            ·
+                          </span>
+                          <span>{item.publishYear}</span>
+                        </>
+                      ) : null}
+                      {item.ragIndexStatus === 'ready' ? (
+                        <>
+                          <span aria-hidden className="text-slate-300 dark:text-slate-600">
+                            ·
+                          </span>
+                          <span className="text-emerald-700 dark:text-emerald-400">
+                            Liqu-ready
+                          </span>
+                        </>
+                      ) : null}
+                    </p>
 
                     {item.academicTrack ||
                     item.department ||
@@ -665,6 +1097,58 @@ function Library() {
                       ) : null}
                     </div>
                   </div>
+
+                  {listPickerFor === key ? (
+                    <div
+                      role="dialog"
+                      aria-label="Choose reading list"
+                      className="absolute inset-x-0 bottom-0 z-30 max-h-[min(340px,55%)] overflow-hidden rounded-t-2xl border border-cyan-200/90 bg-white/98 shadow-[0_-8px_40px_rgba(15,23,42,0.2)] dark:border-slate-600 dark:bg-slate-900/98"
+                    >
+                      <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2 dark:border-slate-700">
+                        <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
+                          Add to list
+                        </span>
+                        <button
+                          type="button"
+                          className="rounded-lg px-2 py-1 text-[11px] font-semibold text-cyan-700 dark:text-cyan-400"
+                          onClick={() => setListPickerFor(null)}
+                        >
+                          Close
+                        </button>
+                      </div>
+                      <div className="max-h-44 space-y-0.5 overflow-y-auto p-2">
+                        {listsLoading ? (
+                          <p className="px-2 py-3 text-xs text-slate-500">
+                            Loading…
+                          </p>
+                        ) : readingLists.length === 0 ? (
+                          <p className="px-2 py-3 text-xs text-slate-500">
+                            No lists yet — create one below.
+                          </p>
+                        ) : (
+                          readingLists.map((l) => (
+                            <button
+                              key={l.id}
+                              type="button"
+                              className="w-full rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-slate-800 hover:bg-cyan-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                              onClick={() => addBookToList(l.id, key)}
+                            >
+                              {l.name}
+                            </button>
+                          ))
+                        )}
+                      </div>
+                      <div className="border-t border-slate-100 p-2 dark:border-slate-700">
+                        <button
+                          type="button"
+                          className="w-full rounded-xl border border-dashed border-cyan-400/70 py-2.5 text-xs font-bold text-cyan-800 dark:border-cyan-600 dark:text-cyan-200"
+                          onClick={() => createListAndAdd(key)}
+                        >
+                          New reading list…
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                 </article>
               );
             })

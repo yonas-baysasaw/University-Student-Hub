@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FaGoogle } from 'react-icons/fa';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import { getPasswordStrength } from '../utils/passwordStrength';
+import { safeInternalPath } from '../utils/safeRedirect';
 
 function Signup() {
   const [username, setUsername] = useState('');
@@ -14,6 +15,8 @@ function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextSafe = safeInternalPath(searchParams.get('next'));
   const successTimer = useRef();
   const strength = useMemo(() => getPasswordStrength(password), [password]);
 
@@ -59,10 +62,12 @@ function Signup() {
       setEmail('');
       setPassword('');
       setConfirmPassword('');
-      successTimer.current = setTimeout(
-        () => navigate('/login', { replace: true }),
-        1200,
-      );
+      successTimer.current = setTimeout(() => {
+        const loginTarget = nextSafe
+          ? `/login?next=${encodeURIComponent(nextSafe)}`
+          : '/login';
+        navigate(loginTarget, { replace: true });
+      }, 1200);
     } catch (submitError) {
       console.error(submitError);
       setError(submitError?.message || 'Something went wrong, try again.');
