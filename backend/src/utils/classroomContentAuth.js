@@ -63,6 +63,16 @@ export function canManageClassroomContent(chat, userId) {
 }
 
 /**
+ * Members who are not classroom admins may submit assignments.
+ * @param {import('mongoose').Document} chat
+ * @param {import('mongoose').Types.ObjectId} userId
+ */
+export function canSubmitAssignments(chat, userId) {
+  if (!isChatMember(chat, userId)) return false;
+  return !canManageClassroomContent(chat, userId);
+}
+
+/**
  * Only the classroom creator may promote/demote admins or remove members.
  * @param {import('mongoose').Document} chat
  * @param {import('mongoose').Types.ObjectId} userId

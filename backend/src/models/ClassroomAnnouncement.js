@@ -30,11 +30,20 @@ const classroomAnnouncementSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    /** 0 = normal, 1 = highlight, 2 = urgent (sort + UI accent). */
+    importance: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 2,
+      index: true,
+    },
   },
   { timestamps: true },
 );
 
 classroomAnnouncementSchema.index({ chat: 1, createdAt: -1 });
+classroomAnnouncementSchema.index({ chat: 1, importance: -1, createdAt: -1 });
 
 export default mongoose.model(
   'ClassroomAnnouncement',

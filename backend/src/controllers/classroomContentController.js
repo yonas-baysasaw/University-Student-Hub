@@ -51,6 +51,31 @@ function assertCanManage(chat, userId) {
   }
 }
 
+const RESOURCE_CATEGORIES = new Set([
+  'syllabus',
+  'reading',
+  'lecture',
+  'lab',
+  'reference',
+  'other',
+]);
+
+function normalizeResourceCategory(raw) {
+  const s = typeof raw === 'string' ? raw.trim() : '';
+  return RESOURCE_CATEGORIES.has(s) ? s : 'other';
+}
+
+function normalizeResourceDescription(raw) {
+  if (typeof raw !== 'string') return '';
+  return raw.trim().slice(0, 2000);
+}
+
+function clampAnnouncementImportance(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(2, Math.max(0, Math.floor(n)));
+}
+
 // ── Announcements ───────────────────────────────────────────────────────────
 
 export const listAnnouncements = asyncHandler(async (req, res) => {
@@ -60,7 +85,7 @@ export const listAnnouncements = asyncHandler(async (req, res) => {
   assertMember(chat, req.user._id);
 
   const rows = await ClassroomAnnouncement.find({ chat: chatId })
-    .sort({ createdAt: -1 })
+    .sort({ importance: -1, createdAt: -1 })
     .lean();
 
   const announcements = rows.map((a) => ({
@@ -68,6 +93,12 @@ export const listAnnouncements = asyncHandler(async (req, res) => {
     title: a.title,
     body: a.body,
     author: a.authorName || 'Instructor',
+    importance:
+      typeof a.importance === 'number' &&
+      a.importance >= 0 &&
+      a.importance <= 2
+        ? a.importance
+        : 0,
     createdAt: a.createdAt
       ? new Date(a.createdAt).toISOString()
       : new Date().toISOString(),
@@ -91,14 +122,18 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'title and body are required' });
   }
 
+  const importance = clampAnnouncementImportance(req.body?.importance);
+
   const created = await ClassroomAnnouncement.create({
     chat: chatId,
     title,
     body,
+    importance,
     createdBy: req.user._id,
     authorName: authorLabel(req.user),
   });
 
+  /** Email members only on create—not on PATCH edits (avoid notify spam). */
   void notifyClassroomMembersOfAnnouncement({
     classroomName: chat.name,
     chatId: String(chatId),
@@ -119,7 +154,57 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
       title: created.title,
       body: created.body,
       author: created.authorName,
+      importance: created.importance ?? 0,
       createdAt: created.createdAt.toISOString(),
+    },
+  });
+});
+
+export const patchAnnouncement = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { chatId, announcementId } = req.params;
+  const chat = await loadChatForClassroomRequest(chatId, res);
+  if (!chat) return;
+  assertMember(chat, req.user._id);
+  assertCanManage(chat, req.user._id);
+
+  if (!mongoose.Types.ObjectId.isValid(announcementId)) {
+    return res.status(400).json({ message: 'Invalid announcement id' });
+  }
+
+  const doc = await ClassroomAnnouncement.findOne({
+    _id: announcementId,
+    chat: chatId,
+  });
+  if (!doc) {
+    return res.status(404).json({ message: 'Announcement not found' });
+  }
+
+  const b = req.body || {};
+  if (b.title !== undefined) {
+    const t = typeof b.title === 'string' ? b.title.trim() : '';
+    if (!t) return res.status(400).json({ message: 'title cannot be empty' });
+    doc.title = t;
+  }
+  if (b.body !== undefined) {
+    const bd = typeof b.body === 'string' ? b.body.trim() : '';
+    if (!bd) return res.status(400).json({ message: 'body cannot be empty' });
+    doc.body = bd;
+  }
+  if (b.importance !== undefined) {
+    doc.importance = clampAnnouncementImportance(b.importance);
+  }
+
+  await doc.save();
+
+  return res.json({
+    announcement: {
+      id: String(doc._id),
+      title: doc.title,
+      body: doc.body,
+      author: doc.authorName,
+      importance: doc.importance ?? 0,
+      createdAt: doc.createdAt.toISOString(),
     },
   });
 });
@@ -167,6 +252,8 @@ export const listResources = asyncHandler(async (req, res) => {
     fileName: r.fileName || '',
     fileUrl: r.fileUrl || '',
     author: r.authorName || 'Instructor',
+    category: r.category || 'other',
+    description: r.description || '',
     createdAt: r.createdAt
       ? new Date(r.createdAt).toISOString()
       : new Date().toISOString(),
@@ -186,6 +273,8 @@ export const createResource = asyncHandler(async (req, res) => {
   const title =
     typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const link = typeof req.body?.link === 'string' ? req.body.link.trim() : '';
+  const category = normalizeResourceCategory(req.body?.category);
+  const description = normalizeResourceDescription(req.body?.description);
   if (!title) {
     return res.status(400).json({ message: 'title is required' });
   }
@@ -215,6 +304,8 @@ export const createResource = asyncHandler(async (req, res) => {
     chat: chatId,
     title,
     link,
+    category,
+    description,
     fileKey,
     fileUrl,
     fileName,
@@ -231,6 +322,8 @@ export const createResource = asyncHandler(async (req, res) => {
       fileName: created.fileName,
       fileUrl: created.fileUrl,
       author: created.authorName,
+      category: created.category || 'other',
+      description: created.description || '',
       createdAt: created.createdAt.toISOString(),
     },
   });

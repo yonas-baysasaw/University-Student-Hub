@@ -55,8 +55,42 @@ const classroomResourceUpload = multer({
 /** Optional single `file` field; title/link in same multipart body. */
 const uploadClassroomResourceSingle = classroomResourceUpload.single('file');
 
+const assignmentUpload = multer({
+  storage,
+  limits: { fileSize: 22 * 1024 * 1024 },
+  fileFilter: classroomResourceFileFilter,
+});
+
+const uploadAssignmentStarterSingle = assignmentUpload.single('file');
+const uploadAssignmentSubmissionSingle = assignmentUpload.single('file');
+
+function chatAttachmentFileFilter(_req, file, cb) {
+  const m = (file?.mimetype || '').toLowerCase();
+  if (
+    m.startsWith('image/') ||
+    m === 'application/pdf' ||
+    m.startsWith('text/') ||
+    m.startsWith('application/msword') ||
+    m.startsWith('application/vnd.openxmlformats-officedocument')
+  ) {
+    return cb(null, true);
+  }
+  return cb(new Error('File type not allowed for chat attachments.'));
+}
+
+const chatAttachmentUpload = multer({
+  storage,
+  limits: { fileSize: 8 * 1024 * 1024 },
+  fileFilter: chatAttachmentFileFilter,
+});
+
+const uploadChatAttachmentSingle = chatAttachmentUpload.single('file');
+
 export {
   uploadApplicationMiddleware,
+  uploadAssignmentStarterSingle,
+  uploadAssignmentSubmissionSingle,
+  uploadChatAttachmentSingle,
   uploadClassroomResourceSingle,
   uploadImageMiddleware,
 };

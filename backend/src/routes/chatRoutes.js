@@ -11,7 +11,10 @@ import {
   patchChatMember,
   patchChatMessage,
   patchChatSchedule,
+  reportChatMessage,
   sendMessage,
+  toggleMessageReaction,
+  uploadChatAttachment,
 } from '../controllers/chatController.js';
 import {
   createAnnouncement,
@@ -20,9 +23,25 @@ import {
   deleteResource,
   listAnnouncements,
   listResources,
+  patchAnnouncement,
 } from '../controllers/classroomContentController.js';
+import {
+  createAssignment,
+  deleteAssignment,
+  getMySubmission,
+  listAssignments,
+  listSubmissionsForAssignment,
+  patchAssignment,
+  patchSubmissionGrade,
+  upsertSubmission,
+} from '../controllers/classroomAssignmentController.js';
 import { isAuthenticated } from '../middlewares/authMiddleware.js';
-import { uploadClassroomResourceSingle } from '../middlewares/uploadMiddleware.js';
+import {
+  uploadAssignmentStarterSingle,
+  uploadAssignmentSubmissionSingle,
+  uploadChatAttachmentSingle,
+  uploadClassroomResourceSingle,
+} from '../middlewares/uploadMiddleware.js';
 
 const router = Router();
 
@@ -40,6 +59,7 @@ router.post('/:chatId/leave', leaveChat);
 
 router.get('/:chatId/announcements', listAnnouncements);
 router.post('/:chatId/announcements', createAnnouncement);
+router.patch('/:chatId/announcements/:announcementId', patchAnnouncement);
 router.delete('/:chatId/announcements/:announcementId', deleteAnnouncement);
 
 router.get('/:chatId/resources', listResources);
@@ -49,6 +69,40 @@ router.post(
   createResource,
 );
 router.delete('/:chatId/resources/:resourceId', deleteResource);
+
+router.get('/:chatId/assignments', listAssignments);
+router.post(
+  '/:chatId/assignments',
+  uploadAssignmentStarterSingle,
+  createAssignment,
+);
+router.patch('/:chatId/assignments/:assignmentId', patchAssignment);
+router.delete('/:chatId/assignments/:assignmentId', deleteAssignment);
+router.post(
+  '/:chatId/assignments/:assignmentId/submissions',
+  uploadAssignmentSubmissionSingle,
+  upsertSubmission,
+);
+router.get(
+  '/:chatId/assignments/:assignmentId/submissions/me',
+  getMySubmission,
+);
+router.get(
+  '/:chatId/assignments/:assignmentId/submissions',
+  listSubmissionsForAssignment,
+);
+router.patch(
+  '/:chatId/assignments/:assignmentId/submissions/:submissionId',
+  patchSubmissionGrade,
+);
+
+router.post(
+  '/:chatId/messages/upload',
+  uploadChatAttachmentSingle,
+  uploadChatAttachment,
+);
+router.post('/:chatId/messages/:messageId/reactions', toggleMessageReaction);
+router.post('/:chatId/messages/:messageId/report', reportChatMessage);
 
 router.patch('/:chatId/messages/:messageId', patchChatMessage);
 router.delete('/:chatId/messages/:messageId', deleteChatMessage);

@@ -1,4 +1,4 @@
-import { Megaphone, RefreshCw } from 'lucide-react';
+import { AtSign, Megaphone, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { readJsonOrThrow } from '../utils/http';
@@ -72,9 +72,10 @@ export default function Notifications() {
         credentials: 'include',
       });
       const data = await readJsonOrThrow(res, 'Could not load notifications');
-      const list = Array.isArray(data.items)
-        ? data.items.filter((i) => i?.type === 'announcement')
-        : [];
+      const raw = Array.isArray(data.items) ? data.items : [];
+      const list = raw.filter(
+        (i) => i?.type === 'announcement' || i?.type === 'mention',
+      );
       setItems(list);
     } catch (e) {
       setError(e?.message || 'Could not load notifications');
@@ -118,8 +119,8 @@ export default function Notifications() {
                 Notifications
               </h1>
               <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                Announcements from all your classrooms, newest first—grouped by
-                day.
+                Announcements and @mentions from your classrooms, newest
+                first—grouped by day.
               </p>
             </div>
           </div>
@@ -150,8 +151,8 @@ export default function Notifications() {
           </p>
         ) : items.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-10 text-center text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400">
-            No announcements yet. When instructors post in your classrooms,
-            they&apos;ll show up here.
+            No notifications yet. Classroom announcements and @mentions in
+            discussions appear here.
           </p>
         ) : (
           <div className="space-y-10">
@@ -161,14 +162,41 @@ export default function Notifications() {
                   {sectionHeading(dateKey, todayKey, yesterdayKey)}
                 </h2>
                 <ul className="space-y-3">
-                  {(groups.get(dateKey) ?? []).map((a, index) => (
+                  {(groups.get(dateKey) ?? []).map((a, index) => {
+                    const baseKey =
+                      a?.type === 'mention'
+                        ? `m-${a._id}-${a.createdAt}`
+                        : `a-${a.id}-${a.createdAt}`;
+                    return (
                     <li
-                      key={`${a.id}-${a.createdAt}`}
+                      key={baseKey}
                       style={{
                         animationDelay: `${Math.min(index * 40, 320)}ms`,
                       }}
                       className="fade-in-up"
                     >
+                      {a.type === 'mention' ? (
+                        <Link
+                          to={`/classroom/${encodeURIComponent(String(a.chatId))}`}
+                          className="group block rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:border-violet-300 hover:shadow-md dark:border-slate-600 dark:bg-slate-900/30 dark:hover:border-violet-700"
+                        >
+                          <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-violet-700 dark:text-violet-400">
+                            <AtSign className="h-3.5 w-3.5" aria-hidden />
+                            {a.chatName ?? 'Classroom'}
+                            <span className="font-normal normal-case text-slate-400 dark:text-slate-500">
+                              Mention · {formatRelativeTime(a.createdAt)}
+                            </span>
+                          </div>
+                          <p className="mt-1 font-display text-[15px] font-semibold text-slate-900 dark:text-slate-50 group-hover:text-violet-800 dark:group-hover:text-violet-200">
+                            {a.actor?.username
+                              ? `@${a.actor.username} mentioned you`
+                              : 'You were mentioned'}
+                          </p>
+                          <p className="mt-2 text-[11px] text-slate-400 dark:text-slate-500">
+                            Open discussion to view the message.
+                          </p>
+                        </Link>
+                      ) : (
                       <Link
                         to={`/classroom/${encodeURIComponent(String(a.chatId))}/announcements`}
                         className="group block rounded-2xl border border-slate-200 bg-white px-4 py-3 transition hover:border-cyan-300 hover:shadow-md dark:border-slate-600 dark:bg-slate-900/30 dark:hover:border-cyan-700"
@@ -191,8 +219,10 @@ export default function Notifications() {
                           {a.author}
                         </p>
                       </Link>
+                      )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               </section>
             ))}

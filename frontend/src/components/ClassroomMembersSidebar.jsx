@@ -41,6 +41,8 @@ function ClassroomMembersSidebar({
   onRefreshMeta,
   onCloseDrawer,
   className = '',
+  showEditClassroomButton = true,
+  showLeaveButton = true,
 }) {
   const [openMenuUserId, setOpenMenuUserId] = useState(null);
   const [actionBusy, setActionBusy] = useState(false);
@@ -116,6 +118,15 @@ function ClassroomMembersSidebar({
     }
   };
 
+  const controlCount =
+    1 + (showEditClassroomButton ? 1 : 0) + (showLeaveButton ? 1 : 0);
+  const controlsGridClass =
+    controlCount <= 1
+      ? 'grid w-full max-w-[14rem] grid-cols-1 gap-2'
+      : controlCount === 2
+        ? 'grid w-full max-w-[14rem] grid-cols-2 gap-2'
+        : 'grid w-full max-w-[14rem] grid-cols-3 gap-2';
+
   const classroomControls = (
     <>
       <button
@@ -132,34 +143,38 @@ function ClassroomMembersSidebar({
         <Copy className="h-5 w-5" strokeWidth={1.5} aria-hidden />
         Copy link
       </button>
-      <button
-        type="button"
-        onClick={() => onOpenEditClassroom?.()}
-        disabled={!viewerCanManageClassroom}
-        title={
-          viewerCanManageClassroom
-            ? 'Rename this classroom'
-            : 'Only classroom admins can edit'
-        }
-        className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50/90 hover:text-cyan-900 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-cyan-600 dark:hover:bg-slate-800"
-      >
-        <Pencil className="h-5 w-5" strokeWidth={1.5} aria-hidden />
-        Edit
-      </button>
-      <button
-        type="button"
-        onClick={() => onRequestLeave?.()}
-        disabled={viewerIsClassroomCreator || leaveBusy || !chatId}
-        title={
-          viewerIsClassroomCreator
-            ? 'Owners archive or delete the classroom instead'
-            : 'Leave this classroom'
-        }
-        className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50/90 hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-rose-700 dark:hover:bg-rose-950/40"
-      >
-        <LogOut className="h-5 w-5" strokeWidth={1.5} aria-hidden />
-        {leaveBusy ? '…' : 'Leave'}
-      </button>
+      {showEditClassroomButton ? (
+        <button
+          type="button"
+          onClick={() => onOpenEditClassroom?.()}
+          disabled={!viewerCanManageClassroom}
+          title={
+            viewerCanManageClassroom
+              ? 'Rename this classroom'
+              : 'Only classroom admins can edit'
+          }
+          className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50/90 hover:text-cyan-900 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-cyan-600 dark:hover:bg-slate-800"
+        >
+          <Pencil className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+          Edit
+        </button>
+      ) : null}
+      {showLeaveButton ? (
+        <button
+          type="button"
+          onClick={() => onRequestLeave?.()}
+          disabled={viewerIsClassroomCreator || leaveBusy || !chatId}
+          title={
+            viewerIsClassroomCreator
+              ? 'Owners archive or delete the classroom instead'
+              : 'Leave this classroom'
+          }
+          className="flex flex-col items-center gap-1.5 rounded-2xl border border-slate-200/90 bg-white px-3 py-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition hover:border-rose-300 hover:bg-rose-50/90 hover:text-rose-800 disabled:cursor-not-allowed disabled:opacity-45 dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-200 dark:hover:border-rose-700 dark:hover:bg-rose-950/40"
+        >
+          <LogOut className="h-5 w-5" strokeWidth={1.5} aria-hidden />
+          {leaveBusy ? '…' : 'Leave'}
+        </button>
+      ) : null}
     </>
   );
 
@@ -200,9 +215,7 @@ function ClassroomMembersSidebar({
             {members.length === 1 ? 'member' : 'members'}
           </p>
 
-          <div className="mt-5 grid w-full max-w-[14rem] grid-cols-3 gap-2">
-            {classroomControls}
-          </div>
+          <div className={`mt-5 ${controlsGridClass}`}>{classroomControls}</div>
         </div>
       </div>
 
