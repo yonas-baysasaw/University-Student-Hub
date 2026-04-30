@@ -1,6 +1,6 @@
 import { ArrowLeft, BookOpen, ChevronDown, Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import ReadAlongPanel from '../components/ReadAlongPanel';
 import { HUB_QUICK_PROMPTS } from '../constants/supportPrompts';
@@ -12,8 +12,8 @@ const MOBILE_READER_OPEN_KEY = 'studyBuddy.mobileReaderOpen';
 const DEFAULT_SPLIT_PCT = 52;
 const SPLIT_MIN = 22;
 const SPLIT_MAX = 72;
-/** When reader focus-read is on, AI column snaps to ~this width (%). */
-const FOCUS_READ_AI_PCT = 28;
+/** When reader focus-read is on, default left (Liqu AI) column width (%). Kept above 50% so chat stays wider than the reader until the user drags the splitter. */
+const FOCUS_READ_AI_PCT = 56;
 
 const starterPromptsWithBook = [
   'Summarize this chapter simply.',
@@ -63,7 +63,6 @@ function useIsLg() {
 
 function StudyBuddy() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -135,13 +134,6 @@ function StudyBuddy() {
   const starterPrompts = useMemo(
     () => (selectedBookId ? starterPromptsWithBook : HUB_QUICK_PROMPTS),
     [selectedBookId],
-  );
-
-  const onQuickPrompt = useCallback(
-    (prompt) => {
-      navigate('.', { state: { prefill: prompt }, replace: true });
-    },
-    [navigate],
   );
 
   const persistSplit = useCallback((pct) => {
@@ -354,7 +346,6 @@ function StudyBuddy() {
                   bookTitle={selectedBook?.title ?? ''}
                   bookId={selectedBookId || ''}
                   starterPrompts={starterPrompts}
-                  onQuickPrompt={onQuickPrompt}
                   workspacePresentation="studyBuddy"
                   sessionSidebarMode="rail"
                   denseStudyChrome={readerFocusRead}

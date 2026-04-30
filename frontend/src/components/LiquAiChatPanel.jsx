@@ -37,7 +37,7 @@ const GEMINI_TXT_ATTACH_MAX = 12000;
 /** Distance from scroll bottom below which we keep "follow stream" on for Gemini. */
 const GEMINI_SCROLL_STICK_THRESHOLD_PX = 96;
 
-/** Accent rings for Study Buddy horizontal quick-start pills (cycles by index). */
+/** Accent rings for Study Buddy quick-start tiles (cycles by index). */
 const STUDY_QUICK_PILL_ACCENTS = [
   'border-amber-400/55 bg-amber-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(245,158,11,0.4)] hover:bg-amber-500/[0.14] dark:border-amber-400/45 dark:bg-amber-950/45 dark:text-amber-50 dark:shadow-[0_0_28px_-12px_rgba(251,191,36,0.22)] dark:hover:bg-amber-900/40',
   'border-cyan-400/50 bg-cyan-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(34,211,238,0.35)] hover:bg-cyan-500/[0.14] dark:border-cyan-400/40 dark:bg-cyan-950/45 dark:text-cyan-50 dark:shadow-[0_0_28px_-12px_rgba(34,211,238,0.2)] dark:hover:bg-cyan-900/35',
@@ -116,7 +116,7 @@ function formatSessionUpdatedAt(iso) {
  * Gemini chat with sessions, socket streaming, and REST fallback — for Study buddy.
  * When `bookId` changes, the panel clears the active session and `session` URL param.
  * `bookTitle` tunes the welcome message. `contextBlurb` adds extra context (e.g. classroom material) below that line.
- * `starterPrompts` + `onQuickPrompt`: quick prompts below the welcome bubble.
+ * `starterPrompts` + optional `onQuickPrompt`: quick prompts below the welcome bubble (prefill elsewhere). Study Buddy omits `onQuickPrompt`; starters submit the message inline.
  * @param {'default' | 'gemini'} [variant] — `gemini` is a Gemini-style layout (light-first with `dark:` parity); default keeps card styling.
  * @param {null|'studyBuddy'} [workspacePresentation] — Study Buddy: Copilot-like greeting, pills, hero prompts + optional inline sidebar.
  * @param {'overlay'|'inline'|'rail'} [sessionSidebarMode] — `rail`: Gemini-style thin nav rail; `inline`: wide list beside chat.
@@ -606,10 +606,19 @@ function LiquAiChatPanel({
     }
   }
 
-  async function sendMessage(e) {
+  async function sendMessage(e, overrideText) {
     e?.preventDefault();
-    const text = draft.trim();
+    const text = (
+      overrideText != null ? String(overrideText) : draft
+    ).trim();
     if (!text || loading) return;
+
+    if (overrideText != null) {
+      navigate(
+        { pathname: location.pathname, search: location.search },
+        { replace: true, state: {} },
+      );
+    }
 
     const userMsg = { id: Date.now().toString(), role: 'user', content: text };
     if (isGemini) setFollowStream(true);
@@ -737,7 +746,7 @@ function LiquAiChatPanel({
     showQuickPromptsEmptyState &&
     Array.isArray(starterPrompts) &&
     starterPrompts.length > 0 &&
-    typeof onQuickPrompt === 'function';
+    (isStudyWorkspace || typeof onQuickPrompt === 'function');
 
   const isStarterState =
     !loading && messages.length === 1 && messages[0]?.id === 'welcome';
@@ -1200,23 +1209,28 @@ function LiquAiChatPanel({
                         />
                       ) : null}
 
-                      <div>
-                        <p className="mb-2 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-500">
+                      <div className="rounded-2xl border border-slate-200/60 bg-white/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+                        <p className="mb-3 flex items-center gap-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                          <Sparkles
+                            className="h-3 w-3 shrink-0 text-amber-500/90 dark:text-amber-400/90"
+                            strokeWidth={2}
+                            aria-hidden
+                          />
                           Quick start
                         </p>
-                        <ul className="m-0 flex list-none snap-x snap-mandatory gap-2 overflow-x-auto pb-1 pl-0.5 pt-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                           {starterPrompts.map((prompt, i) => (
-                            <li key={prompt} className="snap-start shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => onQuickPrompt(prompt)}
-                                className={`rounded-full border px-3.5 py-2 text-left text-xs font-medium leading-snug transition active:scale-[0.98] ${STUDY_QUICK_PILL_ACCENTS[i % STUDY_QUICK_PILL_ACCENTS.length]}`}
-                              >
-                                {prompt}
-                              </button>
-                            </li>
+                            <button
+                              key={prompt}
+                              type="button"
+                              disabled={loading}
+                              onClick={() => void sendMessage(undefined, prompt)}
+                              className={`w-full rounded-xl border px-3.5 py-2.5 text-left text-xs font-medium leading-snug transition hover:brightness-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-slate-500/50 dark:focus-visible:ring-offset-transparent ${STUDY_QUICK_PILL_ACCENTS[i % STUDY_QUICK_PILL_ACCENTS.length]}`}
+                            >
+                              {prompt}
+                            </button>
                           ))}
-                        </ul>
+                        </div>
                       </div>
                     </div>
                   ) : null}
