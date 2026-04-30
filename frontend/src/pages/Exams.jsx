@@ -7,10 +7,12 @@ import {
   Check,
   ChevronDown,
   FileStack,
+  Globe2,
   GraduationCap,
   GripHorizontal,
   Heart,
   Library,
+  Lock,
   PencilLine,
   Plus,
   Share2,
@@ -89,6 +91,58 @@ function normalizeOptions(raw) {
   return raw.map((x) => String(x ?? '').trim()).filter(Boolean);
 }
 
+/** All / Private / Public — works with `scope=browse` or `scope=mine` on GET /api/exams */
+function PapersVisibilityControl({ value, onChange, className = '' }) {
+  const opts = [
+    {
+      id: 'all',
+      label: 'All',
+      hint: 'Everything in view',
+      Icon: FileStack,
+    },
+    {
+      id: 'private',
+      label: 'Private',
+      hint: 'Only you',
+      Icon: Lock,
+    },
+    {
+      id: 'public',
+      label: 'Public',
+      hint: 'Discovery / bank',
+      Icon: Globe2,
+    },
+  ];
+
+  return (
+    <div
+      className={`inline-flex flex-wrap items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-1 shadow-inner dark:border-slate-700 dark:bg-slate-900/65 ${className}`}
+      role="group"
+      aria-label="Paper visibility filter"
+    >
+      {opts.map(({ id, label, hint, Icon }) => {
+        const active = value === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            title={hint}
+            onClick={() => onChange(id)}
+            className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${
+              active
+                ? 'bg-white text-cyan-900 shadow-sm ring-1 ring-cyan-500/25 dark:bg-slate-800 dark:text-cyan-100 dark:ring-cyan-500/35'
+                : 'text-slate-500 hover:bg-white/70 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800/80 dark:hover:text-slate-100'
+            }`}
+          >
+            <Icon className="h-3.5 w-3.5 shrink-0 opacity-90" aria-hidden />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Exams() {
   const [tab, setTab] = useState('vault');
 
@@ -158,7 +212,7 @@ function Exams() {
         </div>
 
         {tab === 'vault' ? (
-          <VaultWorkspace />
+          <VaultWorkspace onOpenImport={() => setTab('import')} />
         ) : tab === 'bank' ? (
           <BankTab />
         ) : (
@@ -189,7 +243,7 @@ Explanation: ${form.explanation || '(none)'}
 Subject/topic hints: ${form.subject || ''} / ${form.topic || ''}`;
 }
 
-function VaultWorkspace() {
+function VaultWorkspace({ onOpenImport }) {
   const { user } = useAuth();
   const username = user?.username ?? 'you';
 
@@ -220,6 +274,14 @@ function VaultWorkspace() {
   const [quizOpen, setQuizOpen] = useState(false);
   const [quizQs, setQuizQs] = useState([]);
 
+  const [myPapers, setMyPapers] = useState([]);
+  const [myPapersTotal, setMyPapersTotal] = useState(0);
+  const [myPapersPage, setMyPapersPage] = useState(1);
+  const [papersVisibility, setPapersVisibility] = useState('all');
+  const [papersSearch, setPapersSearch] = useState('');
+  const [myPapersLoading, setMyPapersLoading] = useState(true);
+  const papersPollRef = useRef(null);
+
   const fetchVault = useCallback(async () => {
     setLoading(true);
     try {
@@ -244,6 +306,52 @@ function VaultWorkspace() {
   useEffect(() => {
     fetchVault();
   }, [fetchVault]);
+
+  const fetchMyPapers = useCallback(async () => {
+    setMyPapersLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(myPapersPage),
+        limit: '18',
+        scope: 'mine',
+      });
+      if (papersVisibility !== 'all') {
+        params.set('visibility', papersVisibility);
+      }
+      const ps = papersSearch.trim();
+      if (ps) params.set('search', ps);
+      const res = await fetch(`/api/exams?${params}`, {
+        credentials: 'include',
+      });
+      const data = await readJsonOrThrow(res, 'Failed to load your papers');
+      setMyPapers(data.exams ?? []);
+      setMyPapersTotal(Number(data.total) || 0);
+    } catch (e) {
+      toast.error(e.message);
+      setMyPapers([]);
+      setMyPapersTotal(0);
+    } finally {
+      setMyPapersLoading(false);
+    }
+  }, [myPapersPage, papersVisibility, papersSearch]);
+
+  useEffect(() => {
+    fetchMyPapers();
+  }, [fetchMyPapers]);
+
+  useEffect(() => {
+    const busy = myPapers.some(
+      (e) =>
+        e.processingStatus === 'processing' ||
+        e.processingStatus === 'pending',
+    );
+    if (busy) {
+      papersPollRef.current = setInterval(fetchMyPapers, 4000);
+    } else {
+      clearInterval(papersPollRef.current);
+    }
+    return () => clearInterval(papersPollRef.current);
+  }, [myPapers, fetchMyPapers]);
 
   const selectedList = rows.filter((r) => selSet.has(r.id));
   /** Stable order list for publishing: reorder from publishOrderIds if set */
@@ -410,6 +518,8 @@ function VaultWorkspace() {
       });
       setPublishOpen(false);
       setSelSet(new Set());
+      fetchMyPapers();
+      fetchVault();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -468,112 +578,268 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="search"
-          placeholder="Search your vault…"
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          className="input-field h-10 flex-1 min-w-[180px] text-sm"
-        />
-        <button
-          type="button"
-          className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
-          onClick={openComposerNew}
-        >
-          <Plus className="h-4 w-4 shrink-0" />
-          Add MCQ
-        </button>
-        <button
-          type="button"
-          className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
-          onClick={startPractice}
-        >
-          <Shuffle className="h-4 w-4 shrink-0" />
-          Practice
-        </button>
-      </div>
+    <div className="space-y-12">
+      <section className="space-y-4" aria-labelledby="vault-papers-heading">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 ring-1 ring-cyan-500/25 dark:from-cyan-600/25 dark:to-indigo-900/30">
+                <FileStack className="h-4 w-4 text-slate-800 dark:text-slate-100" />
+              </span>
+              <h2
+                id="vault-papers-heading"
+                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+              >
+                Your papers
+              </h2>
+            </div>
+            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              Imported PDFs and snapshots you curated — same shelf as drafts, with
+              a visibility lens so you see private imports, bank-ready papers, or
+              everything together.
+            </p>
+          </div>
+          <PapersVisibilityControl
+            value={papersVisibility}
+            onChange={(id) => {
+              setPapersVisibility(id);
+              setMyPapersPage(1);
+            }}
+          />
+        </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20 text-slate-500">
-          <span className="loading loading-spinner" />
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            placeholder="Find a paper, course, or department…"
+            value={papersSearch}
+            onChange={(e) => {
+              setPapersSearch(e.target.value);
+              setMyPapersPage(1);
+            }}
+            className="input-field h-10 min-w-[220px] flex-1 text-sm"
+          />
+          {typeof onOpenImport === 'function' ? (
+            <button
+              type="button"
+              className="btn-secondary inline-flex items-center gap-2 whitespace-nowrap px-4 py-2 text-sm"
+              onClick={onOpenImport}
+            >
+              <Upload className="h-4 w-4 shrink-0" aria-hidden />
+              Import PDF
+            </button>
+          ) : null}
+          <span className="hidden whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:inline">
+            {myPapersTotal} · your uploads in this lens
+          </span>
         </div>
-      ) : rows.length === 0 ? (
-        <div className="panel-card rounded-3xl px-8 py-12 text-center">
-          <GraduationCap className="mx-auto h-10 w-10 text-cyan-600/70" />
-          <p className="mt-3 font-display text-lg text-slate-900 dark:text-slate-50">
-            Your vault is empty
-          </p>
-          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
-            Use <strong>Add MCQ</strong> above to draft private questions. Nothing
-            leaves your account until you publish a composed paper to the bank.
-          </p>
+
+        {myPapersLoading ? (
+          <div className="flex items-center justify-center py-14 text-slate-500">
+            <span className="loading loading-spinner" />
+            <span className="ml-2 text-sm">Loading your papers…</span>
+          </div>
+        ) : myPapers.length === 0 ? (
+          <div className="panel-card rounded-2xl border border-dashed border-slate-200/90 px-6 py-10 text-center dark:border-slate-700/90">
+            <FileStack className="mx-auto h-9 w-9 text-slate-400 dark:text-slate-500" />
+            <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">
+              No papers in this lens
+            </p>
+            <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
+              {papersVisibility === 'private'
+                ? 'No private extracts yet — try All or import a PDF (stays private until you switch to Community).'
+                : papersVisibility === 'public'
+                  ? 'Nothing listed on the bank from you yet — publish from drafts below or expose a PDF.'
+                  : 'Import a syllabus or compose questions and publish — your shelf stays organized here.'}
+            </p>
+            {typeof onOpenImport === 'function' ? (
+              <button
+                type="button"
+                className="btn-primary mt-4 px-5 py-2 text-sm"
+                onClick={onOpenImport}
+              >
+                Go to Import PDF
+              </button>
+            ) : null}
+          </div>
+        ) : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {myPapers.map((exam) => (
+                <ExamCard
+                  key={exam.id}
+                  exam={exam}
+                  currentUserId={user?._id ?? user?.id}
+                  onDelete={() => fetchMyPapers()}
+                  onUpdate={(updated) =>
+                    setMyPapers((prev) =>
+                      prev.map((e) => (e.id === updated.id ? updated : e)),
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+              Showing {myPapers.length} of {myPapersTotal} ({papersVisibility})
+            </p>
+            {myPapersTotal > 18 ? (
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  type="button"
+                  disabled={myPapersPage === 1}
+                  onClick={() => setMyPapersPage((p) => Math.max(1, p - 1))}
+                  className="btn-secondary px-4 py-2 text-sm disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-600 dark:text-slate-400">
+                  Page {myPapersPage} of{' '}
+                  {Math.max(1, Math.ceil(myPapersTotal / 18))}
+                </span>
+                <button
+                  type="button"
+                  disabled={myPapersPage >= Math.ceil(myPapersTotal / 18)}
+                  onClick={() => setMyPapersPage((p) => p + 1)}
+                  className="btn-secondary px-4 py-2 text-sm disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
+
+      <section className="space-y-4" aria-labelledby="vault-drafts-heading">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200/80 pt-10 dark:border-slate-700/80">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-slate-300/25 ring-1 ring-slate-200/70 dark:from-indigo-900/35 dark:to-slate-700/35 dark:ring-slate-600/60">
+                <GraduationCap className="h-4 w-4 text-slate-800 dark:text-slate-100" />
+              </span>
+              <h2
+                id="vault-drafts-heading"
+                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+              >
+                Question drafts
+              </h2>
+            </div>
+            <p className="mt-2 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
+              Stem-and-option work in progress — stays on-device until you batch
+              publish as a curated paper above.
+            </p>
+          </div>
         </div>
-      ) : (
-        <>
-          <ul className="space-y-2">
-            {rows.map((mc) => {
-              const chk = selSet.has(mc.id);
-              return (
-                <li key={mc.id}>
-                  <div
-                    className={`panel-card flex flex-wrap items-start gap-3 rounded-2xl p-4 transition md:flex-nowrap md:items-center ${
-                      chk ? 'ring-2 ring-cyan-500/35 dark:ring-cyan-400/30' : ''
-                    }`}
-                  >
-                    <label className="flex cursor-pointer items-center gap-2 pt-1">
-                      <input
-                        type="checkbox"
-                        checked={chk}
-                        onChange={(e) => toggleSel(mc.id, e.target.checked)}
-                        className="rounded border-slate-300 dark:border-slate-600"
-                      />
-                    </label>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">
-                        {mc.question.length > 200
-                          ? `${mc.question.slice(0, 197)}…`
-                          : mc.question}
-                      </p>
-                      {(mc.subject || mc.topic) && (
-                        <p className="mt-1 text-xs text-slate-500">
-                          {[mc.subject, mc.topic].filter(Boolean).join(' · ')} ·{' '}
-                          <span className="font-semibold">
-                            Difficulty {mc.difficulty ?? '?'}
-                          </span>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            placeholder="Search your vault drafts…"
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="input-field h-10 flex-1 min-w-[180px] text-sm"
+          />
+          <button
+            type="button"
+            className="btn-primary inline-flex items-center gap-2 px-4 py-2 text-sm"
+            onClick={openComposerNew}
+          >
+            <Plus className="h-4 w-4 shrink-0" />
+            Add MCQ
+          </button>
+          <button
+            type="button"
+            className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm"
+            onClick={startPractice}
+          >
+            <Shuffle className="h-4 w-4 shrink-0" />
+            Practice
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16 text-slate-500">
+            <span className="loading loading-spinner" />
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="panel-card rounded-2xl border border-slate-200/70 px-6 py-10 text-center dark:border-slate-700/70">
+            <GraduationCap className="mx-auto h-10 w-10 text-cyan-600/70" />
+            <p className="mt-3 font-display text-base font-semibold text-slate-900 dark:text-slate-50">
+              No drafts yet — only MCQs missing
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+              Papers you uploaded still appear above. Tap <strong>Add MCQ</strong>{' '}
+              to sketch privately; stitch them together when publishing to the bank.
+            </p>
+          </div>
+        ) : (
+          <>
+            <ul className="space-y-2">
+              {rows.map((mc) => {
+                const chk = selSet.has(mc.id);
+                return (
+                  <li key={mc.id}>
+                    <div
+                      className={`panel-card flex flex-wrap items-start gap-3 rounded-2xl p-4 transition md:flex-nowrap md:items-center ${
+                        chk
+                          ? 'ring-2 ring-cyan-500/35 dark:ring-cyan-400/30'
+                          : ''
+                      }`}
+                    >
+                      <label className="flex cursor-pointer items-center gap-2 pt-1">
+                        <input
+                          type="checkbox"
+                          checked={chk}
+                          onChange={(e) => toggleSel(mc.id, e.target.checked)}
+                          className="rounded border-slate-300 dark:border-slate-600"
+                        />
+                      </label>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium leading-snug text-slate-900 dark:text-slate-100">
+                          {mc.question.length > 200
+                            ? `${mc.question.slice(0, 197)}…`
+                            : mc.question}
                         </p>
-                      )}
+                        {(mc.subject || mc.topic) && (
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                            {[mc.subject, mc.topic].filter(Boolean).join(' · ')}{' '}
+                            ·{' '}
+                            <span className="font-semibold">
+                              Difficulty {mc.difficulty ?? '?'}
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          className="btn-secondary px-3 py-1.5 text-xs"
+                          onClick={() => openComposerEdit(mc)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-xl border border-rose-200/80 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-900/45 dark:text-rose-400 dark:hover:bg-rose-950/35"
+                          onClick={() => deleteMc(mc.id)}
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        className="btn-secondary py-1.5 px-3 text-xs"
-                        onClick={() => openComposerEdit(mc)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-xl border border-rose-200/80 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:border-rose-900/45 dark:text-rose-400 dark:hover:bg-rose-950/35"
-                        onClick={() => deleteMc(mc.id)}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="text-center text-xs text-slate-500">
-            Showing {rows.length} of {total}
-          </p>
-        </>
-      )}
+                  </li>
+                );
+              })}
+            </ul>
+            <p className="text-center text-xs text-slate-500 dark:text-slate-400">
+              Showing {rows.length} of {total}
+            </p>
+          </>
+        )}
+      </section>
 
       {composerOpen ? (
         <div className="fixed inset-0 z-[2147483630] flex flex-col lg:flex-row">
@@ -1137,13 +1403,20 @@ function BankTab() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [visibilityFilter, setVisibilityFilter] = useState('all');
   const pollRef = useRef(null);
 
   const fetchExams = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ page, limit: 18 });
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '18',
+      });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
+      if (visibilityFilter !== 'all') {
+        params.set('visibility', visibilityFilter);
+      }
 
       const res = await fetch(`/api/exams?${params}`, {
         credentials: 'include',
@@ -1156,7 +1429,7 @@ function BankTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter]);
+  }, [page, search, statusFilter, visibilityFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -1177,8 +1450,31 @@ function BankTab() {
   }, [exams, fetchExams]);
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="min-w-[200px] flex-1">
+          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Who can browse
+          </span>
+          <PapersVisibilityControl
+            value={visibilityFilter}
+            onChange={(id) => {
+              setVisibilityFilter(id);
+              setPage(1);
+            }}
+          />
+        </div>
+        <span className="hidden text-[11px] leading-snug text-slate-400 dark:text-slate-500 md:block md:max-w-xs">
+          <strong className="text-slate-600 dark:text-slate-300">Public</strong>{' '}
+          is the whole bank.&nbsp;
+          <strong className="text-slate-600 dark:text-slate-300">
+            Private
+          </strong>{' '}
+          is only drafts you uploaded.
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
           placeholder="Search papers…"
@@ -1187,7 +1483,7 @@ function BankTab() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 w-60 text-sm"
+          className="input-field h-9 max-w-none flex-1 min-w-[10rem] sm:max-w-md sm:min-w-[14rem]"
         />
         <select
           value={statusFilter}
@@ -1195,7 +1491,7 @@ function BankTab() {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 text-sm"
+          className="input-field h-9 shrink-0 text-sm"
         >
           <option value="">All statuses</option>
           <option value="complete">Ready</option>
@@ -1203,7 +1499,7 @@ function BankTab() {
           <option value="pending">Queued</option>
           <option value="failed">Failed</option>
         </select>
-        <span className="ml-auto text-xs text-slate-500">
+        <span className="ml-auto whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
           {total} paper{total !== 1 ? 's' : ''}
         </span>
       </div>
@@ -1223,9 +1519,15 @@ function BankTab() {
 
       {!loading && !error && exams.length === 0 && (
         <div className="panel-card rounded-2xl p-8 text-center">
-          <p className="font-display text-lg text-slate-700">No papers yet.</p>
-          <p className="mt-1 text-sm text-slate-500">
-            Import a PDF or publish from your vault.
+          <p className="font-display text-lg text-slate-700 dark:text-slate-200">
+            No papers yet.
+          </p>
+          <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
+            {visibilityFilter === 'private'
+              ? 'Nothing private-import in this list — widen to All or add a PDF from your vault tab.'
+              : visibilityFilter === 'public'
+                ? 'No community papers match — invite classmates to publish or widen your lens.'
+                : 'Import a PDF or publish from your vault.'}
           </p>
         </div>
       )}

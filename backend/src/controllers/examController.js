@@ -163,26 +163,55 @@ async function listExamsController(req, res, next) {
     const userId = req.user._id;
     const { subject, status, search, page = 1, limit = 20 } = req.query;
 
-    const filter = {
-      $or: [{ uploadedBy: userId }, { visibility: 'public' }],
-    };
+    /** `browse` (default): your papers + community public. `mine`: only uploads you own. */
+    const scope = String(req.query.scope ?? 'browse')
+      .trim()
+      .toLowerCase();
+    /** `all` | `private` | `public` — narrows visibility within scope. */
+    const visibility = String(req.query.visibility ?? 'all')
+      .trim()
+      .toLowerCase();
+
+    const andParts = [];
+
+    if (scope === 'mine') {
+      andParts.push({ uploadedBy: userId });
+      if (visibility === 'private') andParts.push({ visibility: 'private' });
+      else if (visibility === 'public') andParts.push({ visibility: 'public' });
+    } else if (visibility === 'private') {
+      andParts.push({ uploadedBy: userId, visibility: 'private' });
+    } else if (visibility === 'public') {
+      andParts.push({ visibility: 'public' });
+    } else {
+      andParts.push({
+        $or: [{ uploadedBy: userId }, { visibility: 'public' }],
+      });
+    }
+
+    if (search) {
+      const q = String(search).trim();
+      if (q) {
+        andParts.push({
+          $or: [
+            { filename: new RegExp(q, 'i') },
+            { topic: new RegExp(q, 'i') },
+            { subject: new RegExp(q, 'i') },
+            { department: new RegExp(q, 'i') },
+            { courseSubject: new RegExp(q, 'i') },
+          ],
+        });
+      }
+    }
+
+    const filter =
+      andParts.length === 0
+        ? {}
+        : andParts.length === 1
+          ? { ...andParts[0] }
+          : { $and: andParts };
 
     if (status) filter.processingStatus = status;
     if (subject) filter.subject = new RegExp(subject, 'i');
-    if (search) {
-      filter.$and = [
-        filter.$and ?? [],
-        {
-          $or: [
-            { filename: new RegExp(search, 'i') },
-            { topic: new RegExp(search, 'i') },
-            { subject: new RegExp(search, 'i') },
-            { department: new RegExp(search, 'i') },
-            { courseSubject: new RegExp(search, 'i') },
-          ],
-        },
-      ].flat();
-    }
 
     const skip = (Number(page) - 1) * Number(limit);
     const [exams, total] = await Promise.all([
