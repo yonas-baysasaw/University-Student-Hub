@@ -1,7 +1,10 @@
+import { ArrowLeft, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useSocket } from '../contexts/SocketContext';
+import { academicTrackLabel } from '../utils/bookUploadMeta';
+import { examPaperTypeLabel } from '../utils/examPaperLabels';
 import { readJsonOrThrow } from '../utils/http';
 
 // Ported quiz logic from did-exit/js/quiz-manager.js and ai-integration.js (analyzeAnswers)
@@ -12,6 +15,78 @@ const STATUS_LABELS = {
   complete: 'Ready',
   failed: 'Processing failed',
 };
+
+const EXAMS_HUB_PATH = '/liqu-ai/exams';
+
+function ExamCatalogStrip({ exam, className = '' }) {
+  const uid = exam?.uploadedBy?.id ?? exam?.uploadedBy?._id;
+  const chips = [];
+  const ptLabel = examPaperTypeLabel(exam?.paperType);
+  if (ptLabel && ptLabel !== 'Paper') {
+    chips.push({ key: 'pt', label: ptLabel });
+  }
+  const track = academicTrackLabel(exam?.academicTrack);
+  if (track) chips.push({ key: 'track', label: track });
+  if (exam?.department?.trim())
+    chips.push({ key: 'dept', label: exam.department.trim() });
+  if (exam?.courseSubject?.trim())
+    chips.push({ key: 'course', label: exam.courseSubject.trim() });
+
+  if (
+    chips.length === 0 &&
+    !exam?.uploadedBy?.username &&
+    !exam?.subject &&
+    !exam?.topic
+  )
+    return null;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-3 gap-y-2 text-[11px] text-slate-500 dark:text-slate-400 ${className}`}
+    >
+      {chips.map((c) => (
+        <span
+          key={c.key}
+          className="rounded-full bg-slate-100 px-2.5 py-0.5 font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200"
+        >
+          {c.label}
+        </span>
+      ))}
+      {(exam?.subject || exam?.topic) && (
+        <span className="text-slate-500 dark:text-slate-400">
+          {[exam.subject, exam.topic].filter(Boolean).join(' · ')}
+        </span>
+      )}
+      {exam?.uploadedBy?.username ? (
+        <span className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300">
+          <UserRound className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+          <span className="text-slate-400">Curated by</span>
+          <Link
+            to={uid ? `/users/${uid}` : EXAMS_HUB_PATH}
+            className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+          >
+            @{exam.uploadedBy.username}
+          </Link>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function BackToExamHubLink({ variant = 'primary' }) {
+  let cls =
+    'inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-cyan-600/55 dark:hover:text-cyan-100';
+  if (variant === 'muted') {
+    cls =
+      'inline-flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white';
+  }
+  return (
+    <Link to={EXAMS_HUB_PATH} className={cls}>
+      <ArrowLeft className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      Exam studio
+    </Link>
+  );
+}
 
 // ── analyzeAnswers — ported verbatim from did-exit/js/ai-integration.js ──────
 
@@ -161,12 +236,9 @@ function ExamPractice() {
     return (
       <div className="page-surface px-4 py-16 text-center">
         <p className="text-rose-600">{error}</p>
-        <Link
-          to="/liqu-ai/exams"
-          className="btn-primary mt-4 inline-block px-5 py-2.5 text-sm"
-        >
-          Back to Exams
-        </Link>
+        <div className="mt-6 flex justify-center">
+          <BackToExamHubLink />
+        </div>
       </div>
     );
   }
@@ -193,9 +265,14 @@ function ExamPractice() {
     exam.processingStatus === 'pending';
 
   return (
-    <div className="page-surface flex flex-col items-center justify-center px-4 py-24 text-center">
+    <div className="page-surface flex flex-col items-center justify-center px-4 py-16 text-center md:py-24">
+      <div className="mb-8 w-full max-w-md">
+        <BackToExamHubLink />
+      </div>
       <div className="panel-card w-full max-w-md rounded-3xl p-8">
-        <p className="font-display text-xl text-slate-900">{exam.filename}</p>
+        <p className="font-display text-xl text-slate-900 dark:text-slate-50">
+          {exam.filename}
+        </p>
         <p
           className={`mt-3 text-sm ${isFailed ? 'text-rose-600' : 'text-slate-500'}`}
         >
@@ -207,12 +284,9 @@ function ExamPractice() {
             Questions are being extracted…
           </div>
         )}
-        <Link
-          to="/liqu-ai/exams"
-          className="btn-secondary mt-6 inline-block px-5 py-2.5 text-sm"
-        >
-          Back to Exams
-        </Link>
+        <div className="mt-6 flex justify-center">
+          <BackToExamHubLink variant="muted" />
+        </div>
       </div>
     </div>
   );
@@ -338,7 +412,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
         throw new Error(d.message || 'Delete failed');
       }
       toast.success('Exam deleted');
-      navigate('/liqu-ai/exams');
+      navigate(EXAMS_HUB_PATH);
     } catch (err) {
       toast.error(err.message);
       setDeleting(false);
@@ -361,43 +435,42 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
   }
 
   return (
-    <div className="page-surface px-4 pb-10 pt-8 md:px-6">
+    <div className="page-surface px-4 pb-10 pt-6 md:px-6 md:pt-8">
       {/* ── Exam header ─────────────────────────────────────────────────────── */}
       <div className="mx-auto mb-4 max-w-5xl">
-        <div className="panel-card fade-in-up rounded-3xl p-4 md:p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+        <div className="mb-3">
+          <BackToExamHubLink />
+        </div>
+        <div className="panel-card fade-in-up rounded-3xl border border-slate-200/80 p-4 dark:border-slate-700 md:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
                 Exam Practice
                 {isProcessing && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/55 dark:text-amber-200">
                     <span className="loading loading-spinner loading-xs" />
                     Still extracting…
                   </span>
                 )}
               </p>
               <h1
-                className="mt-0.5 truncate font-display text-lg text-slate-900"
+                className="mt-0.5 truncate font-display text-lg text-slate-900 dark:text-slate-50"
                 title={exam.filename}
               >
                 {exam.filename}
               </h1>
-              {exam.subject && (
-                <p className="mt-0.5 text-xs text-slate-500">{exam.subject}</p>
-              )}
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              {/* Edit/delete menu */}
+            <div className="flex shrink-0 items-start gap-1">
               <div className="dropdown dropdown-end">
                 <button
                   type="button"
                   tabIndex={0}
-                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
                   title="Options"
                 >
                   ⋯
                 </button>
-                <ul className="menu menu-sm dropdown-content z-[999] mt-1 w-44 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg">
+                <ul className="menu menu-sm dropdown-content z-[999] mt-1 w-44 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
                   <li>
                     <button
                       type="button"
@@ -406,7 +479,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
                         setEditSubject(exam.subject ?? '');
                         setEditOpen(true);
                       }}
-                      className="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100"
+                      className="rounded-xl px-3 py-2 text-sm text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                     >
                       Edit details
                     </button>
@@ -415,19 +488,13 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
                     <button
                       type="button"
                       onClick={() => setConfirmDelete(true)}
-                      className="rounded-xl px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                      className="rounded-xl px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:text-rose-900/70 dark:hover:bg-rose-950/35"
                     >
                       Delete exam
                     </button>
                   </li>
                 </ul>
               </div>
-              <Link
-                to="/liqu-ai/exams"
-                className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100"
-              >
-                ← Back
-              </Link>
             </div>
           </div>
 
@@ -855,7 +922,10 @@ function ResultsScreen({ exam, results, onRestart, onReview }) {
   const grade = getGrade(results.percentage);
 
   return (
-    <div className="page-surface px-4 pb-10 pt-8 md:px-6">
+    <div className="page-surface px-4 pb-10 pt-6 md:px-6 md:pt-8">
+      <div className="mx-auto mb-6 max-w-3xl">
+        <BackToExamHubLink />
+      </div>
       <div className="mx-auto max-w-3xl">
         {/* Score card */}
         <div className="panel-card fade-in-up mb-6 rounded-3xl p-7 text-center">
@@ -873,11 +943,15 @@ function ResultsScreen({ exam, results, onRestart, onReview }) {
             · {results.totalQuestions} total
           </p>
           <p
-            className="mt-1 truncate text-xs text-slate-400"
+            className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500"
             title={exam.filename}
           >
             {exam.filename}
           </p>
+          <ExamCatalogStrip
+            exam={exam}
+            className="mx-auto mt-3 max-w-lg justify-center"
+          />
 
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <button
@@ -894,8 +968,11 @@ function ResultsScreen({ exam, results, onRestart, onReview }) {
             >
               Review answers
             </button>
-            <Link to="/liqu-ai/exams" className="btn-secondary px-5 py-2.5 text-sm">
-              Back to Exams
+            <Link
+              to={EXAMS_HUB_PATH}
+              className="btn-secondary px-5 py-2.5 text-sm"
+            >
+              Exam studio
             </Link>
           </div>
         </div>

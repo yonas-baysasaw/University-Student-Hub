@@ -65,6 +65,72 @@ const examSchema = new mongoose.Schema(
       default: '',
       trim: true,
     },
+    /** Catalog metadata (PDF imports + optional on composed papers) */
+    academicTrack: {
+      type: String,
+      default: '',
+      trim: true,
+      index: true,
+    },
+    department: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 160,
+    },
+    courseSubject: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 200,
+    },
+    /** exit / mock / model / final / midterm / other */
+    paperType: {
+      type: String,
+      enum: [
+        'exit_exam',
+        'mock_exit_exam',
+        'model_exit_exam',
+        'final_exam',
+        'midterm',
+        'other',
+      ],
+      default: 'other',
+      index: true,
+    },
+    likesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    dislikesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    savesCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    likedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    dislikedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    savedBy: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     visibility: {
       type: String,
       enum: ['public', 'private'],
@@ -102,6 +168,6 @@ examSchema.pre('validate', function (next) {
 });
 
 examSchema.index({ contentHash: 1, processingStatus: 1 });
-examSchema.index({ filename: 'text', subject: 'text', topic: 'text' });
+examSchema.index({ filename: 'text', subject: 'text', topic: 'text', department: 'text', courseSubject: 'text' });
 
 export default mongoose.model('Exam', examSchema);

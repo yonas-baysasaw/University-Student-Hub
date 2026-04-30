@@ -1,18 +1,24 @@
 import {
   ArrowDown,
+  ArrowLeft,
   ArrowUp,
+  Bookmark,
   BookMarked,
   Check,
   ChevronDown,
   FileStack,
   GraduationCap,
   GripHorizontal,
+  Heart,
   Library,
   PencilLine,
   Plus,
+  Share2,
   Shuffle,
   Sparkles,
+  ThumbsDown,
   Upload,
+  UserRound,
   X,
 } from 'lucide-react';
 import {
@@ -27,6 +33,17 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  ACADEMIC_TRACKS,
+  COURSE_SUBJECT_SUGGESTIONS,
+  DEPARTMENTS_BY_TRACK,
+  academicTrackLabel,
+  resolveDepartmentForSubmit,
+} from '../utils/bookUploadMeta';
+import {
+  EXAM_PAPER_TYPE_OPTIONS,
+  examPaperTypeLabel,
+} from '../utils/examPaperLabels';
 import { readJsonOrThrow } from '../utils/http';
 
 const TABS = [
@@ -78,6 +95,15 @@ function Exams() {
   return (
     <div className="liqu-ai-ambient page-surface px-4 pb-14 pt-6 md:px-6 md:pt-8">
       <div className="mx-auto max-w-6xl">
+        <div className="mb-4">
+          <Link
+            to="/liqu-ai"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-cyan-700/50 dark:hover:text-cyan-100"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
+            Back to Liqu AI
+          </Link>
+        </div>
         <header className="panel-card fade-in-up relative mb-6 overflow-hidden rounded-3xl p-6 md:p-8">
           <div
             className="workspace-hero-mesh pointer-events-none absolute inset-0 rounded-3xl opacity-70"
@@ -184,6 +210,10 @@ function VaultWorkspace() {
   const [pubTitle, setPubTitle] = useState('');
   const [pubSubject, setPubSubject] = useState('');
   const [pubTopic, setPubTopic] = useState('');
+  const [pubTrack, setPubTrack] = useState('engineering');
+  const [pubDepartment, setPubDepartment] = useState('');
+  const [pubCourse, setPubCourse] = useState('');
+  const [pubPaperType, setPubPaperType] = useState('other');
   const [publishOrderIds, setPublishOrderIds] = useState([]);
   const [publishing, setPublishing] = useState(false);
 
@@ -331,6 +361,10 @@ function VaultWorkspace() {
     setPublishOrderIds(idsFromSelection);
     setPubSubject(selectedList[0]?.subject ?? '');
     setPubTopic(selectedList[0]?.topic ?? '');
+    setPubTrack('engineering');
+    setPubDepartment('');
+    setPubCourse('');
+    setPubPaperType('other');
     setPubTitle('');
     setPublishOpen(true);
   }
@@ -351,6 +385,10 @@ function VaultWorkspace() {
           subject: pubSubject.trim(),
           topic: pubTopic.trim(),
           questionIds: publishOrderIds,
+          academicTrack: pubTrack,
+          department: pubDepartment.trim(),
+          courseSubject: pubCourse.trim(),
+          paperType: pubPaperType,
         }),
       });
       const data = await readJsonOrThrow(res, 'Publish failed');
@@ -470,17 +508,10 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
           <p className="mt-3 font-display text-lg text-slate-900 dark:text-slate-50">
             Your vault is empty
           </p>
-          <p className="mt-2 text-sm text-slate-500">
-            Compose your first MCQ—nothing leaves your account until you
-            publish.
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-slate-500">
+            Use <strong>Add MCQ</strong> above to draft private questions. Nothing
+            leaves your account until you publish a composed paper to the bank.
           </p>
-          <button
-            type="button"
-            className="btn-primary mt-6 px-6 py-2 text-sm"
-            onClick={openComposerNew}
-          >
-            Compose first MCQ
-          </button>
         </div>
       ) : (
         <>
@@ -779,6 +810,75 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
                   />
                 </label>
               </div>
+
+              <details className="rounded-xl border border-slate-200/80 bg-slate-50/60 px-3 py-3 dark:border-slate-700 dark:bg-slate-950/35">
+                <summary className="cursor-pointer select-none text-xs font-semibold text-slate-800 dark:text-slate-200">
+                  Catalog · helps classmates discover your paper
+                </summary>
+                <div className="mt-3 space-y-3">
+                  <label className="block text-[11px] font-semibold text-slate-500">
+                    Academic field
+                    <select
+                      value={pubTrack}
+                      onChange={(e) => {
+                        setPubTrack(e.target.value);
+                        setPubDepartment('');
+                      }}
+                      className="mt-1 input-field h-10 w-full text-sm"
+                    >
+                      {ACADEMIC_TRACKS.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-[11px] font-semibold text-slate-500">
+                    Department / discipline
+                    <select
+                      value={pubDepartment}
+                      onChange={(e) => setPubDepartment(e.target.value)}
+                      className="mt-1 input-field h-10 w-full text-sm"
+                    >
+                      <option value="">Select…</option>
+                      {(DEPARTMENTS_BY_TRACK[pubTrack] ?? []).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block text-[11px] font-semibold text-slate-500">
+                    Course · subject title
+                    <input
+                      value={pubCourse}
+                      onChange={(e) => setPubCourse(e.target.value)}
+                      placeholder="e.g. Data Structures"
+                      className="mt-1 input-field w-full text-sm"
+                      list="pub-course-list"
+                    />
+                    <datalist id="pub-course-list">
+                      {COURSE_SUBJECT_SUGGESTIONS.map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                  </label>
+                  <label className="block text-[11px] font-semibold text-slate-500">
+                    Paper classification
+                    <select
+                      value={pubPaperType}
+                      onChange={(e) => setPubPaperType(e.target.value)}
+                      className="mt-1 input-field h-10 w-full text-sm"
+                    >
+                      {EXAM_PAPER_TYPE_OPTIONS.map((o) => (
+                        <option key={o.id} value={o.id}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </details>
 
               <p className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
                 Ordering
@@ -1175,6 +1275,213 @@ function BankTab() {
   );
 }
 
+// ── Question bank engagement (Library-inspired) ────────────────────────────────
+
+function ExamPaperEngagement({ exam, currentUserId, onUpdate }) {
+  const vs = exam.viewerState ?? {};
+  const authorId =
+    exam.uploadedBy?.id ?? exam.uploadedBy?._id ?? exam.uploadedBy;
+  const [busy, setBusy] = useState(null);
+
+  const userReaction =
+    vs.liked === true ? 'like' : vs.disliked === true ? 'dislike' : 'none';
+
+  async function toggleReaction(kind) {
+    const nextReaction = kind === userReaction ? 'none' : kind;
+    setBusy(kind);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/react`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reaction: nextReaction }),
+      });
+      const data = await readJsonOrThrow(res, 'Could not update reaction');
+      onUpdate?.(data);
+      toast.success(
+        nextReaction === 'none'
+          ? 'Reaction cleared'
+          : nextReaction === 'like'
+            ? 'Marked helpful'
+            : 'Feedback saved',
+      );
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleShelf() {
+    setBusy('save');
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/save`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await readJsonOrThrow(res, 'Could not update shelf');
+      onUpdate?.(data);
+      toast.success(
+        data.viewerState?.saved ? 'Saved to your shelf' : 'Removed from shelf',
+      );
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function sharePaper() {
+    const url = `${window.location.origin}/exams/${exam.id}`;
+    setBusy('share');
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: exam.filename,
+          text: `${exam.filename} · ${examPaperTypeLabel(exam.paperType)}`,
+          url,
+        });
+        toast.success('Shared');
+      } else if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        toast.success('Practice link copied');
+      } else {
+        toast.error('Sharing not supported in this browser');
+      }
+    } catch {
+      toast.message('Share cancelled');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleSubscribeAuthor() {
+    if (!authorId || String(authorId) === String(currentUserId)) return;
+    setBusy('sub');
+    try {
+      const res = await fetch(`/api/profile/public/${authorId}/subscribe`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      const data = await readJsonOrThrow(res, 'Could not subscribe');
+      const subscribed = Boolean(data?.subscribed);
+      const ct = Number.isFinite(Number(data?.profile?.subscribersCount))
+        ? Number(data.profile.subscribersCount)
+        : exam.uploadedBy?.subscribersCount;
+      onUpdate?.({
+        ...exam,
+        uploadedBy: {
+          ...exam.uploadedBy,
+          viewerSubscribed: subscribed,
+          subscribersCount:
+            ct ?? exam.uploadedBy?.subscribersCount ?? 0,
+        },
+      });
+      toast.success(
+        subscribed
+          ? 'You\'ll see more from this curator'
+          : 'Unfollowed creator',
+      );
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const canFollow =
+    authorId && String(authorId) !== String(currentUserId ?? '');
+
+  return (
+    <div className="mt-4 rounded-2xl border border-slate-200/70 bg-gradient-to-br from-slate-50/90 to-white/95 px-3 py-2.5 dark:border-slate-700 dark:from-slate-900/50 dark:to-slate-950/65">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          disabled={busy != null && busy !== 'like'}
+          onClick={() => toggleReaction('like')}
+          title="Mark as helpful"
+          className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition ${
+            vs.liked
+              ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-200'
+              : 'border-slate-200/90 text-slate-600 hover:border-cyan-300/70 dark:border-slate-600 dark:text-slate-400'
+          }`}
+        >
+          <Heart
+            className={`h-3.5 w-3.5 ${vs.liked ? 'fill-current' : ''}`}
+            aria-hidden
+          />
+          {exam.likesCount ?? 0}
+        </button>
+        <button
+          type="button"
+          disabled={busy != null && busy !== 'dislike'}
+          onClick={() => toggleReaction('dislike')}
+          title="Not helpful"
+          className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition ${
+            vs.disliked
+              ? 'border-slate-400 bg-slate-800 text-white dark:bg-slate-700'
+              : 'border-slate-200/90 text-slate-600 hover:border-slate-400 dark:border-slate-600 dark:text-slate-400'
+          }`}
+        >
+          <ThumbsDown
+            className={`h-3.5 w-3.5 ${vs.disliked ? 'fill-current' : ''}`}
+            aria-hidden
+          />
+          {exam.dislikesCount ?? 0}
+        </button>
+        <button
+          type="button"
+          disabled={busy === 'save'}
+          onClick={toggleShelf}
+          title="Save to shelf"
+          className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition ${
+            vs.saved
+              ? 'border-violet-300 bg-violet-50 text-violet-900 dark:border-violet-900/55 dark:bg-violet-950/40 dark:text-violet-100'
+              : 'border-slate-200/90 text-slate-600 hover:border-violet-300/70 dark:border-slate-600 dark:text-slate-400'
+          }`}
+        >
+          <Bookmark
+            className={`h-3.5 w-3.5 ${vs.saved ? 'fill-current' : ''}`}
+            aria-hidden
+          />
+          Shelf
+        </button>
+        <button
+          type="button"
+          disabled={busy === 'share'}
+          onClick={sharePaper}
+          className="inline-flex items-center gap-1 rounded-xl border border-slate-200/90 px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:border-cyan-400/70 dark:border-slate-600 dark:text-slate-400"
+        >
+          <Share2 className="h-3.5 w-3.5" aria-hidden />
+          Share
+        </button>
+        {canFollow ? (
+          <button
+            type="button"
+            disabled={busy === 'sub'}
+            onClick={toggleSubscribeAuthor}
+            className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-[11px] font-semibold transition ${
+              exam.uploadedBy?.viewerSubscribed
+                ? 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-900/55 dark:bg-emerald-950/35 dark:text-emerald-50'
+                : 'border-slate-200/90 text-slate-600 hover:border-emerald-300/70 dark:border-slate-600 dark:text-slate-400'
+            }`}
+          >
+            <UserRound className="h-3.5 w-3.5" aria-hidden />
+            {exam.uploadedBy?.viewerSubscribed ? 'Following' : 'Follow'}{' '}
+            <span className="font-normal opacity-75">
+              · {exam.uploadedBy?.subscribersCount ?? 0}
+            </span>
+          </button>
+        ) : null}
+      </div>
+      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
+        Reactions steer discovery; saves keep papers one tap away in your profile
+        rhythm.
+      </p>
+    </div>
+  );
+}
+
 function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
   const status = STATUS_LABELS[exam.processingStatus] ?? STATUS_LABELS.pending;
   const canPractice = exam.totalQuestions > 0;
@@ -1192,6 +1499,14 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
   const [editTopic, setEditTopic] = useState(exam.topic ?? '');
   const [editVisibility, setEditVisibility] = useState(
     exam.visibility ?? 'private',
+  );
+  const [editTrack, setEditTrack] = useState(
+    exam.academicTrack || 'engineering',
+  );
+  const [editDept, setEditDept] = useState(exam.department ?? '');
+  const [editCourse, setEditCourse] = useState(exam.courseSubject ?? '');
+  const [editPaperType, setEditPaperType] = useState(
+    exam.paperType ?? 'other',
   );
   const [editSaving, setEditSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1211,6 +1526,10 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
           subject: editSubject,
           topic: editTopic,
           visibility: editVisibility,
+          academicTrack: editTrack,
+          department: editDept,
+          courseSubject: editCourse,
+          paperType: editPaperType,
         }),
       });
       const data = await readJsonOrThrow(res, 'Failed to update');
@@ -1278,6 +1597,12 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                     Private
                   </span>
                 ) : null}
+                <span
+                  className="rounded-full border border-teal-200/80 bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-900 dark:border-teal-900/45 dark:bg-teal-950/40 dark:text-teal-100"
+                  title={examPaperTypeLabel(exam.paperType)}
+                >
+                  {examPaperTypeLabel(exam.paperType)}
+                </span>
               </div>
             </div>
             {isOwner && (
@@ -1298,6 +1623,10 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                         setEditSubject(exam.subject ?? '');
                         setEditTopic(exam.topic ?? '');
                         setEditVisibility(exam.visibility ?? 'private');
+                        setEditTrack(exam.academicTrack || 'engineering');
+                        setEditDept(exam.department ?? '');
+                        setEditCourse(exam.courseSubject ?? '');
+                        setEditPaperType(exam.paperType ?? 'other');
                         setEditOpen(true);
                       }}
                       className="rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-300"
@@ -1325,10 +1654,42 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
             </p>
           )}
 
-          <p className="mt-2 text-xs text-slate-500">
-            {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''}{' '}
-            · <span>{exam.uploadedBy?.username ?? 'Unknown'}</span>
+          {(exam.academicTrack || exam.department || exam.courseSubject) && (
+            <p className="mt-2 text-[11px] font-medium leading-snug text-slate-600 dark:text-slate-400">
+              {[
+                academicTrackLabel(exam.academicTrack),
+                exam.department,
+                exam.courseSubject,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+          )}
+          <p className="mt-2 inline-flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+            <UserRound className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden />
+            <Link
+              to={`/users/${exam.uploadedBy?.id ?? exam.uploadedBy?._id ?? ''}`}
+              className="font-medium text-cyan-700 hover:underline dark:text-cyan-400"
+            >
+              @{exam.uploadedBy?.username ?? 'curator'}
+            </Link>
+            {exam.uploadedBy?.subscribersCount != null &&
+            Number(exam.uploadedBy.subscribersCount) > 0 ? (
+              <span className="text-slate-400 dark:text-slate-500">
+                · {exam.uploadedBy.subscribersCount} followers
+              </span>
+            ) : null}
           </p>
+
+          <p className="mt-1 text-xs text-slate-500">
+            {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''}
+          </p>
+
+          <ExamPaperEngagement
+            exam={exam}
+            currentUserId={currentUserId}
+            onUpdate={onUpdate}
+          />
         </div>
 
         <div className="mt-4">
@@ -1418,6 +1779,69 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
               className="input-field mb-3 w-full text-sm"
               placeholder="e.g. Unit 3 review"
             />
+            <details className="mb-4 rounded-xl border border-slate-200 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/55">
+              <summary className="cursor-pointer select-none text-xs font-semibold text-slate-800 dark:text-slate-300">
+                <span className="inline-flex items-center gap-2">
+                  <ChevronDown className="inline h-3 w-3" /> Academic catalog
+                </span>
+              </summary>
+              <div className="mt-3 space-y-2">
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Field
+                  <select
+                    value={editTrack}
+                    onChange={(e) => {
+                      setEditTrack(e.target.value);
+                      setEditDept('');
+                    }}
+                    className="mt-1 input-field h-9 w-full text-sm"
+                  >
+                    {ACADEMIC_TRACKS.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Department
+                  <select
+                    value={editDept}
+                    onChange={(e) => setEditDept(e.target.value)}
+                    className="mt-1 input-field h-9 w-full text-sm"
+                  >
+                    <option value="">Select…</option>
+                    {(DEPARTMENTS_BY_TRACK[editTrack] ?? []).map((d) => (
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Course
+                  <input
+                    value={editCourse}
+                    onChange={(e) => setEditCourse(e.target.value)}
+                    className="mt-1 input-field w-full text-sm"
+                  />
+                </label>
+                <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                  Paper type
+                  <select
+                    value={editPaperType}
+                    onChange={(e) => setEditPaperType(e.target.value)}
+                    className="mt-1 input-field h-9 w-full text-sm"
+                  >
+                    {EXAM_PAPER_TYPE_OPTIONS.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </details>
             <details className="mb-5 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/70">
               <summary className="cursor-pointer select-none text-xs font-semibold text-slate-800 dark:text-slate-300">
                 <span className="inline-flex items-center gap-2">
@@ -1509,6 +1933,32 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
 
 // ── PDF import ─────────────────────────────────────────────────────────────────
 
+function validatePdfCatalogForUpload(form) {
+  const track = String(form.academicTrack || '').trim().toLowerCase();
+  if (!['engineering', 'social', 'natural'].includes(track)) {
+    return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
+  }
+  const dept = resolveDepartmentForSubmit(form);
+  if (!dept || dept.length > 160) {
+    return 'Department or discipline is required.';
+  }
+  if (form.department === 'Other' && !String(form.departmentOther || '').trim()) {
+    return 'Specify your department when selecting Other.';
+  }
+  if (!String(form.courseSubject || '').trim()) {
+    return 'Course or subject is required (e.g. Operating Systems).';
+  }
+  const pt = String(form.paperType || '').trim();
+  const allowed = EXAM_PAPER_TYPE_OPTIONS.map((o) => o.id);
+  if (!allowed.includes(pt)) {
+    return 'Select a paper type (exit, mock, model, final, midterm, etc.).';
+  }
+  if (String(form.displayTitle || '').trim().length > 200) {
+    return 'Paper title is too long (max 200 characters).';
+  }
+  return null;
+}
+
 function PdfImportTab({ onUploaded }) {
   const [file, setFile] = useState(null);
   const [dragOver, setDragOver] = useState(false);
@@ -1517,6 +1967,12 @@ function PdfImportTab({ onUploaded }) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(null);
   const [privacyPrivate, setPrivacyPrivate] = useState(true);
+  const [importTrack, setImportTrack] = useState('engineering');
+  const [importDept, setImportDept] = useState('');
+  const [importDeptOther, setImportDeptOther] = useState('');
+  const [importCourse, setImportCourse] = useState('');
+  const [importPaperType, setImportPaperType] = useState('other');
+  const [displayTitle, setDisplayTitle] = useState('');
   const inputRef = useRef(null);
 
   function pickFile(picked) {
@@ -1541,6 +1997,23 @@ function PdfImportTab({ onUploaded }) {
 
   async function upload() {
     if (!file) return;
+
+    const catalogForm = {
+      academicTrack: importTrack,
+      department: importDept,
+      departmentOther: importDeptOther,
+      courseSubject: importCourse,
+      paperType: importPaperType,
+      displayTitle,
+    };
+    const catErr = validatePdfCatalogForUpload(catalogForm);
+    if (catErr) {
+      setError(catErr);
+      return;
+    }
+
+    const resolvedDept = resolveDepartmentForSubmit(catalogForm);
+
     setUploading(true);
     setError('');
     setProgress(10);
@@ -1549,6 +2022,12 @@ function PdfImportTab({ onUploaded }) {
       const form = new FormData();
       form.append('pdf', file);
       form.append('visibility', privacyPrivate ? 'private' : 'public');
+      form.append('academicTrack', String(importTrack).trim().toLowerCase());
+      form.append('department', resolvedDept);
+      form.append('courseSubject', String(importCourse).trim());
+      form.append('paperType', String(importPaperType).trim());
+      const dt = String(displayTitle || '').trim();
+      if (dt) form.append('displayTitle', dt);
 
       const progressTimer = setInterval(() => {
         setProgress((p) => Math.min(p + 8, 85));
@@ -1695,6 +2174,131 @@ function PdfImportTab({ onUploaded }) {
         </button>
       </div>
 
+      <div className="mt-6 rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white/98 to-slate-50/80 p-5 shadow-inner dark:border-slate-700 dark:from-slate-950/80 dark:to-slate-900/50">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 pb-3 dark:border-slate-700/80">
+          <div className="min-w-0">
+            <p className="font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
+              Paper catalog
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+              Required metadata — mirrors the library so classmates see who curated
+              the paper, field, course, and whether it&apos;s exit, mock, final, or mid.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-cyan-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-cyan-900 dark:bg-cyan-950/65 dark:text-cyan-100">
+            All required
+          </span>
+        </div>
+
+        <div className="mt-4 space-y-3">
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            Display title · optional rename
+            <input
+              value={displayTitle}
+              onChange={(e) => setDisplayTitle(e.target.value)}
+              placeholder="Defaults to PDF filename without .pdf"
+              className="mt-1 input-field w-full text-sm"
+            />
+          </label>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              Academic field
+              <select
+                value={importTrack}
+                onChange={(e) => {
+                  setImportTrack(e.target.value);
+                  setImportDept('');
+                  setImportDeptOther('');
+                }}
+                className="mt-1 input-field h-10 w-full text-sm"
+              >
+                {ACADEMIC_TRACKS.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              Paper type
+              <select
+                value={importPaperType}
+                onChange={(e) => setImportPaperType(e.target.value)}
+                className="mt-1 input-field h-10 w-full text-sm"
+              >
+                {EXAM_PAPER_TYPE_OPTIONS.map((o) => (
+                  <option key={o.id} value={o.id}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            Department / discipline
+            <select
+              value={importDept}
+              onChange={(e) => {
+                setImportDept(e.target.value);
+                if (e.target.value !== 'Other') setImportDeptOther('');
+              }}
+              className="mt-1 input-field h-10 w-full text-sm"
+            >
+              <option value="">Select…</option>
+              {(DEPARTMENTS_BY_TRACK[importTrack] ?? []).map((d) => (
+                <option key={d} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
+          </label>
+          {importDept === 'Other' ? (
+            <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+              Describe your department
+              <input
+                value={importDeptOther}
+                onChange={(e) => setImportDeptOther(e.target.value)}
+                placeholder="e.g. Architecture, Veterinary medicine…"
+                className="mt-1 input-field w-full text-sm"
+              />
+            </label>
+          ) : null}
+
+          <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+            Course · subject line
+            <input
+              value={importCourse}
+              onChange={(e) => setImportCourse(e.target.value)}
+              placeholder="e.g. Data Structures & Algorithms"
+              className="mt-1 input-field w-full text-sm"
+              list="pdf-import-course-list"
+            />
+            <datalist id="pdf-import-course-list">
+              {COURSE_SUBJECT_SUGGESTIONS.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </label>
+          <div className="flex flex-wrap gap-1.5">
+            <span className="w-full text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Quick picks
+            </span>
+            {COURSE_SUBJECT_SUGGESTIONS.slice(0, 6).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setImportCourse(c)}
+                className="rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600 hover:border-cyan-300/70 hover:text-cyan-800 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-300 dark:hover:border-cyan-700/55"
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {error && (
         <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm text-rose-700 dark:border-rose-900/55 dark:bg-rose-950/40 dark:text-rose-200">
           {error}
@@ -1722,6 +2326,11 @@ function PdfImportTab({ onUploaded }) {
           disabled={!file || uploading}
           onClick={upload}
           className="btn-primary px-6 py-2.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+          title={
+            file
+              ? 'Upload requires catalog fields above'
+              : 'Pick a PDF first'
+          }
         >
           {uploading ? 'Working…' : 'Upload & extract'}
         </button>

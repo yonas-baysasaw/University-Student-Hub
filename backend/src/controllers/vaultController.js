@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import Exam from '../models/Exam.js';
 import PersonalMcq from '../models/PersonalMcq.js';
 import Question from '../models/Question.js';
+import { EXAM_PAPER_TYPES } from '../utils/examCatalogMeta.js';
+import { formatExamForClient } from '../utils/examJson.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 const MAX_PUBLISH_QUESTIONS = 100;
@@ -245,7 +247,16 @@ async function publishVaultToBank(req, res, next) {
     assertCanWrite(req.user);
     const userId = req.user._id;
 
-    const { title, subject, topic, questionIds } = req.body;
+    const {
+      title,
+      subject,
+      topic,
+      questionIds,
+      academicTrack,
+      department,
+      courseSubject,
+      paperType,
+    } = req.body;
     const ids = Array.isArray(questionIds) ? questionIds : [];
 
     if (!title?.trim())
@@ -281,6 +292,9 @@ async function publishVaultToBank(req, res, next) {
       ordered.map((r) => r.question),
     );
 
+    let pt = String(paperType || 'other').trim();
+    if (!EXAM_PAPER_TYPES.includes(pt)) pt = 'other';
+
     const exam = await Exam.create({
       uploadedBy: userId,
       examKind: 'vault_compiled',
@@ -294,6 +308,14 @@ async function publishVaultToBank(req, res, next) {
       topic: topic != null ? String(topic).trim() : '',
       visibility: 'public',
       textContent: '',
+      academicTrack:
+        academicTrack != null
+          ? String(academicTrack).trim().toLowerCase()
+          : '',
+      department: department != null ? String(department).trim() : '',
+      courseSubject:
+        courseSubject != null ? String(courseSubject).trim() : '',
+      paperType: pt,
     });
 
     const examId = exam._id;
@@ -309,11 +331,11 @@ async function publishVaultToBank(req, res, next) {
     await Question.insertMany(qDocs, { ordered: true });
 
     const populated = await Exam.findById(examId)
-      .populate('uploadedBy', 'username name avatar')
+      .populate('uploadedBy', 'username name avatar subscribers')
       .lean();
 
     return res.status(201).json({
-      exam: formatPublishedExam(populated),
+      exam: formatExamForClient(req, populated),
       warnings: stemWarning.message
         ? [{ code: 'stem_overlap', ...stemWarning }]
         : [],
@@ -321,29 +343,6 @@ async function publishVaultToBank(req, res, next) {
   } catch (err) {
     next(err);
   }
-}
-
-function formatPublishedExam(exam) {
-  const id =
-    exam._id != null && typeof exam._id === 'object'
-      ? exam._id.toString()
-      : exam._id;
-  return {
-    id,
-    filename: exam.filename,
-    fileSize: exam.fileSize,
-    fileUrl: exam.fileUrl,
-    processingStatus: exam.processingStatus,
-    totalQuestions: exam.totalQuestions,
-    subject: exam.subject,
-    topic: exam.topic,
-    visibility: exam.visibility,
-    isDuplicate: exam.isDuplicate,
-    examKind: exam.examKind,
-    uploadedBy: exam.uploadedBy,
-    createdAt: exam.createdAt,
-    updatedAt: exam.updatedAt,
-  };
 }
 
 async function practiceBatch(req, res, next) {

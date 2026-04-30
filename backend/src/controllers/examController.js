@@ -12,6 +12,11 @@ import {
   hashContent,
 } from '../services/pdfService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
+import {
+  EXAM_PAPER_TYPES,
+  validateExamPdfCatalogMeta,
+} from '../utils/examCatalogMeta.js';
+import { formatExamForClient } from '../utils/examJson.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 // ── Upload & Process ──────────────────────────────────────────────────────────
@@ -59,12 +64,31 @@ async function uploadExamController(req, res, next) {
     const visibilityArg = req.body?.visibility;
     const visibility = visibilityArg === 'public' ? 'public' : 'private';
 
+    const catalogErr = validateExamPdfCatalogMeta(req.body ?? {});
+    if (catalogErr) return res.status(400).json({ message: catalogErr });
+
+    const displayTitle = String(req.body?.displayTitle || '').trim();
+    const titleForRecord =
+      displayTitle ||
+      String(file.originalname || 'exam.pdf').replace(/\.pdf$/i, '').trim() ||
+      file.originalname ||
+      'Untitled exam';
+
+    const catalogFields = {
+      academicTrack: String(req.body?.academicTrack || '')
+        .trim()
+        .toLowerCase(),
+      department: String(req.body?.department || '').trim(),
+      courseSubject: String(req.body?.courseSubject || '').trim(),
+      paperType: String(req.body?.paperType || '').trim() || 'other',
+    };
+
     if (existingExam) {
       // Create a lightweight duplicate record pointing to original's questions
       const dupExam = await Exam.create({
         uploadedBy: userId,
         examKind: 'pdf',
-        filename: file.originalname,
+        filename: titleForRecord,
         fileSize: file.size,
         fileUrl: s3Result.location,
         fileKey: s3Result.key,
@@ -75,16 +99,21 @@ async function uploadExamController(req, res, next) {
         isDuplicate: true,
         originalExamId: existingExam._id,
         visibility,
+        ...catalogFields,
       });
 
-      return res.status(201).json(formatExam(dupExam));
+      const dupPopulated = await Exam.findById(dupExam._id).populate(
+        'uploadedBy',
+        'username name avatar subscribers',
+      );
+      return res.status(201).json(formatExamForClient(req, dupPopulated));
     }
 
     // Create a new exam record (status: pending)
     const exam = await Exam.create({
       uploadedBy: userId,
       examKind: 'pdf',
-      filename: file.originalname,
+      filename: titleForRecord,
       fileSize: file.size,
       fileUrl: s3Result.location,
       fileKey: s3Result.key,
@@ -92,10 +121,9 @@ async function uploadExamController(req, res, next) {
       textContent,
       processingStatus: 'pending',
       visibility,
+      ...catalogFields,
     });
 
-    // Kick off background batch processing — do not await
-    // We keep a reference to file.buffer here; pass it into the closure so it isn't GC'd
     const pdfBuffer = file.buffer;
     (async () => {
       try {
@@ -118,7 +146,11 @@ async function uploadExamController(req, res, next) {
       }
     })();
 
-    return res.status(201).json(formatExam(exam));
+    const populatedNew = await Exam.findById(exam._id).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.status(201).json(formatExamForClient(req, populatedNew));
   } catch (error) {
     return next(error);
   }
@@ -144,6 +176,9 @@ async function listExamsController(req, res, next) {
           $or: [
             { filename: new RegExp(search, 'i') },
             { topic: new RegExp(search, 'i') },
+            { subject: new RegExp(search, 'i') },
+            { department: new RegExp(search, 'i') },
+            { courseSubject: new RegExp(search, 'i') },
           ],
         },
       ].flat();
@@ -155,12 +190,12 @@ async function listExamsController(req, res, next) {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(Number(limit))
-        .populate('uploadedBy', 'username name avatar'),
+        .populate('uploadedBy', 'username name avatar subscribers'),
       Exam.countDocuments(filter),
     ]);
 
     return res.json({
-      exams: exams.map(formatExam),
+      exams: exams.map((ex) => formatExamForClient(req, ex)),
       total,
       page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
@@ -177,7 +212,7 @@ async function getExamController(req, res, next) {
     const userId = req.user._id;
     const exam = await Exam.findById(req.params.examId).populate(
       'uploadedBy',
-      'username name avatar',
+      'username name avatar subscribers',
     );
 
     if (!exam) return res.status(404).json({ message: 'Exam not found.' });
@@ -185,7 +220,7 @@ async function getExamController(req, res, next) {
       return res.status(403).json({ message: 'Access denied.' });
     }
 
-    return res.json(formatExam(exam));
+    return res.json(formatExamForClient(req, exam));
   } catch (error) {
     return next(error);
   }
@@ -316,7 +351,16 @@ async function updateExamController(req, res, next) {
     assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
-    const { filename, subject, topic, visibility } = req.body;
+    const {
+      filename,
+      subject,
+      topic,
+      visibility,
+      academicTrack,
+      department,
+      courseSubject,
+      paperType,
+    } = req.body;
 
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found.' });
@@ -336,13 +380,30 @@ async function updateExamController(req, res, next) {
       }
       exam.visibility = visibility;
     }
+    const PAPER_ENUM = EXAM_PAPER_TYPES;
+    if (academicTrack !== undefined) {
+      exam.academicTrack = String(academicTrack ?? '').trim().toLowerCase();
+    }
+    if (department !== undefined) {
+      exam.department = String(department ?? '').trim();
+    }
+    if (courseSubject !== undefined) {
+      exam.courseSubject = String(courseSubject ?? '').trim();
+    }
+    if (paperType !== undefined) {
+      const pt = String(paperType ?? '').trim();
+      if (!PAPER_ENUM.includes(pt)) {
+        return res.status(400).json({ message: 'Invalid paper type.' });
+      }
+      exam.paperType = pt;
+    }
     await exam.save();
 
     const refreshed = await Exam.findById(examId).populate(
       'uploadedBy',
-      'username name avatar',
+      'username name avatar subscribers',
     );
-    return res.json(formatExam(refreshed));
+    return res.json(formatExamForClient(req, refreshed));
   } catch (error) {
     return next(error);
   }
@@ -397,6 +458,85 @@ async function deleteExamController(req, res, next) {
   }
 }
 
+// ── Social: reactions & saved shelf (parity with Library) ───────────────────────
+
+async function reactToExamController(req, res, next) {
+  try {
+    assertCanWrite(req.user);
+    const userId = req.user._id;
+    const { examId } = req.params;
+    const { reaction } = req.body ?? {};
+
+    if (!['like', 'dislike', null, 'none'].includes(reaction)) {
+      return res.status(400).json({
+        message: 'reaction must be like, dislike, or none',
+      });
+    }
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (!canAccessExam(exam, userId)) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const uid = String(userId);
+    exam.likedBy = (exam.likedBy || []).filter((id) => String(id) !== uid);
+    exam.dislikedBy = (exam.dislikedBy || []).filter(
+      (id) => String(id) !== uid,
+    );
+
+    if (reaction === 'like') exam.likedBy.push(userId);
+    else if (reaction === 'dislike') exam.dislikedBy.push(userId);
+
+    exam.likesCount = exam.likedBy.length;
+    exam.dislikesCount = exam.dislikedBy.length;
+    await exam.save();
+
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, refreshed));
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function toggleSaveExamController(req, res, next) {
+  try {
+    assertCanWrite(req.user);
+    const userId = req.user._id;
+    const { examId } = req.params;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (!canAccessExam(exam, userId)) {
+      return res.status(403).json({ message: 'Access denied.' });
+    }
+
+    const uid = String(userId);
+    const savedBy = Array.isArray(exam.savedBy) ? exam.savedBy : [];
+    const hasSaved = savedBy.some((id) => String(id) === uid);
+
+    if (hasSaved) {
+      exam.savedBy = savedBy.filter((id) => String(id) !== uid);
+    } else {
+      exam.savedBy = [...savedBy, userId];
+    }
+
+    exam.savesCount = exam.savedBy.length;
+    await exam.save();
+
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, refreshed));
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function canAccessExam(exam, userId) {
@@ -405,25 +545,6 @@ function canAccessExam(exam, userId) {
       ? exam.uploadedBy._id.toString()
       : (exam.uploadedBy?.toString?.() ?? String(exam.uploadedBy));
   return exam.visibility === 'public' || ownerId === userId.toString();
-}
-
-function formatExam(exam) {
-  return {
-    id: exam._id,
-    filename: exam.filename,
-    fileSize: exam.fileSize,
-    fileUrl: exam.fileUrl,
-    processingStatus: exam.processingStatus,
-    totalQuestions: exam.totalQuestions,
-    subject: exam.subject,
-    topic: exam.topic,
-    visibility: exam.visibility,
-    isDuplicate: exam.isDuplicate,
-    examKind: exam.examKind ?? 'pdf',
-    uploadedBy: exam.uploadedBy,
-    createdAt: exam.createdAt,
-    updatedAt: exam.updatedAt,
-  };
 }
 
 function formatQuestion(q) {
@@ -443,7 +564,9 @@ export {
   getExamController,
   getQuestionsController,
   listExamsController,
+  reactToExamController,
   submitAttemptController,
+  toggleSaveExamController,
   updateExamController,
   uploadExamController,
 };
