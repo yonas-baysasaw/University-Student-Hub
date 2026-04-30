@@ -1,4 +1,12 @@
-import { ArrowLeft, UserRound } from 'lucide-react';
+import {
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Flag,
+  Keyboard,
+  MoreHorizontal,
+  UserRound,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -420,6 +428,79 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
     }
   }
 
+  useEffect(() => {
+    if (submitted) return undefined;
+
+    function onKeyDown(e) {
+      if (e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = e.target;
+      if (
+        el instanceof HTMLElement &&
+        (el.tagName === 'INPUT' ||
+          el.tagName === 'TEXTAREA' ||
+          el.tagName === 'SELECT')
+      ) {
+        return;
+      }
+
+      const q = questions[currentIndex];
+      if (!q?.options?.length) return;
+
+      switch (e.key) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          setCurrentIndex((i) => Math.max(0, i - 1));
+          return;
+        case 'ArrowRight':
+          e.preventDefault();
+          setCurrentIndex((i) => Math.min(questions.length - 1, i + 1));
+          return;
+        case 'f':
+        case 'F':
+          e.preventDefault();
+          setFlagged((prev) => {
+            const next = new Set(prev);
+            const idx = currentIndex;
+            if (next.has(idx)) next.delete(idx);
+            else next.add(idx);
+            return next;
+          });
+          return;
+        default:
+          break;
+      }
+
+      const k = e.key.toLowerCase();
+      const ai = 'abcde'.indexOf(k);
+      if (ai !== -1 && ai < q.options.length) {
+        e.preventDefault();
+        setUserAnswers((prev) => {
+          const next = [...prev];
+          next[currentIndex] = ai;
+          return next;
+        });
+        return;
+      }
+
+      const digit = Number.parseInt(e.key, 10);
+      if (
+        digit >= 1 &&
+        digit <= q.options.length &&
+        e.code.startsWith('Digit')
+      ) {
+        e.preventDefault();
+        setUserAnswers((prev) => {
+          const next = [...prev];
+          next[currentIndex] = digit - 1;
+          return next;
+        });
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [submitted, currentIndex, questions]);
+
   if (submitted && results) {
     return (
       <ResultsScreen
@@ -435,40 +516,47 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
   }
 
   return (
-    <div className="page-surface px-4 pb-10 pt-6 md:px-6 md:pt-8">
+    <div className="relative min-h-[calc(100vh-3.5rem)] overflow-x-hidden bg-gradient-to-b from-slate-50 via-white to-slate-100/80 px-4 pb-14 pt-5 dark:from-[#06080c] dark:via-[#0a0f14] dark:to-[#06080c] md:min-h-screen md:px-6 md:pb-16 md:pt-7">
+      <div
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(6,182,212,0.12),transparent)] dark:bg-[radial-gradient(ellipse_70%_45%_at_50%_-10%,rgba(6,182,212,0.08),transparent)]"
+        aria-hidden
+      />
+
       {/* ── Exam header ─────────────────────────────────────────────────────── */}
-      <div className="mx-auto mb-4 max-w-5xl">
-        <div className="mb-3">
+      <div className="relative mx-auto mb-6 max-w-5xl">
+        <div className="mb-4">
           <BackToExamHubLink />
         </div>
-        <div className="panel-card fade-in-up rounded-3xl border border-slate-200/80 p-4 dark:border-slate-700 md:p-5">
+        <div className="panel-card fade-in-up rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-lg shadow-slate-200/40 backdrop-blur-sm dark:border-slate-700/60 dark:bg-slate-900/75 dark:shadow-none md:p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
-                Exam Practice
+            <div className="min-w-0 flex-1 space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-cyan-700 dark:text-cyan-400">
+                Exam practice
                 {isProcessing && (
-                  <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/55 dark:text-amber-200">
-                    <span className="loading loading-spinner loading-xs" />
-                    Still extracting…
+                  <span className="ml-2 inline-flex items-center gap-1.5 rounded-full border border-amber-400/30 bg-amber-500/10 px-2.5 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-amber-800 dark:text-amber-200">
+                    <span className="loading loading-spinner loading-xs text-amber-600" />
+                    Live extraction
                   </span>
                 )}
               </p>
               <h1
-                className="mt-0.5 truncate font-display text-lg text-slate-900 dark:text-slate-50"
+                className="font-display text-xl font-semibold tracking-tight text-slate-950 dark:text-white md:text-2xl"
                 title={exam.filename}
               >
                 {exam.filename}
               </h1>
+              <ExamCatalogStrip exam={exam} className="mt-1 opacity-95" />
             </div>
             <div className="flex shrink-0 items-start gap-1">
               <div className="dropdown dropdown-end">
                 <button
                   type="button"
                   tabIndex={0}
-                  className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
-                  title="Options"
+                  className="rounded-xl border border-transparent p-2 text-slate-400 transition hover:border-slate-200 hover:bg-slate-100 hover:text-slate-600 dark:hover:border-slate-600 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                  title="Exam options"
+                  aria-label="Exam options"
                 >
-                  ⋯
+                  <MoreHorizontal className="h-5 w-5" aria-hidden />
                 </button>
                 <ul className="menu menu-sm dropdown-content z-[999] mt-1 w-44 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
                   <li>
@@ -498,61 +586,81 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
             </div>
           </div>
 
-          {/* Progress bar */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between text-xs text-slate-500">
-              <span>
-                {answeredCount} / {questions.length} answered
+          {/* Progress */}
+          <div className="mt-5">
+            <div className="mb-2 flex items-center justify-between gap-4 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+              <span className="tabular-nums tracking-tight">
+                {answeredCount} / {questions.length}{' '}
+                <span className="font-normal text-slate-400 dark:text-slate-500">
+                  answered
+                </span>
               </span>
-              <span>
-                Q {currentIndex + 1} of {questions.length}
+              <span className="tabular-nums tracking-tight text-cyan-800 dark:text-cyan-300/90">
+                Q{currentIndex + 1}{' '}
+                <span className="font-normal text-slate-400 dark:text-slate-500">
+                  of {questions.length}
+                </span>
               </span>
             </div>
-            <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-slate-200">
+            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/70">
               <div
-                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-slate-800 transition-all duration-300"
+                className="relative h-full rounded-full bg-gradient-to-r from-cyan-500 via-cyan-600 to-teal-600 shadow-[0_0_20px_-2px_rgba(34,211,238,0.45)] transition-all duration-500 ease-out dark:from-cyan-500 dark:via-cyan-400 dark:to-teal-400 dark:shadow-[0_0_28px_-4px_rgba(34,211,238,0.35)]"
                 style={{
-                  width: `${(answeredCount / questions.length) * 100}%`,
+                  width: `${
+                    questions.length
+                      ? (answeredCount / questions.length) * 100
+                      : 0
+                  }%`,
                 }}
               />
             </div>
           </div>
 
-          {/* Mode toggle */}
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-xs text-slate-600">Mode:</span>
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input
-                type="radio"
-                name="mode"
-                value="exam"
-                checked={mode === 'exam'}
-                onChange={() => setMode('exam')}
-                className="radio radio-xs radio-primary"
-              />
-              <span className="text-xs font-medium text-slate-700">Exam</span>
-            </label>
-            <label className="flex cursor-pointer items-center gap-1.5">
-              <input
-                type="radio"
-                name="mode"
-                value="normal"
-                checked={mode === 'normal'}
-                onChange={() => setMode('normal')}
-                className="radio radio-xs radio-primary"
-              />
-              <span className="text-xs font-medium text-slate-700">
-                Practice (show answers)
-              </span>
-            </label>
+          {/* Study mode */}
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 dark:text-slate-500">
+              Study mode
+            </span>
+            <div className="inline-flex rounded-2xl border border-slate-200/90 bg-slate-100/90 p-1 dark:border-slate-600/70 dark:bg-slate-950/80">
+              <button
+                type="button"
+                onClick={() => setMode('exam')}
+                aria-pressed={mode === 'exam'}
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                  mode === 'exam'
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-white dark:ring-slate-600/80'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                Exam
+                <span className="hidden font-normal opacity-75 sm:inline">
+                  stealth
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMode('normal')}
+                aria-pressed={mode === 'normal'}
+                className={`flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition ${
+                  mode === 'normal'
+                    ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/80 dark:bg-slate-800 dark:text-white dark:ring-slate-600/80'
+                    : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                Practice
+                <span className="hidden font-normal opacity-75 sm:inline">
+                  show answers
+                </span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Two-column layout: sidebar + question ───────────────────────────── */}
-      <div className="mx-auto flex max-w-5xl gap-4">
+      {/* ── Two-column layout ───────────────────────────────────────────────── */}
+      <div className="relative mx-auto flex max-w-5xl gap-6">
         {/* Left sidebar — desktop always visible, mobile hidden */}
-        <aside className="hidden lg:flex lg:w-64 xl:w-72 lg:flex-col lg:gap-3">
+        <aside className="hidden lg:flex lg:w-64 xl:w-72 lg:flex-col lg:gap-4">
           <QuestionNav
             questions={questions}
             userAnswers={userAnswers}
@@ -562,46 +670,66 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
           />
         </aside>
 
-        {/* Main question area */}
-        <div className="flex-1 min-w-0">
-          {/* Mobile: hamburger to open drawer */}
-          <div className="mb-3 flex items-center gap-2 lg:hidden">
+        {/* Main question */}
+        <div className="min-w-0 flex-1 lg:pb-2">
+          <div className="mb-4 flex lg:hidden">
             <button
               type="button"
               onClick={() => setMobileNavOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className="flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/95 px-4 py-3 text-xs font-semibold text-slate-700 shadow-sm backdrop-blur dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-200"
             >
-              ☰ Questions ({answeredCount}/{questions.length})
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-slate-200/40 text-[13px] font-bold text-cyan-800 dark:from-cyan-500/15 dark:to-slate-700/50 dark:text-cyan-200">
+                ☰
+              </span>
+              Questions · {answeredCount}/{questions.length}{' '}
+              <ChevronRight className="ml-auto h-4 w-4 opacity-60" aria-hidden />
             </button>
           </div>
 
-          {/* Question card */}
-          <div className="panel-card rounded-3xl p-5 md:p-7">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                Question {currentIndex + 1}
-              </span>
+          <article className="panel-card rounded-[1.65rem] border border-slate-200/80 bg-white/95 p-6 shadow-xl shadow-slate-200/30 ring-1 ring-slate-100/90 md:p-10 dark:border-slate-600/55 dark:bg-gradient-to-br dark:from-[#12181f]/95 dark:via-[#0f151c]/98 dark:to-[#0d1218] dark:shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)] dark:ring-cyan-500/10">
+            <header className="mb-8 flex flex-wrap items-start justify-between gap-4 border-b border-slate-100/90 pb-5 dark:border-slate-700/55">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className="inline-flex items-center rounded-full bg-gradient-to-r from-cyan-500/15 to-teal-500/10 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-cyan-800 ring-1 ring-cyan-500/25 dark:from-cyan-500/20 dark:to-transparent dark:text-cyan-200 dark:ring-cyan-400/30">
+                  Question {currentIndex + 1}
+                </span>
+                {flagged.has(currentIndex) ? (
+                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-800 ring-1 ring-amber-500/25 dark:text-amber-100">
+                    Flagged
+                  </span>
+                ) : null}
+              </div>
               <button
                 type="button"
                 onClick={toggleFlag}
-                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                aria-pressed={flagged.has(currentIndex)}
+                className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500/70 ${
                   flagged.has(currentIndex)
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'text-slate-500 hover:bg-slate-100'
+                    ? 'border-amber-400/60 bg-amber-500/10 text-amber-900 shadow-inner dark:bg-amber-500/15 dark:text-amber-100'
+                    : 'border-slate-200/90 text-slate-600 hover:border-amber-300/70 hover:bg-amber-50/80 dark:border-slate-600 dark:text-slate-300 dark:hover:border-amber-500/35 dark:hover:bg-amber-950/25'
                 }`}
               >
-                {flagged.has(currentIndex) ? '⚑ Flagged' : '⚐ Flag'}
+                <Flag
+                  className={`h-3.5 w-3.5 ${flagged.has(currentIndex) ? 'fill-amber-500 text-amber-600 dark:text-amber-300' : ''}`}
+                  aria-hidden
+                />
+                {flagged.has(currentIndex) ? 'Flagged' : 'Flag for review'}
               </button>
+            </header>
+
+            <div className="prose prose-slate prose-lg max-w-none dark:prose-invert dark:max-w-none">
+              <p
+                className="font-display text-lg font-medium leading-relaxed tracking-tight text-slate-900 dark:text-white md:text-xl md:leading-snug [&_strong]:font-semibold"
+                style={{ WebkitFontSmoothing: 'antialiased' }}
+              >
+                {current.question}
+              </p>
             </div>
 
-            <p className="font-display text-lg leading-snug text-slate-900 md:text-xl">
-              {current.question}
-            </p>
-
-            <div className="mt-5 space-y-2">
+            <fieldset className="mt-8 space-y-3 border-0 p-0">
+              <legend className="sr-only">Answer choices</legend>
               {current.options.map((option, idx) => (
                 <OptionButton
-                  // biome-ignore lint/suspicious/noArrayIndexKey: options are positional — index IS the semantic key
+                  // biome-ignore lint/suspicious/noArrayIndexKey: positional MCQ slots
                   key={`${currentIndex}-${idx}`}
                   option={option}
                   index={idx}
@@ -610,45 +738,58 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
                   showResult={
                     mode === 'normal' && userAnswers[currentIndex] !== null
                   }
-                  submitted={submitted}
                   onSelect={() => selectAnswer(idx)}
                 />
               ))}
-            </div>
+            </fieldset>
 
-            {/* Explanation (normal mode only) */}
-            {mode === 'normal' && userAnswers[currentIndex] !== null && (
+            {mode === 'normal' && userAnswers[currentIndex] !== null ? (
               <ExplanationBlock question={current} navigate={navigate} />
-            )}
-          </div>
+            ) : null}
+          </article>
 
-          {/* Navigation */}
-          <div className="mt-4 flex items-center justify-between gap-3">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 lg:items-center lg:justify-between lg:gap-4">
+            <div className="order-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-[10px] font-medium text-slate-400 dark:text-slate-500 lg:order-2 lg:flex-1 lg:justify-center">
+              <span className="inline-flex items-center gap-1.5">
+                <Keyboard className="h-3.5 w-3.5 opacity-70" aria-hidden />
+                ← → Navigate
+              </span>
+              <span className="hidden sm:inline opacity-60" aria-hidden>
+                ·
+              </span>
+              <span className="hidden sm:inline">A–E Select</span>
+              <span className="hidden sm:inline opacity-60" aria-hidden>
+                ·
+              </span>
+              <span className="hidden sm:inline">F Flag</span>
+            </div>
             <button
               type="button"
               disabled={currentIndex === 0}
-              onClick={() => setCurrentIndex((i) => i - 1)}
-              className="btn-secondary px-5 py-2.5 text-sm disabled:opacity-40"
+              onClick={() => setCurrentIndex((i) => Math.max(0, i - 1))}
+              className="order-1 inline-flex shrink-0 items-center gap-1.5 rounded-2xl border border-slate-200/95 bg-white/90 px-5 py-2.5 text-sm font-semibold text-slate-600 shadow-sm backdrop-blur transition hover:border-slate-300 hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-35 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              ← Previous
+              <ChevronLeft className="h-4 w-4 shrink-0" aria-hidden />
+              Previous
             </button>
 
             {currentIndex < questions.length - 1 ? (
               <button
                 type="button"
                 onClick={() => setCurrentIndex((i) => i + 1)}
-                className="btn-primary px-5 py-2.5 text-sm"
+                className="order-2 inline-flex shrink-0 items-center gap-1.5 rounded-2xl bg-gradient-to-r from-cyan-600 to-teal-600 px-6 py-2.5 text-sm font-semibold text-white shadow-lg shadow-cyan-500/25 transition hover:from-cyan-500 hover:to-teal-500 hover:shadow-cyan-500/35 focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 lg:order-3"
               >
-                Next →
+                Next
+                <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={submitQuiz}
                 disabled={submitting}
-                className="btn-primary bg-emerald-600 px-5 py-2.5 text-sm hover:bg-emerald-700 disabled:opacity-50"
+                className="order-2 inline-flex shrink-0 items-center rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-2.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition hover:from-emerald-500 hover:to-teal-500 disabled:opacity-50 lg:order-3"
               >
-                {submitting ? 'Submitting…' : 'Submit Quiz'}
+                {submitting ? 'Submitting…' : 'Submit exam'}
               </button>
             )}
           </div>
@@ -660,19 +801,20 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
         <div className="fixed inset-0 z-[9999] flex">
           <button
             type="button"
-            className="absolute inset-0 bg-black/40 cursor-default"
+            className="absolute inset-0 cursor-default bg-black/50 backdrop-blur-sm dark:bg-black/60"
             onClick={() => setMobileNavOpen(false)}
             aria-label="Close navigation"
           />
-          <div className="relative z-10 flex h-full w-72 flex-col bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <h3 className="font-display text-base text-slate-900">
-                All Questions
+          <div className="relative z-10 flex h-full w-[min(20rem,100vw)] flex-col border-r border-slate-200/80 bg-white shadow-2xl dark:border-slate-700 dark:bg-[#111820] dark:shadow-[4px_0_40px_-10px_rgba(0,0,0,0.6)]">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-4 dark:border-slate-700/80">
+              <h3 className="font-display text-base font-semibold text-slate-900 dark:text-white">
+                All questions
               </h3>
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(false)}
-                className="rounded-full p-1 text-slate-500 hover:bg-slate-100"
+                className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+                aria-label="Close"
               >
                 ✕
               </button>
@@ -797,11 +939,13 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
 
 function ExplanationBlock({ question, navigate }) {
   return (
-    <div className="mt-4 rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-cyan-700">
+    <div className="mt-8 rounded-2xl border border-cyan-500/25 bg-gradient-to-br from-cyan-50/95 to-white px-5 py-4 dark:border-cyan-500/20 dark:from-cyan-950/40 dark:to-slate-900/40">
+      <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-800 dark:text-cyan-400">
         Explanation
       </p>
-      <p className="mt-1 text-sm text-slate-700">{question.explanation}</p>
+      <p className="mt-2 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+        {question.explanation}
+      </p>
       <button
         type="button"
         onClick={() =>
@@ -811,9 +955,9 @@ function ExplanationBlock({ question, navigate }) {
             },
           })
         }
-        className="mt-2 rounded-full border border-cyan-300 bg-white px-3 py-1 text-xs font-semibold text-cyan-700 hover:bg-cyan-100 transition"
+        className="mt-3 rounded-xl border border-cyan-400/40 bg-white/90 px-4 py-2 text-xs font-semibold text-cyan-800 shadow-sm transition hover:bg-cyan-50 dark:border-cyan-500/35 dark:bg-slate-800 dark:text-cyan-200 dark:hover:bg-slate-700/80"
       >
-        Explain further with Liqu AI →
+        Explain deeper with Liqu AI →
       </button>
     </div>
   );
@@ -829,23 +973,30 @@ function QuestionNav({
   onSelect,
 }) {
   return (
-    <div className="panel-card rounded-2xl p-4">
-      <h3 className="mb-3 font-display text-sm text-slate-900">
-        Questions ({questions.length})
-      </h3>
-      <div className="flex flex-wrap gap-2">
+    <div className="panel-card rounded-3xl border border-slate-200/80 bg-white/90 p-4 shadow-md shadow-slate-200/20 backdrop-blur-sm dark:border-slate-700/70 dark:bg-slate-900/70 dark:shadow-none">
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <h3 className="font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
+          Questions
+        </h3>
+        <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-600 dark:bg-slate-800 dark:text-slate-400">
+          {questions.length}
+        </span>
+      </div>
+      <div className="grid grid-cols-5 gap-2 sm:grid-cols-6">
         {questions.map((_, i) => {
           let cls =
-            'h-9 w-9 rounded-xl border text-xs font-semibold transition ';
+            'aspect-square min-h-9 rounded-xl border text-xs font-bold tabular-nums transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-900 ';
           if (i === currentIndex) {
-            cls += 'border-cyan-500 bg-cyan-500 text-white';
+            cls +=
+              'border-cyan-500 bg-gradient-to-br from-cyan-500 to-teal-600 text-white shadow-md shadow-cyan-500/30';
           } else if (userAnswers[i] !== null) {
-            cls += 'border-emerald-300 bg-emerald-50 text-emerald-700';
+            cls +=
+              'border-emerald-400/50 bg-emerald-500/10 text-emerald-800 hover:bg-emerald-500/15 dark:border-emerald-700/70 dark:bg-emerald-950/40 dark:text-emerald-300';
           } else {
             cls +=
-              'border-slate-200 bg-white text-slate-600 hover:border-cyan-300';
+              'border-slate-200/90 bg-white text-slate-600 hover:border-cyan-300/80 hover:bg-cyan-50/50 dark:border-slate-600 dark:bg-slate-800/60 dark:text-slate-300 dark:hover:border-cyan-500/35 dark:hover:bg-slate-700/70';
           }
-          if (flagged.has(i)) cls += ' ring-2 ring-amber-400';
+          if (flagged.has(i)) cls += ' ring-2 ring-amber-400 ring-offset-2 ring-offset-white dark:ring-offset-slate-900';
 
           return (
             <button
@@ -853,25 +1004,28 @@ function QuestionNav({
               type="button"
               className={cls}
               onClick={() => onSelect(i)}
+              aria-current={i === currentIndex ? 'true' : undefined}
             >
               {i + 1}
             </button>
           );
         })}
       </div>
-      <div className="mt-3 flex flex-wrap gap-3 text-xs text-slate-500">
-        <span>
-          <span className="mr-1 inline-block h-3 w-3 rounded border border-emerald-300 bg-emerald-100" />
-          Answered
-        </span>
-        <span>
-          <span className="mr-1 inline-block h-3 w-3 rounded border border-slate-200 bg-white" />
-          Unanswered
-        </span>
-        <span>
-          <span className="mr-1 inline-block h-3 w-3 rounded border border-slate-200 bg-white ring-2 ring-amber-400" />
-          Flagged
-        </span>
+      <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 dark:border-slate-700/60">
+        <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 shrink-0 rounded-md border border-emerald-400/70 bg-emerald-500/20 shadow-sm dark:bg-emerald-500/35" />
+            Answered
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 shrink-0 rounded-md border border-slate-300 bg-white shadow-sm dark:border-slate-500 dark:bg-slate-700" />
+            Unanswered
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 shrink-0 rounded-md border border-amber-400/80 bg-transparent ring-2 ring-amber-400/90 ring-offset-1 ring-offset-white dark:ring-offset-slate-900" />
+            Flagged
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -888,29 +1042,45 @@ function OptionButton({
   onSelect,
 }) {
   let cls =
-    'w-full rounded-2xl border px-4 py-3 text-left text-sm font-medium transition cursor-pointer ';
+    'group flex w-full items-start gap-3 rounded-2xl border px-5 py-4 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-[#12181f] ';
 
   if (showResult) {
     if (index === correct) {
-      cls += 'border-emerald-400 bg-emerald-50 text-emerald-800';
+      cls +=
+        'border-emerald-500/70 bg-gradient-to-br from-emerald-50 to-teal-50/80 font-medium text-emerald-950 shadow-inner dark:border-emerald-700/75 dark:from-emerald-950/50 dark:to-emerald-900/35 dark:text-emerald-100';
     } else if (selected && index !== correct) {
-      cls += 'border-rose-400 bg-rose-50 text-rose-800';
+      cls +=
+        'border-rose-500/65 bg-gradient-to-br from-rose-50 to-rose-50/50 font-medium text-rose-950 dark:border-rose-800 dark:from-rose-950/40 dark:to-transparent dark:text-rose-50';
     } else {
-      cls += 'border-slate-200 bg-white text-slate-700';
+      cls +=
+        'border-slate-200/95 bg-white/95 text-slate-600 opacity-80 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-400';
     }
   } else if (selected) {
-    cls += 'border-cyan-500 bg-cyan-50 text-cyan-900 shadow-sm';
+    cls +=
+      'border-cyan-500 bg-gradient-to-br from-cyan-50 to-white font-semibold text-slate-900 shadow-md shadow-cyan-500/15 ring-1 ring-cyan-500/30 dark:border-cyan-400 dark:from-cyan-950/45 dark:to-slate-900/70 dark:text-white dark:shadow-cyan-500/15';
   } else {
     cls +=
-      'border-slate-200 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50';
+      'cursor-pointer border-slate-200/90 bg-white text-slate-800 hover:border-cyan-400/60 hover:bg-gradient-to-br hover:from-cyan-500/10 hover:to-white dark:border-slate-600 dark:bg-slate-800/85 dark:text-slate-100 dark:hover:border-cyan-500/50 dark:hover:from-cyan-500/10 dark:hover:to-slate-800/90';
   }
 
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
 
   return (
     <button type="button" className={cls} onClick={onSelect}>
-      <span className="mr-3 font-semibold">{LETTERS[index]}.</span>
-      {option}
+      <span
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-xs font-bold tabular-nums transition ${
+          showResult && index === correct
+            ? 'bg-emerald-600 text-white dark:bg-emerald-500'
+            : showResult && selected && index !== correct
+              ? 'bg-rose-600 text-white dark:bg-rose-500'
+              : selected && !showResult
+                ? 'bg-cyan-600 text-white dark:bg-cyan-500'
+                : 'border border-slate-200/95 bg-slate-50 text-slate-700 group-hover:border-cyan-300/80 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:group-hover:border-cyan-500/55'
+        }`}
+      >
+        {LETTERS[index]}
+      </span>
+      <span className="min-w-0 flex-1 leading-relaxed">{option}</span>
     </button>
   );
 }
