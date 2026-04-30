@@ -16,10 +16,10 @@ const options = [
   },
   {
     title: 'Exams',
-    path: '/exams',
+    path: '/liqu-ai/exams',
     description:
-      'Open the Exams area for practice questions, exit-exam style prep, and course assessments.',
-    cta: 'Open Exams',
+      'Private MCQ vault, community question bank, and PDF imports—organized in one Liqu AI exam studio.',
+    cta: 'Open Exam studio',
     icon: ClipboardList,
     glow: 'from-slate-400/25 to-violet-500/25 dark:from-slate-500/20 dark:to-violet-600/25',
     iconSurface:

@@ -8,6 +8,13 @@ const examSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    /** `pdf`: uploaded extraction; `vault_compiled`: published from user's private vault. */
+    examKind: {
+      type: String,
+      enum: ['pdf', 'vault_compiled'],
+      default: 'pdf',
+      index: true,
+    },
     filename: {
       type: String,
       required: true,
@@ -15,15 +22,15 @@ const examSchema = new mongoose.Schema(
     },
     fileSize: {
       type: Number,
-      required: true,
+      default: 0,
     },
     fileUrl: {
       type: String,
-      required: true,
+      default: '',
     },
     fileKey: {
       type: String,
-      required: true,
+      default: '',
     },
     // SHA-256 hash of extracted text content for deduplication
     contentHash: {
@@ -78,7 +85,23 @@ const examSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
+examSchema.pre('validate', function (next) {
+  if (this.examKind === 'vault_compiled') {
+    return next();
+  }
+  if (!this.fileUrl?.trim()) {
+    this.invalidate('fileUrl', 'PDF exams require a file URL');
+  }
+  if (!this.fileKey?.trim()) {
+    this.invalidate('fileKey', 'PDF exams require a file key');
+  }
+  if (this.fileSize == null || this.fileSize <= 0) {
+    this.invalidate('fileSize', 'PDF exams require a positive file size');
+  }
+  next();
+});
+
 examSchema.index({ contentHash: 1, processingStatus: 1 });
-examSchema.index({ title: 'text', subject: 'text', topic: 'text' });
+examSchema.index({ filename: 'text', subject: 'text', topic: 'text' });
 
 export default mongoose.model('Exam', examSchema);

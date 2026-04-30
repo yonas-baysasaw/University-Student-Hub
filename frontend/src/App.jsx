@@ -92,9 +92,13 @@ function AppRoutes() {
             <Route path="/liqu-ai/study-buddy" element={<StudyBuddy />} />
             <Route
               path="/liqu-ai/did-exit"
-              element={<Navigate to="/exams" replace />}
+              element={<Navigate to="/liqu-ai/exams" replace />}
             />
-            <Route path="/exams" element={<Exams />} />
+            <Route path="/liqu-ai/exams" element={<Exams />} />
+            <Route
+              path="/exams"
+              element={<Navigate to="/liqu-ai/exams" replace />}
+            />
             <Route path="/exams/:examId" element={<ExamPractice />} />
             <Route path="/profile" element={<Profile />} />
             <Route
@@ -157,6 +161,7 @@ function AppRoutes() {
           <Route path="/liqu-ai" element={<RedirectToLogin />} />
           <Route path="/liqu-ai/study-buddy" element={<RedirectToLogin />} />
           <Route path="/liqu-ai/did-exit" element={<RedirectToLogin />} />
+          <Route path="/liqu-ai/exams" element={<RedirectToLogin />} />
           <Route path="/profile" element={<RedirectToLogin />} />
           <Route path="/users/:userId" element={<PublicProfile />} />
           <Route path="/exams" element={<RedirectToLogin />} />

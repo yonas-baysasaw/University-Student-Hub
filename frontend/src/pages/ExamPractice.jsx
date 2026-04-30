@@ -162,7 +162,7 @@ function ExamPractice() {
       <div className="page-surface px-4 py-16 text-center">
         <p className="text-rose-600">{error}</p>
         <Link
-          to="/exams"
+          to="/liqu-ai/exams"
           className="btn-primary mt-4 inline-block px-5 py-2.5 text-sm"
         >
           Back to Exams
@@ -208,7 +208,7 @@ function ExamPractice() {
           </div>
         )}
         <Link
-          to="/exams"
+          to="/liqu-ai/exams"
           className="btn-secondary mt-6 inline-block px-5 py-2.5 text-sm"
         >
           Back to Exams
@@ -338,7 +338,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
         throw new Error(d.message || 'Delete failed');
       }
       toast.success('Exam deleted');
-      navigate('/exams');
+      navigate('/liqu-ai/exams');
     } catch (err) {
       toast.error(err.message);
       setDeleting(false);
@@ -423,7 +423,7 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
                 </ul>
               </div>
               <Link
-                to="/exams"
+                to="/liqu-ai/exams"
                 className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100"
               >
                 ← Back
@@ -894,7 +894,7 @@ function ResultsScreen({ exam, results, onRestart, onReview }) {
             >
               Review answers
             </button>
-            <Link to="/exams" className="btn-secondary px-5 py-2.5 text-sm">
+            <Link to="/liqu-ai/exams" className="btn-secondary px-5 py-2.5 text-sm">
               Back to Exams
             </Link>
           </div>

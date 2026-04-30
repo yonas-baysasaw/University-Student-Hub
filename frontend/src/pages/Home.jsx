@@ -341,7 +341,7 @@ function Home() {
       icon: Sparkles,
     },
     {
-      to: '/exams',
+      to: '/liqu-ai/exams',
       label: 'Exams',
       hint: 'Practice sets',
       icon: BookOpen,

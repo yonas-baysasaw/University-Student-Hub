@@ -56,10 +56,14 @@ async function uploadExamController(req, res, next) {
       });
     }
 
+    const visibilityArg = req.body?.visibility;
+    const visibility = visibilityArg === 'public' ? 'public' : 'private';
+
     if (existingExam) {
       // Create a lightweight duplicate record pointing to original's questions
       const dupExam = await Exam.create({
         uploadedBy: userId,
+        examKind: 'pdf',
         filename: file.originalname,
         fileSize: file.size,
         fileUrl: s3Result.location,
@@ -70,6 +74,7 @@ async function uploadExamController(req, res, next) {
         processingStatus: 'complete',
         isDuplicate: true,
         originalExamId: existingExam._id,
+        visibility,
       });
 
       return res.status(201).json(formatExam(dupExam));
@@ -78,6 +83,7 @@ async function uploadExamController(req, res, next) {
     // Create a new exam record (status: pending)
     const exam = await Exam.create({
       uploadedBy: userId,
+      examKind: 'pdf',
       filename: file.originalname,
       fileSize: file.size,
       fileUrl: s3Result.location,
@@ -85,6 +91,7 @@ async function uploadExamController(req, res, next) {
       contentHash,
       textContent,
       processingStatus: 'pending',
+      visibility,
     });
 
     // Kick off background batch processing — do not await
@@ -309,7 +316,7 @@ async function updateExamController(req, res, next) {
     assertCanWrite(req.user);
     const userId = req.user._id;
     const { examId } = req.params;
-    const { filename, subject } = req.body;
+    const { filename, subject, topic, visibility } = req.body;
 
     const exam = await Exam.findById(examId);
     if (!exam) return res.status(404).json({ message: 'Exam not found.' });
@@ -321,10 +328,21 @@ async function updateExamController(req, res, next) {
 
     if (filename !== undefined)
       exam.filename = filename.trim() || exam.filename;
-    if (subject !== undefined) exam.subject = subject.trim();
+    if (subject !== undefined) exam.subject = String(subject ?? '').trim();
+    if (topic !== undefined) exam.topic = String(topic ?? '').trim();
+    if (visibility !== undefined) {
+      if (visibility !== 'public' && visibility !== 'private') {
+        return res.status(400).json({ message: 'Invalid visibility value.' });
+      }
+      exam.visibility = visibility;
+    }
     await exam.save();
 
-    return res.json(formatExam(exam));
+    const refreshed = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar',
+    );
+    return res.json(formatExam(refreshed));
   } catch (error) {
     return next(error);
   }
@@ -346,8 +364,8 @@ async function deleteExamController(req, res, next) {
         .json({ message: 'Only the uploader can delete this exam.' });
     }
 
-    // Delete S3 object
-    if (exam.fileKey) {
+    // Delete S3 object (PDF uploads only; composed papers have no file)
+    if ((!exam.examKind || exam.examKind === 'pdf') && exam.fileKey?.trim()) {
       try {
         await s3Client.send(
           new DeleteObjectCommand({
@@ -382,10 +400,11 @@ async function deleteExamController(req, res, next) {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function canAccessExam(exam, userId) {
-  return (
-    exam.visibility === 'public' ||
-    exam.uploadedBy._id?.toString() === userId.toString()
-  );
+  const ownerId =
+    exam.uploadedBy?._id != null
+      ? exam.uploadedBy._id.toString()
+      : (exam.uploadedBy?.toString?.() ?? String(exam.uploadedBy));
+  return exam.visibility === 'public' || ownerId === userId.toString();
 }
 
 function formatExam(exam) {
@@ -400,6 +419,7 @@ function formatExam(exam) {
     topic: exam.topic,
     visibility: exam.visibility,
     isDuplicate: exam.isDuplicate,
+    examKind: exam.examKind ?? 'pdf',
     uploadedBy: exam.uploadedBy,
     createdAt: exam.createdAt,
     updatedAt: exam.updatedAt,
