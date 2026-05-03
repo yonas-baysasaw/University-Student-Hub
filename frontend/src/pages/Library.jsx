@@ -55,35 +55,41 @@ function LibraryEngagementTiny({ item, className = '' }) {
   const dislikes = item.dislikesCount ?? 0;
   const views = item.viewsCount ?? 0;
   const downloads = item.downloadsCount ?? 0;
+  const countClass =
+    'font-semibold tabular-nums text-slate-600 dark:text-slate-200';
 
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 ${className}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300 ${className}`}
       aria-label={`${likes} likes, ${dislikes} dislikes, ${views} views, ${downloads} downloads`}
     >
       <span className="inline-flex items-center gap-0.5" title="Likes">
         <Heart className="h-3 w-3 shrink-0 text-rose-400" strokeWidth={2} aria-hidden />
-        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-          {likes}
-        </span>
+        <span className={countClass}>{likes}</span>
       </span>
       <span className="inline-flex items-center gap-0.5" title="Dislikes">
-        <ThumbsDown className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
-        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-          {dislikes}
-        </span>
+        <ThumbsDown
+          className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-300"
+          strokeWidth={2}
+          aria-hidden
+        />
+        <span className={countClass}>{dislikes}</span>
       </span>
       <span className="inline-flex items-center gap-0.5" title="Views">
-        <Share2 className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
-        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-          {views}
-        </span>
+        <Share2
+          className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-300"
+          strokeWidth={2}
+          aria-hidden
+        />
+        <span className={countClass}>{views}</span>
       </span>
       <span className="inline-flex items-center gap-0.5" title="Downloads">
-        <Download className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
-        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
-          {downloads}
-        </span>
+        <Download
+          className="h-3 w-3 shrink-0 text-slate-500 dark:text-slate-300"
+          strokeWidth={2}
+          aria-hidden
+        />
+        <span className={countClass}>{downloads}</span>
       </span>
     </div>
   );
@@ -616,23 +622,26 @@ function LibraryBookGridCard({
         </h2>
         {bookCatalogSnippet(item) ? (
           <p
-            className="mt-1 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400"
+            className="mt-1 truncate text-[11px] font-medium text-slate-600 dark:text-slate-300"
             title={bookCatalogSnippet(item)}
           >
             {bookCatalogSnippet(item)}
           </p>
         ) : null}
-        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-          <span className="text-fuchsia-700/90 dark:text-fuchsia-300/90">{formatLabel}</span>
+        <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+          <span className="text-fuchsia-700/90 dark:text-fuchsia-200/95">{formatLabel}</span>
           {dateShort ? (
             <>
-              <span aria-hidden className="text-slate-300 dark:text-slate-600">
+              <span aria-hidden className="text-slate-400 dark:text-slate-500">
                 ·
               </span>
-              <span>{dateShort}</span>
+              <span className="text-slate-700 dark:text-slate-200">{dateShort}</span>
             </>
           ) : null}
         </p>
+        <div className="mt-2">
+          <LibraryEngagementTiny item={item} className="normal-case" />
+        </div>
         <button
           type="button"
           className="mt-2 inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-fuchsia-500/15 to-cyan-500/15 px-3 py-1 text-[11px] font-bold text-cyan-800 ring-1 ring-cyan-500/25 transition hover:from-fuchsia-500/25 hover:to-cyan-500/25 lg:hidden dark:text-cyan-200 dark:ring-cyan-400/30"
@@ -646,13 +655,13 @@ function LibraryBookGridCard({
       <div
         className={`flex min-h-0 flex-1 flex-col px-3 pb-3 transition-all duration-300 ease-out ${detailMobileClasses} lg:absolute lg:inset-x-0 lg:bottom-0 lg:z-20 lg:mt-0 lg:max-h-[min(400px,82vh)] lg:overflow-y-auto lg:rounded-t-2xl lg:border lg:border-white/50 lg:bg-white/78 lg:px-4 lg:pb-4 lg:pt-4 lg:text-slate-800 lg:shadow-[0_-20px_50px_rgba(15,23,42,0.12)] lg:backdrop-blur-xl lg:transition lg:duration-300 lg:ease-out lg:translate-y-full lg:opacity-0 lg:pointer-events-none lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto lg:group-focus-within:translate-y-0 lg:group-focus-within:opacity-100 lg:group-focus-within:pointer-events-auto dark:lg:border-slate-600/50 dark:lg:bg-slate-950/55 dark:lg:text-slate-100`}
       >
-        <p className="hidden text-[11px] font-semibold text-slate-500 dark:text-slate-400 lg:block lg:text-slate-600 dark:lg:text-slate-300">
+        <p className="hidden text-[11px] font-semibold text-slate-600 lg:block lg:text-slate-700 dark:text-slate-300 dark:lg:text-slate-200">
           {formatLabel}
           {item.publishYear != null && Number.isFinite(Number(item.publishYear))
             ? ` · ${item.publishYear}`
             : ''}
           {item.ragIndexStatus === 'ready' ? (
-            <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-400">
+            <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-300">
               {' '}
               · Liqu-ready
             </span>
@@ -664,14 +673,14 @@ function LibraryBookGridCard({
         item.courseSubject ||
         (item.publishYear != null &&
           Number.isFinite(Number(item.publishYear))) ? (
-          <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2 dark:border-slate-700/90 dark:bg-slate-800/55 lg:mt-3 lg:border-slate-200/80 lg:bg-white/60 dark:lg:border-white/10 dark:lg:bg-white/5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 lg:text-slate-500 dark:lg:text-cyan-200/80">
+          <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2 dark:border-slate-600/70 dark:bg-slate-800/65 lg:mt-3 lg:border-slate-200/80 lg:bg-white/60 dark:lg:border-white/15 dark:lg:bg-white/[0.07]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 lg:text-slate-600 dark:lg:text-slate-300">
               Catalog
             </p>
-            <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-200 lg:text-slate-800 dark:lg:text-slate-100">
+            <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100 lg:text-slate-900 dark:lg:text-slate-50">
                           {item.academicTrack ? (
                             <li>
-                              <span className="text-slate-500 dark:text-slate-400 lg:text-slate-400">
+                              <span className="text-slate-600 dark:text-slate-300 lg:text-slate-500 dark:lg:text-slate-300">
                                 Field ·{' '}
                               </span>
                               {academicTrackLabel(item.academicTrack)}
@@ -679,7 +688,7 @@ function LibraryBookGridCard({
                           ) : null}
                           {item.department ? (
                             <li>
-                              <span className="text-slate-500 dark:text-slate-400 lg:text-slate-400">
+                              <span className="text-slate-600 dark:text-slate-300 lg:text-slate-500 dark:lg:text-slate-300">
                                 Dept ·{' '}
                               </span>
                               {item.department}
@@ -687,7 +696,7 @@ function LibraryBookGridCard({
                           ) : null}
                           {item.courseSubject ? (
                             <li>
-                              <span className="text-slate-500 dark:text-slate-400 lg:text-slate-400">
+                              <span className="text-slate-600 dark:text-slate-300 lg:text-slate-500 dark:lg:text-slate-300">
                                 Course ·{' '}
                               </span>
                               {item.courseSubject}
@@ -696,7 +705,7 @@ function LibraryBookGridCard({
                           {item.publishYear != null &&
                           Number.isFinite(Number(item.publishYear)) ? (
                             <li>
-                              <span className="text-slate-500 dark:text-slate-400 lg:text-slate-400">
+                              <span className="text-slate-600 dark:text-slate-300 lg:text-slate-500 dark:lg:text-slate-300">
                                 Year ·{' '}
                               </span>
                               {item.publishYear}
@@ -707,16 +716,13 @@ function LibraryBookGridCard({
         ) : null}
 
         {topic ? (
-          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-600/90 dark:text-fuchsia-300/90 lg:text-fuchsia-700 dark:lg:text-fuchsia-300/90">
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-600/90 dark:text-fuchsia-200/95 lg:text-fuchsia-700 dark:lg:text-fuchsia-200">
             {topic}
           </p>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3 dark:border-slate-700/80 lg:border-slate-200/80 dark:lg:border-white/10">
-          <LibraryEngagementTiny
-            item={item}
-            className="normal-case text-slate-600 dark:text-slate-400 lg:text-slate-600 dark:lg:text-slate-400"
-          />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3 dark:border-slate-600/80 lg:border-slate-200/80 dark:lg:border-white/15">
+          <LibraryEngagementTiny item={item} className="normal-case" />
           {isOwner ? (
             <button
               type="button"
@@ -742,7 +748,7 @@ function LibraryBookGridCard({
                 alt=""
                 className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-cyan-400/30"
               />
-              <span className="min-w-0 truncate text-xs font-semibold text-slate-800 group-hover/up:text-cyan-700 dark:text-slate-200 dark:group-hover/up:text-cyan-300 lg:text-slate-900 lg:dark:text-slate-100">
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-800 group-hover/up:text-cyan-700 dark:text-slate-100 dark:group-hover/up:text-cyan-300 lg:text-slate-900 lg:dark:text-slate-50">
                 {item.uploader.name}
               </span>
             </Link>
@@ -753,7 +759,7 @@ function LibraryBookGridCard({
                 alt=""
                 className="h-9 w-9 rounded-full object-cover ring-2 ring-white/20"
               />
-              <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300 lg:text-slate-900 lg:dark:text-slate-100">
+              <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-200 lg:text-slate-900 lg:dark:text-slate-50">
                 {item.uploader.name}
               </span>
             </div>
@@ -761,11 +767,11 @@ function LibraryBookGridCard({
         </div>
 
         {item.description ? (
-          <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300 lg:text-slate-700 lg:dark:text-slate-300">
+          <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600 dark:text-slate-200 lg:text-slate-700 lg:dark:text-slate-200">
             {item.description}
           </p>
         ) : (
-          <p className="mt-3 text-sm italic text-slate-500">
+          <p className="mt-3 text-sm italic text-slate-500 dark:text-slate-400 lg:dark:text-slate-400">
             No description
           </p>
         )}
