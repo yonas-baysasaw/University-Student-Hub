@@ -19,7 +19,7 @@ import {
   UserRound,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -55,6 +55,7 @@ function formatReviewTimestamp(iso) {
 function BookDetail() {
   const { bookId } = useParams();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [book, setBook] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -84,6 +85,7 @@ function BookDetail() {
   const [comments, setComments] = useState([]);
   const [commentsLoading, setCommentsLoading] = useState(false);
   const [commentsError, setCommentsError] = useState('');
+  const [deletingBook, setDeletingBook] = useState(false);
   const [commentBody, setCommentBody] = useState('');
   const [replyToId, setReplyToId] = useState(null);
   const [commentSubmitting, setCommentSubmitting] = useState(false);
@@ -500,6 +502,35 @@ function BookDetail() {
     }
   };
 
+  const handleDeleteBook = async () => {
+    const id = book?._id;
+    if (!id || deletingBook) return;
+    if (
+      !window.confirm(
+        'Permanently delete this book from the library? Reviews and discussion will be removed. This cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    setDeletingBook(true);
+    setActionMessage('');
+    try {
+      const res = await fetch(`/api/books/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.message || 'Could not delete this book.');
+      }
+      navigate('/library');
+    } catch (err) {
+      setActionMessage(err?.message || 'Could not delete this book.');
+    } finally {
+      setDeletingBook(false);
+    }
+  };
+
   const handleDeleteComment = async (cid) => {
     if (!book?._id || !cid) return;
     setCommentDeletingId(cid);
@@ -786,14 +817,27 @@ function BookDetail() {
                       </p>
                     </div>
                     {isOwner ? (
-                      <button
-                        type="button"
-                        onClick={() => setEditMetaOpen(true)}
-                        className="ml-auto inline-flex items-center gap-2 rounded-2xl border border-cyan-200/80 bg-white/90 px-3 py-2 text-xs font-bold text-cyan-900 shadow-sm transition hover:border-cyan-400 dark:border-cyan-800 dark:bg-slate-800 dark:text-cyan-100"
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden />
-                        Edit details
-                      </button>
+                      <div className="ml-auto flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditMetaOpen(true)}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-cyan-200/80 bg-white/90 px-3 py-2 text-xs font-bold text-cyan-900 shadow-sm transition hover:border-cyan-400 dark:border-cyan-800 dark:bg-slate-800 dark:text-cyan-100"
+                        >
+                          <Pencil className="h-3.5 w-3.5" aria-hidden />
+                          Edit details
+                        </button>
+                        <button
+                          type="button"
+                          disabled={deletingBook}
+                          onClick={handleDeleteBook}
+                          className="inline-flex items-center gap-2 rounded-2xl border border-rose-200/90 bg-white/90 px-3 py-2 text-xs font-bold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-800 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                          title="Delete this book permanently"
+                          aria-label="Delete book"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden />
+                          {deletingBook ? 'Deleting…' : 'Delete'}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                   {isOwner && book.visibility === 'unlisted' ? (

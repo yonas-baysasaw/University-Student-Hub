@@ -173,6 +173,7 @@ function Profile() {
   const [readingLists, setReadingLists] = useState([]);
   const [listReorder, setListReorder] = useState(null);
   const [listReorderBusy, setListReorderBusy] = useState(false);
+  const [deletingSharedBookId, setDeletingSharedBookId] = useState(null);
 
   const refreshReadingLists = useCallback(async () => {
     try {
@@ -264,6 +265,44 @@ function Profile() {
       await refreshReadingLists();
     } catch {
       /* ignore */
+    }
+  };
+
+  const deleteSharedBook = async (mongoId) => {
+    if (!mongoId) return;
+    if (
+      !window.confirm(
+        'Permanently delete this book from the library? Readers will lose access. This cannot be undone.',
+      )
+    ) {
+      return;
+    }
+    const idStr = String(mongoId);
+    setDeletingSharedBookId(idStr);
+    setUploadError('');
+    try {
+      const res = await fetch(`/api/books/${encodeURIComponent(mongoId)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.message || 'Could not delete this book.');
+      }
+      setSharedBooks((prev) => prev.filter((b) => String(b._id) !== idStr));
+      setStats((prev) => ({
+        ...prev,
+        totalBooks: Math.max(
+          0,
+          Number.isFinite(prev?.totalBooks) ? prev.totalBooks - 1 : 0,
+        ),
+      }));
+      setUploadSuccess('Book removed from the library.');
+      window.setTimeout(() => setUploadSuccess(''), 3200);
+    } catch (err) {
+      setUploadError(err?.message || 'Delete failed.');
+    } finally {
+      setDeletingSharedBookId(null);
     }
   };
 
@@ -1167,13 +1206,25 @@ function Profile() {
                         ) : (
                           <div className="flex-1" />
                         )}
-                        <Link
-                          to={`/library/${book._id}`}
-                          className="btn-secondary mt-4 inline-flex w-full items-center justify-center gap-2 py-2.5 text-sm"
-                        >
-                          Open detail
-                          <ArrowRight className="h-4 w-4" />
-                        </Link>
+                        <div className="mt-4 flex gap-2">
+                          <Link
+                            to={`/library/${book._id}`}
+                            className="btn-secondary inline-flex min-w-0 flex-1 items-center justify-center gap-2 py-2.5 text-sm"
+                          >
+                            Open detail
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                          <button
+                            type="button"
+                            disabled={deletingSharedBookId === String(book._id)}
+                            title="Remove from library permanently"
+                            aria-label="Delete shared book"
+                            className="inline-flex h-[42px] w-11 shrink-0 items-center justify-center rounded-xl border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-950 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                            onClick={() => deleteSharedBook(book._id)}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </button>
+                        </div>
                       </div>
                     </article>
                   ))

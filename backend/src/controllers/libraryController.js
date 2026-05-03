@@ -1,6 +1,9 @@
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
+import BookChunk from '../models/BookChunk.js';
+import BookComment from '../models/BookComment.js';
+import BookReview from '../models/BookReview.js';
 import {
   browseListFilter,
   directAccessOutcome,
@@ -329,6 +332,13 @@ export const deleteBook = asyncHandler(async (req, res) => {
       message: 'Book not found',
     });
   }
+
+  const bid = deleted._id;
+  await Promise.all([
+    BookReview.deleteMany({ bookId: bid }),
+    BookComment.deleteMany({ bookId: bid }),
+    BookChunk.deleteMany({ book: bid }),
+  ]);
 
   res.status(200).json({
     success: true,

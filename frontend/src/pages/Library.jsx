@@ -11,15 +11,21 @@ import {
   ListPlus,
   Library as LibraryIcon,
   Search,
+  Share2,
   SlidersHorizontal,
   Sparkles,
+  ThumbsDown,
+  Trash2,
   Upload,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
+import UploadBookModal from '../components/UploadBookModal.jsx';
 import { useAuth } from '../contexts/AuthContext';
+import { useBookUploadModal } from '../hooks/useBookUploadModal.js';
 import { fetchLibraryBooks } from '../utils/books';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
 import {
@@ -31,6 +37,57 @@ import {
 } from '../utils/formatLabels';
 
 const GUEST_SAVED_KEY = 'library.guestSavedIds';
+
+/** Visible below title — department, course, year, field — one line while browsing. */
+function bookCatalogSnippet(item) {
+  const parts = [];
+  if (item.academicTrack) parts.push(academicTrackLabel(item.academicTrack));
+  if (item.department?.trim()) parts.push(item.department.trim());
+  if (item.courseSubject?.trim()) parts.push(item.courseSubject.trim());
+  if (item.publishYear != null && Number.isFinite(Number(item.publishYear)))
+    parts.push(String(item.publishYear));
+  return parts.join(' · ');
+}
+
+/** Compact hearts / dislikes / views / downloads (library cards). */
+function LibraryEngagementTiny({ item, className = '' }) {
+  const likes = item.likesCount ?? 0;
+  const dislikes = item.dislikesCount ?? 0;
+  const views = item.viewsCount ?? 0;
+  const downloads = item.downloadsCount ?? 0;
+
+  return (
+    <div
+      className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 ${className}`}
+      aria-label={`${likes} likes, ${dislikes} dislikes, ${views} views, ${downloads} downloads`}
+    >
+      <span className="inline-flex items-center gap-0.5" title="Likes">
+        <Heart className="h-3 w-3 shrink-0 text-rose-400" strokeWidth={2} aria-hidden />
+        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+          {likes}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-0.5" title="Dislikes">
+        <ThumbsDown className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
+        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+          {dislikes}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-0.5" title="Views">
+        <Share2 className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
+        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+          {views}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-0.5" title="Downloads">
+        <Download className="h-3 w-3 shrink-0 text-slate-400" strokeWidth={2} aria-hidden />
+        <span className="font-semibold tabular-nums text-slate-500 dark:text-slate-400">
+          {downloads}
+        </span>
+      </span>
+    </div>
+  );
+}
 const LS_LIBRARY_VIEW = 'ush.library.view';
 const LS_LIBRARY_COLS = 'ush.library.gridCols';
 
@@ -42,7 +99,14 @@ function readLibraryViewPrefs() {
     const v = window.localStorage.getItem(LS_LIBRARY_VIEW);
     const c = window.localStorage.getItem(LS_LIBRARY_COLS);
     const cols = c === '2' || c === '3' || c === '4' ? c : '3';
-    return { view: v === 'list' ? 'list' : 'grid', cols };
+    if (v === 'list' || v === 'grid') {
+      return { view: v, cols };
+    }
+    const prefersList =
+      typeof window.matchMedia === 'function'
+        ? window.matchMedia('(max-width: 767px)').matches
+        : false;
+    return { view: prefersList ? 'list' : 'grid', cols };
   } catch {
     return { view: 'grid', cols: '3' };
   }
@@ -90,7 +154,7 @@ function readGuestSavedIds() {
   }
 }
 
-const useResources = (listFetchKey, listBookIdsSerialized) => {
+const useResources = (listFetchKey, listBookIdsSerialized, reloadNonce = 0) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -137,7 +201,7 @@ const useResources = (listFetchKey, listBookIdsSerialized) => {
     return () => {
       active = false;
     };
-  }, [listFetchKey, listBookIdsSerialized]);
+  }, [listFetchKey, listBookIdsSerialized, reloadNonce]);
 
   return { resources, setResources, loading, error };
 };
@@ -161,6 +225,9 @@ function LibraryBookListRow({
   listsLoading,
   addBookToList,
   createListAndAdd,
+  isOwner,
+  onDeleteBook,
+  deleteBusy,
 }) {
   return (
     <article
@@ -241,6 +308,14 @@ function LibraryBookListRow({
               {item.title}
             </Link>
           </h2>
+          {bookCatalogSnippet(item) ? (
+            <p
+              className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400"
+              title={bookCatalogSnippet(item)}
+            >
+              {bookCatalogSnippet(item)}
+            </p>
+          ) : null}
           <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
             <span>{formatLabel}</span>
             {dateShort ? (
@@ -288,15 +363,20 @@ function LibraryBookListRow({
           </p>
         ) : null}
 
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-          <span className="inline-flex items-center gap-1 normal-case">
-            <Heart className="h-3 w-3 text-rose-400" aria-hidden />
-            {item.likesCount ?? 0}
-          </span>
-          <span className="inline-flex items-center gap-1 normal-case">
-            <Download className="h-3 w-3 text-slate-400" aria-hidden />
-            {item.downloadsCount ?? 0}
-          </span>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <LibraryEngagementTiny item={item} className="normal-case" />
+          {isOwner ? (
+            <button
+              type="button"
+              disabled={deleteBusy}
+              title="Delete this book from the library"
+              aria-label="Delete book"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/50"
+              onClick={() => onDeleteBook?.(itemKey)}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ) : null}
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
@@ -430,6 +510,9 @@ function LibraryBookGridCard({
   createListAndAdd,
   mobileDetailOpen,
   onToggleMobileDetail,
+  isOwner,
+  onDeleteBook,
+  deleteBusy,
 }) {
   const detailMobileClasses = mobileDetailOpen
     ? 'max-lg:max-h-[2000px] max-lg:translate-y-0 max-lg:opacity-100 max-lg:pointer-events-auto max-lg:mt-1'
@@ -531,6 +614,14 @@ function LibraryBookGridCard({
             {item.title}
           </Link>
         </h2>
+        {bookCatalogSnippet(item) ? (
+          <p
+            className="mt-1 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400"
+            title={bookCatalogSnippet(item)}
+          >
+            {bookCatalogSnippet(item)}
+          </p>
+        ) : null}
         <p className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
           <span className="text-fuchsia-700/90 dark:text-fuchsia-300/90">{formatLabel}</span>
           {dateShort ? (
@@ -553,15 +644,18 @@ function LibraryBookGridCard({
       </div>
 
       <div
-        className={`flex min-h-0 flex-1 flex-col px-3 pb-3 transition-all duration-300 ease-out ${detailMobileClasses} lg:absolute lg:inset-x-0 lg:bottom-0 lg:z-20 lg:mt-0 lg:max-h-[min(400px,82vh)] lg:overflow-y-auto lg:rounded-t-2xl lg:border lg:border-cyan-400/35 lg:bg-slate-950/[0.94] lg:px-4 lg:pb-4 lg:pt-4 lg:text-slate-100 lg:shadow-[0_-28px_70px_rgba(0,0,0,0.42)] lg:backdrop-blur-xl lg:transition lg:duration-300 lg:ease-out lg:translate-y-full lg:opacity-0 lg:pointer-events-none lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto lg:group-focus-within:translate-y-0 lg:group-focus-within:opacity-100 lg:group-focus-within:pointer-events-auto dark:lg:border-fuchsia-500/20`}
+        className={`flex min-h-0 flex-1 flex-col px-3 pb-3 transition-all duration-300 ease-out ${detailMobileClasses} lg:absolute lg:inset-x-0 lg:bottom-0 lg:z-20 lg:mt-0 lg:max-h-[min(400px,82vh)] lg:overflow-y-auto lg:rounded-t-2xl lg:border lg:border-white/50 lg:bg-white/78 lg:px-4 lg:pb-4 lg:pt-4 lg:text-slate-800 lg:shadow-[0_-20px_50px_rgba(15,23,42,0.12)] lg:backdrop-blur-xl lg:transition lg:duration-300 lg:ease-out lg:translate-y-full lg:opacity-0 lg:pointer-events-none lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:group-hover:pointer-events-auto lg:group-focus-within:translate-y-0 lg:group-focus-within:opacity-100 lg:group-focus-within:pointer-events-auto dark:lg:border-slate-600/50 dark:lg:bg-slate-950/55 dark:lg:text-slate-100`}
       >
-        <p className="hidden text-[11px] font-semibold text-slate-500 dark:text-slate-400 lg:block lg:text-slate-300">
+        <p className="hidden text-[11px] font-semibold text-slate-500 dark:text-slate-400 lg:block lg:text-slate-600 dark:lg:text-slate-300">
           {formatLabel}
           {item.publishYear != null && Number.isFinite(Number(item.publishYear))
             ? ` · ${item.publishYear}`
             : ''}
           {item.ragIndexStatus === 'ready' ? (
-            <span className="text-emerald-400"> · Liqu-ready</span>
+            <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-400">
+              {' '}
+              · Liqu-ready
+            </span>
           ) : null}
         </p>
 
@@ -570,11 +664,11 @@ function LibraryBookGridCard({
         item.courseSubject ||
         (item.publishYear != null &&
           Number.isFinite(Number(item.publishYear))) ? (
-          <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2 dark:border-slate-700/90 dark:bg-slate-800/55 lg:mt-3 lg:border-white/10 lg:bg-white/5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 lg:text-cyan-200/80">
+          <div className="mt-2 rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-2 dark:border-slate-700/90 dark:bg-slate-800/55 lg:mt-3 lg:border-slate-200/80 lg:bg-white/60 dark:lg:border-white/10 dark:lg:bg-white/5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 lg:text-slate-500 dark:lg:text-cyan-200/80">
               Catalog
             </p>
-            <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-200 lg:text-slate-100">
+            <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-200 lg:text-slate-800 dark:lg:text-slate-100">
                           {item.academicTrack ? (
                             <li>
                               <span className="text-slate-500 dark:text-slate-400 lg:text-slate-400">
@@ -613,25 +707,27 @@ function LibraryBookGridCard({
         ) : null}
 
         {topic ? (
-          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-300/90">
+          <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-fuchsia-600/90 dark:text-fuchsia-300/90 lg:text-fuchsia-700 dark:lg:text-fuchsia-300/90">
             {topic}
           </p>
         ) : null}
 
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-y border-slate-200 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600 dark:border-slate-700/80 dark:text-slate-400 lg:border-white/10 lg:text-slate-400">
-          <span className="inline-flex items-center gap-1">
-            <Heart className="h-3.5 w-3.5 text-rose-400" aria-hidden />
-            {item.likesCount ?? 0}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Download className="h-3.5 w-3.5 text-slate-400" aria-hidden />
-            {item.downloadsCount ?? 0}
-          </span>
-          {dateShort ? (
-            <span className="inline-flex items-center gap-1 normal-case tracking-normal">
-              <Calendar className="h-3.5 w-3.5 text-slate-400" aria-hidden />
-              {dateShort}
-            </span>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3 dark:border-slate-700/80 lg:border-slate-200/80 dark:lg:border-white/10">
+          <LibraryEngagementTiny
+            item={item}
+            className="normal-case text-slate-600 dark:text-slate-400 lg:text-slate-600 dark:lg:text-slate-400"
+          />
+          {isOwner ? (
+            <button
+              type="button"
+              disabled={deleteBusy}
+              title="Delete this book"
+              aria-label="Delete book"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white/90 text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/40 dark:bg-slate-900/80 dark:text-rose-400 dark:hover:bg-rose-950/40"
+              onClick={() => onDeleteBook?.(itemKey)}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden />
+            </button>
           ) : null}
         </div>
 
@@ -639,14 +735,14 @@ function LibraryBookGridCard({
           {item.uploader.id ? (
             <Link
               to={`/users/${item.uploader.id}`}
-              className="group/up inline-flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5 ring-1 ring-white/15 transition hover:bg-white/15 lg:bg-white/5"
+              className="group/up inline-flex min-w-0 flex-1 items-center gap-2 rounded-xl bg-white/10 px-2 py-1.5 ring-1 ring-white/15 transition hover:bg-white/15 lg:bg-slate-100/80 lg:ring-slate-200/90 lg:hover:bg-slate-100 dark:lg:bg-white/5 dark:lg:ring-white/15"
             >
               <img
                 src={item.uploader.avatar || defaultProfile}
                 alt=""
                 className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-cyan-400/30"
               />
-              <span className="min-w-0 truncate text-xs font-semibold text-slate-200 group-hover/up:text-cyan-300">
+              <span className="min-w-0 truncate text-xs font-semibold text-slate-800 group-hover/up:text-cyan-700 dark:text-slate-200 dark:group-hover/up:text-cyan-300 lg:text-slate-900 lg:dark:text-slate-100">
                 {item.uploader.name}
               </span>
             </Link>
@@ -657,7 +753,7 @@ function LibraryBookGridCard({
                 alt=""
                 className="h-9 w-9 rounded-full object-cover ring-2 ring-white/20"
               />
-              <span className="truncate text-xs font-semibold text-slate-300">
+              <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300 lg:text-slate-900 lg:dark:text-slate-100">
                 {item.uploader.name}
               </span>
             </div>
@@ -665,11 +761,11 @@ function LibraryBookGridCard({
         </div>
 
         {item.description ? (
-          <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-300 max-lg:text-slate-600 dark:max-lg:text-slate-300">
+          <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-slate-600 dark:text-slate-300 lg:text-slate-700 lg:dark:text-slate-300">
             {item.description}
           </p>
         ) : (
-          <p className="mt-3 text-sm italic text-slate-500 max-lg:text-slate-500">
+          <p className="mt-3 text-sm italic text-slate-500">
             No description
           </p>
         )}
@@ -681,7 +777,7 @@ function LibraryBookGridCard({
                 href={item.bookUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-center text-xs font-bold text-white transition hover:bg-white/15 max-lg:border-slate-200 max-lg:bg-white max-lg:text-slate-800 max-lg:hover:bg-cyan-50 dark:max-lg:border-slate-600 dark:max-lg:bg-slate-950 dark:max-lg:text-slate-100"
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2.5 text-center text-xs font-bold text-white transition hover:bg-white/15 max-lg:border-slate-200 max-lg:bg-white max-lg:text-slate-800 max-lg:hover:bg-cyan-50 dark:max-lg:border-slate-600 dark:max-lg:bg-slate-950 dark:max-lg:text-slate-100 lg:border-slate-200/90 lg:bg-white/90 lg:text-slate-900 lg:hover:bg-cyan-50/80 dark:lg:border-slate-600/80 dark:lg:bg-slate-900/70 dark:lg:text-slate-100 dark:lg:hover:bg-slate-800"
               >
                 Open file
               </a>
@@ -802,10 +898,16 @@ function Library() {
     };
   }, [listId, user]);
 
+  const [booksReloadSig, setBooksReloadSig] = useState(0);
   const { resources, setResources, loading, error } = useResources(
     listFetchKey,
     listBookIdsSerialized,
+    booksReloadSig,
   );
+
+  const { openUploadModal, uploadModalProps } = useBookUploadModal({
+    onSuccess: () => setBooksReloadSig((n) => n + 1),
+  });
 
   const patchParams = useCallback(
     (updates) => {
@@ -854,6 +956,44 @@ function Library() {
   );
   const [savingId, setSavingId] = useState(null);
   const [saveToast, setSaveToast] = useState('');
+  const [deletingId, setDeletingId] = useState(null);
+
+  const deleteOwnedBook = useCallback(
+    async (id) => {
+      if (!id) return;
+      if (
+        !window.confirm(
+          'Permanently delete this book from the library? This cannot be undone.',
+        )
+      ) {
+        return;
+      }
+      setDeletingId(id);
+      setSaveToast('');
+      try {
+        const res = await fetch(`/api/books/${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || 'Could not delete book');
+        }
+        setResources((prev) =>
+          prev.filter((r) => String(r.bookId || r.id) !== String(id)),
+        );
+        setSaveToast('Book removed from the library.');
+        window.setTimeout(() => setSaveToast(''), 2800);
+      } catch (e) {
+        setSaveToast(e?.message || 'Delete failed.');
+        window.setTimeout(() => setSaveToast(''), 4000);
+      } finally {
+        setDeletingId(null);
+      }
+    },
+    [setResources],
+  );
+
   const [listPickerFor, setListPickerFor] = useState(null);
   const [readingLists, setReadingLists] = useState([]);
   const [listsLoading, setListsLoading] = useState(false);
@@ -884,9 +1024,27 @@ function Library() {
 
   useEffect(() => {
     if (!filtersOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [filtersOpen]);
+
+  useEffect(() => {
+    if (!filtersOpen) return;
+    if (typeof window.matchMedia !== 'function') return;
+    if (!window.matchMedia('(min-width: 1024px)').matches) return;
     const t = window.setTimeout(() => {
-      filterPanelRef.current?.querySelector('select')?.focus?.();
-    }, 50);
+      const el = filterPanelRef.current;
+      if (el && typeof el.focus === 'function') {
+        try {
+          el.focus({ preventScroll: true });
+        } catch {
+          el.focus();
+        }
+      }
+    }, 0);
     return () => window.clearTimeout(t);
   }, [filtersOpen]);
 
@@ -1142,9 +1300,9 @@ function Library() {
               <h1 className="font-display text-balance text-3xl font-bold tracking-tight text-slate-900 md:text-4xl dark:text-white">
                 Campus library
               </h1>
-              <p className="max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              <p className="max-w-xl text-[0.9375rem] leading-relaxed text-slate-500 dark:text-slate-500">
                 Browse shared materials, bookmark what you need, and jump into{' '}
-                <span className="font-semibold text-slate-800 dark:text-slate-200">
+                <span className="font-display font-bold text-cyan-600 dark:text-cyan-400">
                   Liqu AI Study buddy
                 </span>{' '}
                 with one click.
@@ -1154,8 +1312,9 @@ function Library() {
 
           <div className="flex flex-shrink-0 flex-wrap gap-2">
             {user ? (
-              <Link
-                to="/profile"
+              <button
+                type="button"
+                onClick={openUploadModal}
                 className="group inline-flex items-center gap-2 rounded-2xl border border-slate-200/90 bg-white/90 px-4 py-2.5 text-sm font-semibold text-slate-800 shadow-md shadow-slate-900/5 ring-1 ring-slate-200/80 transition hover:border-cyan-300/60 hover:shadow-lg dark:border-slate-600 dark:bg-slate-900/90 dark:text-slate-100 dark:ring-slate-600 dark:hover:border-cyan-500/40"
               >
                 <Upload
@@ -1163,7 +1322,7 @@ function Library() {
                   aria-hidden
                 />
                 Upload
-              </Link>
+              </button>
             ) : (
               <Link
                 to={`/login?next=${encodeURIComponent('/library')}`}
@@ -1434,39 +1593,41 @@ function Library() {
           </div>
         </div>
 
-        {filtersOpen ? (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center lg:items-center lg:p-6">
-            <button
-              type="button"
-              className="library-filter-backdrop absolute inset-0 cursor-default border-0 bg-slate-950/55 backdrop-blur-[2px]"
-              aria-label="Close filters"
-              onClick={() => setFiltersOpen(false)}
-            />
-            <div
-              ref={filterPanelRef}
-              id="library-filter-dialog"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="library-filters-title"
-              className="relative z-[101] flex max-h-[min(92vh,720px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-white/40 bg-white/97 shadow-2xl dark:border-slate-600 dark:bg-slate-900/97 lg:max-h-[min(85vh,640px)] lg:rounded-3xl"
-            >
-              <div className="flex items-center justify-between border-b border-slate-200/90 px-4 py-3 dark:border-slate-700">
-                <h2
-                  id="library-filters-title"
-                  className="bg-gradient-to-r from-fuchsia-600 to-cyan-600 bg-clip-text text-sm font-black uppercase tracking-wide text-transparent dark:from-fuchsia-300 dark:to-cyan-300"
-                >
-                  Refine results
-                </h2>
+        {filtersOpen && typeof document !== 'undefined'
+          ? createPortal(
+              <div className="fixed inset-0 z-[200] flex items-end justify-center lg:items-center lg:p-4">
                 <button
                   type="button"
-                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                  className="library-filter-backdrop absolute inset-0 cursor-default border-0 bg-slate-950/55 backdrop-blur-[2px]"
+                  aria-label="Close filters"
                   onClick={() => setFiltersOpen(false)}
-                  aria-label="Close filter panel"
+                />
+                <div
+                  ref={filterPanelRef}
+                  id="library-filter-dialog"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="library-filters-title"
+                  tabIndex={-1}
+                  className="relative z-[201] flex max-h-[min(88dvh,560px)] w-full max-w-lg flex-col overflow-hidden overscroll-contain rounded-t-2xl border border-white/40 bg-white/97 shadow-2xl outline-none dark:border-slate-600 dark:bg-slate-900/97 lg:max-h-[min(82dvh,520px)] lg:rounded-2xl"
                 >
-                  <X className="h-5 w-5" aria-hidden />
-                </button>
-              </div>
-              <div className="space-y-4 overflow-y-auto p-4">
+                  <div className="flex items-center justify-between gap-2 border-b border-slate-200/90 px-3 py-1.5 dark:border-slate-700">
+                    <h2
+                      id="library-filters-title"
+                      className="truncate bg-gradient-to-r from-fuchsia-600 to-cyan-600 bg-clip-text text-[11px] font-bold uppercase tracking-widest text-transparent dark:from-fuchsia-300 dark:to-cyan-300"
+                    >
+                      Filters
+                    </h2>
+                    <button
+                      type="button"
+                      className="shrink-0 rounded-md p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-slate-100"
+                      onClick={() => setFiltersOpen(false)}
+                      aria-label="Close filter panel"
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </button>
+                  </div>
+                  <div className="space-y-3 overflow-y-auto overscroll-y-contain p-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
                     Material type
@@ -1591,28 +1752,30 @@ function Library() {
                     </select>
                   </div>
                 </div>
-              </div>
-              <div className="flex flex-wrap gap-2 border-t border-slate-200/90 p-4 dark:border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => {
-                    clearAllFilters();
-                  }}
-                  className="flex-1 rounded-xl border border-slate-200/90 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-                >
-                  Clear all
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFiltersOpen(false)}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-cyan-600 to-fuchsia-600 py-2.5 text-xs font-bold text-white shadow-lg hover:brightness-110"
-                >
-                  Done
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+                  </div>
+                  <div className="flex flex-wrap gap-2 border-t border-slate-200/90 p-3 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearAllFilters();
+                      }}
+                      className="flex-1 rounded-lg border border-slate-200/90 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                    >
+                      Clear all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFiltersOpen(false)}
+                      className="flex-1 rounded-lg bg-gradient-to-r from-cyan-600 to-fuchsia-600 py-2 text-xs font-bold text-white shadow-md hover:brightness-110"
+                    >
+                      Done
+                    </button>
+                  </div>
+                </div>
+              </div>,
+              document.body,
+            )
+          : null}
 
         <div className={resultsContainerClass}>
           {loading ? (
@@ -1642,17 +1805,18 @@ function Library() {
                 {savedOnly
                   ? 'Nothing saved matches these filters. Try “All books” or clear search.'
                   : resources.length === 0
-                    ? 'The shelves are empty. Upload a PDF or document from your profile to share with classmates.'
+                    ? 'The shelves are empty. Upload a PDF or study pack right here for classmates.'
                     : 'No matches. Try another keyword or topic filter.'}
               </p>
               {user && resources.length === 0 ? (
-                <Link
-                  to="/profile"
+                <button
+                  type="button"
+                  onClick={openUploadModal}
                   className="mt-6 inline-flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-cyan-900/20 hover:bg-cyan-500 dark:bg-cyan-700 dark:hover:bg-cyan-600"
                 >
                   <Upload className="h-4 w-4" aria-hidden />
                   Upload your first book
-                </Link>
+                </button>
               ) : null}
             </div>
           ) : (
@@ -1665,6 +1829,12 @@ function Library() {
               const visLabel = visibilityLabel(item.level);
               const visTone = visibilityTone(item.level);
               const dateShort = formatLibraryDate(item.createdAt);
+              const uploaderUid = item.uploader?.id;
+              const isOwned = Boolean(
+                user &&
+                  uploaderUid &&
+                  String(user._id || user.id) === String(uploaderUid),
+              );
 
               if (libraryView === 'list') {
                 return (
@@ -1688,6 +1858,9 @@ function Library() {
                     listsLoading={listsLoading}
                     addBookToList={addBookToList}
                     createListAndAdd={createListAndAdd}
+                    isOwner={isOwned}
+                    onDeleteBook={deleteOwnedBook}
+                    deleteBusy={deletingId === key}
                   />
                 );
               }
@@ -1717,11 +1890,16 @@ function Library() {
                   onToggleMobileDetail={() =>
                     setMobileDetailKey((k) => (k === key ? null : key))
                   }
+                  isOwner={isOwned}
+                  onDeleteBook={deleteOwnedBook}
+                  deleteBusy={deletingId === key}
                 />
               );
             })
           )}
         </div>
+
+        <UploadBookModal {...uploadModalProps} />
       </section>
     </div>
   );

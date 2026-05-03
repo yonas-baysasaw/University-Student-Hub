@@ -22,6 +22,10 @@ export function mapBookToResource(book, index = 0) {
     bookUrl: book?.bookUrl ?? '',
     thumbnailUrl: book?.thumbnailUrl ?? '',
     likesCount: Number.isFinite(book?.likesCount) ? book.likesCount : 0,
+    dislikesCount: Number.isFinite(book?.dislikesCount)
+      ? book.dislikesCount
+      : 0,
+    viewsCount: Number.isFinite(book?.views) ? book.views : 0,
     ragIndexStatus: book?.ragIndexStatus ?? 'idle',
     downloadsCount: Number.isFinite(book?.downloadsCount)
       ? book.downloadsCount
