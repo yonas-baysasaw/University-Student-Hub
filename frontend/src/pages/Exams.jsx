@@ -308,8 +308,9 @@ function VaultWorkspace({ onOpenImport }) {
     fetchVault();
   }, [fetchVault]);
 
-  const fetchMyPapers = useCallback(async () => {
-    setMyPapersLoading(true);
+  const fetchMyPapers = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setMyPapersLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(myPapersPage),
@@ -329,10 +330,12 @@ function VaultWorkspace({ onOpenImport }) {
       setMyPapersTotal(Number(data.total) || 0);
     } catch (e) {
       toast.error(e.message);
-      setMyPapers([]);
-      setMyPapersTotal(0);
+      if (!silent) {
+        setMyPapers([]);
+        setMyPapersTotal(0);
+      }
     } finally {
-      setMyPapersLoading(false);
+      if (!silent) setMyPapersLoading(false);
     }
   }, [myPapersPage, papersVisibility, papersSearch]);
 
@@ -347,7 +350,9 @@ function VaultWorkspace({ onOpenImport }) {
         e.processingStatus === 'pending',
     );
     if (busy) {
-      papersPollRef.current = setInterval(fetchMyPapers, 4000);
+      papersPollRef.current = setInterval(() => {
+        fetchMyPapers({ silent: true });
+      }, 4000);
     } else {
       clearInterval(papersPollRef.current);
     }

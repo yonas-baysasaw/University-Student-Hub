@@ -459,24 +459,56 @@ function ExamPractice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const pollRef = useRef(null);
+  const fetchSucceededRef = useRef(false);
+  const examIdRef = useRef(examId);
+  examIdRef.current = examId;
 
-  const fetchExamData = useCallback(async () => {
+  useEffect(() => {
+    fetchSucceededRef.current = false;
+    setLoading(true);
+    setError('');
+    setExam(null);
+    setQuestions([]);
+  }, [examId]);
+
+  const fetchExamData = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    const rid = examId;
     try {
       const [examRes, questionsRes] = await Promise.all([
-        fetch(`/api/exams/${examId}`, { credentials: 'include' }),
-        fetch(`/api/exams/${examId}/questions`, { credentials: 'include' }),
+        fetch(`/api/exams/${rid}`, { credentials: 'include' }),
+        fetch(`/api/exams/${rid}/questions`, { credentials: 'include' }),
       ]);
       const examData = await readJsonOrThrow(examRes, 'Failed to load exam');
       const qData = await readJsonOrThrow(
         questionsRes,
         'Failed to load questions',
       );
+      if (rid !== examIdRef.current) return;
       setExam(examData);
-      setQuestions(qData.questions);
+      const nextQs = qData.questions ?? [];
+      setQuestions((prev) => {
+        if (rid !== examIdRef.current) return prev;
+        if (
+          silent &&
+          prev.length > 0 &&
+          getQuestionsSignature(prev) === getQuestionsSignature(nextQs)
+        ) {
+          return prev;
+        }
+        return nextQs;
+      });
+      fetchSucceededRef.current = true;
+      if (!silent) setError('');
     } catch (err) {
-      setError(err.message);
+      if (rid !== examIdRef.current) return;
+      if (!silent || !fetchSucceededRef.current) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      if (!silent && rid === examIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [examId]);
 
@@ -537,17 +569,17 @@ function ExamPractice() {
   }, [socket, examId]);
 
   // Poll while still processing (fallback for when socket isn't available)
+  const processingStatus = exam?.processingStatus;
   useEffect(() => {
-    if (
-      exam?.processingStatus === 'processing' ||
-      exam?.processingStatus === 'pending'
-    ) {
-      pollRef.current = setInterval(fetchExamData, 5000);
+    if (processingStatus === 'processing' || processingStatus === 'pending') {
+      pollRef.current = setInterval(() => {
+        fetchExamData({ silent: true });
+      }, 5000);
     } else {
       clearInterval(pollRef.current);
     }
     return () => clearInterval(pollRef.current);
-  }, [exam, fetchExamData]);
+  }, [processingStatus, fetchExamData]);
 
   if (loading) {
     return (
