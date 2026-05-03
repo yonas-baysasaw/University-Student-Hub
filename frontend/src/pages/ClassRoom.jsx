@@ -328,12 +328,12 @@ function ClassRoom() {
           </p>
         ) : null}
 
-        <div className="relative mt-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+        <div className="relative mt-4 inline-flex w-fit max-w-full flex-col rounded-lg border border-slate-200/90 bg-white/90 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
             Invite code
           </p>
-          <div className="mt-1 flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-cyan-900 dark:text-cyan-100">
+          <div className="mt-1 flex min-w-0 max-w-full items-center gap-1.5">
+            <code className="min-w-0 max-w-[11rem] truncate font-mono text-sm font-semibold text-cyan-900 sm:max-w-[13rem] dark:text-cyan-100">
               {classroom.invitationCode}
             </code>
             <button
@@ -341,7 +341,7 @@ function ClassRoom() {
               onClick={() => copyInvitationCode(classroom.invitationCode)}
               aria-label="Copy invitation code"
               title="Copy code"
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
             >
               <Copy className="h-3 w-3" aria-hidden />
               Copy
