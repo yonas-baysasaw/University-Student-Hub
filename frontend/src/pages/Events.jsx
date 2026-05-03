@@ -771,11 +771,7 @@ export default function Events() {
             <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
               Events
             </h1>
-            <p className="mt-2 max-w-xl text-sm text-slate-600 dark:text-slate-400">
-              Create gatherings, workshops, and club activities. Like or pass
-              on posts and open a card to reserve a seat or join the
-              conversation.
-            </p>
+            
             {!loading && !error ? (
               <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
                 {events.length}{' '}
