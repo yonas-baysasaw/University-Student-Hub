@@ -14,7 +14,11 @@ import ClassroomCardMenu from '../components/ClassroomCardMenu.jsx';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
 import { CLASSROOM_LIST_CHANGED_EVENT } from '../constants/dashboardEvents.js';
 import { useAuth } from '../contexts/AuthContext';
-import { canManageClassroom, isClassroomMember } from '../utils/classroom';
+import {
+  canManageClassroom,
+  getMemberName,
+  isClassroomMember,
+} from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
 
 function notifyClassroomsChanged() {
@@ -312,6 +316,17 @@ function ClassRoom() {
             </span>
           ) : null}
         </div>
+
+        {classroom.creator ? (
+          <p className="relative mt-3 text-sm text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-slate-500 dark:text-slate-500">
+              Instructor:
+            </span>{' '}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {getMemberName(classroom.creator)}
+            </span>
+          </p>
+        ) : null}
 
         <div className="relative mt-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
