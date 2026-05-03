@@ -63,13 +63,15 @@ function LandingNav() {
           >
             Register
           </Link>
-          <Link
-            to="/login?next=/admin"
+          <a
+            href="https://portal.aau.edu.et/login"
+            target="_blank"
+            rel="noopener noreferrer"
             className="hidden rounded-md border border-dashed border-slate-300 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 transition hover:border-slate-400 hover:text-slate-700 md:inline-flex dark:border-slate-600 dark:text-slate-400 dark:hover:border-slate-500 dark:hover:text-slate-200"
-            aria-label="Admin portal — sign in with staff credentials, then open admin"
+            aria-label="Open Addis Ababa University portal login"
           >
-            Admin Portal
-          </Link>
+            Portal
+          </a>
         </div>
       </div>
 

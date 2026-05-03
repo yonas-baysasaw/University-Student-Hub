@@ -1,4 +1,11 @@
-import { ChevronDown, LogOut, Settings, Shield, User } from 'lucide-react';
+import {
+  ChevronDown,
+  ExternalLink,
+  LogOut,
+  Settings,
+  Shield,
+  User,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, NavLink } from 'react-router-dom';
@@ -229,6 +236,22 @@ function Navbar({ children }) {
                 />
                 My profile
               </Link>
+            </li>
+            <li>
+              <a
+                href="https://portal.aau.edu.et/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/80"
+                onClick={() => setMenuOpen(false)}
+              >
+                <ExternalLink
+                  className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                Portal
+              </a>
             </li>
 
             <li className="my-1.5 h-px bg-slate-200/90 dark:bg-slate-600/80" />
