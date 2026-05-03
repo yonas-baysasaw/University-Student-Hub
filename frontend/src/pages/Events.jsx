@@ -44,6 +44,31 @@ function formatEventWhen(startsAt, endsAt) {
   }
 }
 
+/** Compact 3-col preview grid for list cards (library-adjacent). */
+function EventCardMediaMini({ urls }) {
+  const list = Array.isArray(urls) ? urls.filter(Boolean) : [];
+  if (list.length === 0) return null;
+  const show = list.slice(0, 6);
+  const extra = list.length - show.length;
+  return (
+    <div className="mt-2 grid grid-cols-3 gap-1 sm:max-w-md">
+      {show.map((url, i) => (
+        <div
+          key={`${url}-${i}`}
+          className="relative aspect-square overflow-hidden rounded-lg bg-slate-200/90 ring-1 ring-cyan-500/10 dark:bg-slate-800"
+        >
+          <img src={url} alt="" className="h-full w-full object-cover" />
+          {i === show.length - 1 && extra > 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/55 text-xs font-bold text-white backdrop-blur-[2px]">
+              +{extra}
+            </div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function EventEngagementRow({ event, onUpdated }) {
   const vs = event.viewerState ?? {};
   const userReaction = vs.liked ? 'like' : vs.disliked ? 'dislike' : null;
@@ -313,6 +338,7 @@ export default function Events() {
                       <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
                         {ev.title}
                       </h2>
+                      <EventCardMediaMini urls={ev.mediaUrls} />
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-slate-600 dark:text-slate-400">
                         <span className="inline-flex items-center gap-1">
                           <Clock className="h-3.5 w-3.5 shrink-0" aria-hidden />

@@ -71,6 +71,17 @@ const eventSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
+    /** Image URLs (e.g. S3) for gallery; max length enforced in controller */
+    mediaUrls: {
+      type: [String],
+      default: [],
+      validate: {
+        validator(arr) {
+          return !Array.isArray(arr) || arr.length <= 12;
+        },
+        message: 'At most 12 images allowed per event.',
+      },
+    },
   },
   { timestamps: true },
 );

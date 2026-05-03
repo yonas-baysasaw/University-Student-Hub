@@ -152,6 +152,39 @@ router.get('/', ensureAuth, (req, res) => {
   res.json(serializeCurrentUser(req.user));
 });
 
+/** Directory search for host invite pickers (min 2 chars). */
+router.get(
+  '/users/search',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter at least 2 characters.',
+      });
+    }
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped, 'i');
+    const users = await User.find({
+      $or: [{ username: re }, { name: re }],
+    })
+      .select('username name avatar')
+      .limit(20)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      users: users.map((u) => ({
+        id: String(u._id),
+        username: u.username || '',
+        name: u.name || u.username || 'User',
+        avatar: u.avatar || '',
+      })),
+    });
+  }),
+);
+
 /* ===== Get Current User Activity ===== */
 router.get(
   '/activity',

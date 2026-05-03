@@ -4,13 +4,15 @@ import {
   Clock,
   ExternalLink,
   Heart,
+  ImagePlus,
   Loader2,
   MapPin,
   MessageSquare,
   Star,
   ThumbsDown,
-  Ticket,
+  UserPlus,
   UserRound,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -18,6 +20,8 @@ import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
+
+const MAX_EVENT_MEDIA = 12;
 
 function formatReviewTimestamp(iso) {
   if (!iso) return '';
@@ -116,12 +120,18 @@ export default function EventDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const [reserveOpen, setReserveOpen] = useState(true);
+  const [guestsOpen, setGuestsOpen] = useState(true);
   const [reviewsOpen, setReviewsOpen] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(true);
 
   const [actionLoading, setActionLoading] = useState(false);
   const [userReaction, setUserReaction] = useState(null);
+  const [guestQuery, setGuestQuery] = useState('');
+  const [guestResults, setGuestResults] = useState([]);
+  const [guestSearchBusy, setGuestSearchBusy] = useState(false);
+  const [mediaBusy, setMediaBusy] = useState(false);
+  const mediaInputRef = useRef(null);
+  const guestSearchInputRef = useRef(null);
 
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -238,6 +248,34 @@ export default function EventDetail() {
   const isOrganizer =
     Boolean(user && ownerId && String(user._id || user.id) === String(ownerId));
 
+  useEffect(() => {
+    if (!isOrganizer) {
+      setGuestResults([]);
+      return;
+    }
+    const q = guestQuery.trim();
+    if (q.length < 2) {
+      setGuestResults([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setGuestSearchBusy(true);
+      try {
+        const res = await fetch(
+          `/api/profile/users/search?q=${encodeURIComponent(q)}`,
+          { credentials: 'include' },
+        );
+        const data = await readJsonOrThrow(res, 'Could not search users');
+        setGuestResults(Array.isArray(data.users) ? data.users : []);
+      } catch {
+        setGuestResults([]);
+      } finally {
+        setGuestSearchBusy(false);
+      }
+    }, 320);
+    return () => clearTimeout(t);
+  }, [guestQuery, isOrganizer]);
+
   const topComments = useMemo(
     () => comments.filter((c) => !c.parentCommentId),
     [comments],
@@ -277,9 +315,10 @@ export default function EventDetail() {
 
   const handleReserve = async () => {
     if (!event?._id || !user) {
-      toast.error('Sign in to reserve a seat.');
+      toast.error('Sign in to join this event.');
       return;
     }
+    if (isOrganizer) return;
     setActionLoading(true);
     try {
       const res = await fetch(`/api/events/${event._id}/reserve`, {
@@ -289,12 +328,107 @@ export default function EventDetail() {
       const data = await readJsonOrThrow(res, 'Could not update reservation');
       applyEvent(data.data);
       toast.success(
-        data.data?.viewerState?.reserved ? 'You are on the list' : 'Reservation cancelled',
+        data.data?.viewerState?.reserved
+          ? 'You are on the list'
+          : 'You left this event',
       );
     } catch (err) {
       toast.error(err.message);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  const addGuest = async (targetUserId) => {
+    if (!event?._id || !isOrganizer || actionLoading) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(`/api/events/${event._id}/attendees`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: targetUserId }),
+      });
+      const data = await readJsonOrThrow(res, 'Could not add guest');
+      applyEvent(data.data);
+      setGuestQuery('');
+      setGuestResults([]);
+      toast.success('Guest added');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const removeAttendee = async (targetUserId) => {
+    if (!event?._id || !isOrganizer) return;
+    setActionLoading(true);
+    try {
+      const res = await fetch(
+        `/api/events/${event._id}/attendees/${encodeURIComponent(targetUserId)}`,
+        { method: 'DELETE', credentials: 'include' },
+      );
+      const data = await readJsonOrThrow(res, 'Could not remove guest');
+      applyEvent(data.data);
+      toast.success('Removed from list');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const uploadEventMedia = async (fileList) => {
+    if (!event?._id || !isOrganizer || !fileList?.length) return;
+    const urls = event.mediaUrls || [];
+    const slots = MAX_EVENT_MEDIA - urls.length;
+    const files = Array.from(fileList).slice(0, Math.max(0, slots));
+    if (!files.length) {
+      toast.error(`At most ${MAX_EVENT_MEDIA} photos per event.`);
+      return;
+    }
+    setMediaBusy(true);
+    try {
+      let nextPayload = event;
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch(`/api/events/${event._id}/media`, {
+          method: 'POST',
+          credentials: 'include',
+          body: fd,
+        });
+        const data = await readJsonOrThrow(res, 'Upload failed');
+        if (data.data) nextPayload = data.data;
+      }
+      if (nextPayload) applyEvent(nextPayload);
+      toast.success(files.length > 1 ? 'Photos uploaded' : 'Photo uploaded');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setMediaBusy(false);
+      if (mediaInputRef.current) mediaInputRef.current.value = '';
+    }
+  };
+
+  const removeEventMedia = async (url) => {
+    if (!event?._id || !isOrganizer) return;
+    setMediaBusy(true);
+    try {
+      const res = await fetch(`/api/events/${event._id}/media`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+      const data = await readJsonOrThrow(res, 'Could not remove image');
+      if (data.data) applyEvent(data.data);
+      toast.success('Photo removed');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setMediaBusy(false);
     }
   };
 
@@ -405,10 +539,14 @@ export default function EventDetail() {
 
   const cap = event?.capacity;
   const reserved = event?.reservedCount ?? 0;
+  const attendees = Array.isArray(event?.attendees) ? event.attendees : [];
+  const mediaUrls = Array.isArray(event?.mediaUrls) ? event.mediaUrls : [];
   const capLabel =
     cap != null && cap > 0
-      ? `${reserved} / ${cap} seats`
-      : `${reserved} attending`;
+      ? `${reserved} / ${cap} guests`
+      : `${reserved} guests`;
+  const peopleAttendingLabel =
+    reserved === 1 ? '1 person attending' : `${reserved} people attending`;
 
   return (
     <div className="page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 md:px-6 md:pt-8">
@@ -536,55 +674,227 @@ export default function EventDetail() {
               ) : null}
             </article>
 
+            {mediaUrls.length > 0 || isOrganizer ? (
+              <div className="space-y-3">
+                {mediaUrls.length > 0 ? (
+                  <div className="overflow-hidden rounded-2xl ring-1 ring-slate-200/90 dark:ring-slate-600">
+                    <div className="grid grid-cols-3 gap-0.5 bg-slate-100 dark:bg-slate-800">
+                      {mediaUrls.map((url) => (
+                        <div
+                          key={url}
+                          className="relative aspect-square bg-slate-200 dark:bg-slate-900"
+                        >
+                          <img
+                            src={url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                          {isOrganizer ? (
+                            <button
+                              type="button"
+                              disabled={mediaBusy}
+                              onClick={() => removeEventMedia(url)}
+                              className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-full bg-slate-950/70 text-white shadow-md backdrop-blur-sm transition hover:bg-rose-600 disabled:opacity-50"
+                              aria-label="Remove photo"
+                            >
+                              <X className="h-4 w-4" aria-hidden />
+                            </button>
+                          ) : null}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {isOrganizer && mediaUrls.length < MAX_EVENT_MEDIA ? (
+                  <div>
+                    <input
+                      ref={mediaInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => uploadEventMedia(e.target.files)}
+                    />
+                    <button
+                      type="button"
+                      disabled={mediaBusy}
+                      onClick={() => mediaInputRef.current?.click()}
+                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 shadow-sm transition hover:border-cyan-400/60 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+                    >
+                      {mediaBusy ? (
+                        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                      ) : (
+                        <ImagePlus className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                      )}
+                      Add photos ({mediaUrls.length}/{MAX_EVENT_MEDIA})
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
             <section className="space-y-3">
               <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
                 Book this event
               </h2>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
-                Reserve a spot, read what people thought, or join the discussion.
-                Tap a section header to expand or minimize it.
-              </p>
 
               <div className="space-y-3">
                 <CollapsibleSection
-                  title="Reserve a seat"
-                  icon={Ticket}
-                  open={reserveOpen}
-                  onToggle={() => setReserveOpen((v) => !v)}
-                  summary={capLabel}
+                  title={isOrganizer ? 'Guests' : 'RSVP'}
+                  icon={UserPlus}
+                  open={guestsOpen}
+                  onToggle={() => setGuestsOpen((v) => !v)}
+                  summary={
+                    isOrganizer
+                      ? capLabel
+                      : peopleAttendingLabel +
+                        (cap != null && cap > 0 ? ` · ${cap} max` : '')
+                  }
                 >
-                  <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
-                    {event.viewerState?.reserved
-                      ? 'You have a spot. Cancel anytime.'
-                      : cap != null && cap > 0 && reserved >= cap
-                        ? 'This event is full.'
-                        : 'Save your place so organizers can plan ahead.'}
-                  </p>
-                  <button
-                    type="button"
-                    disabled={
-                      actionLoading ||
-                      (!event.viewerState?.reserved &&
-                        cap != null &&
-                        cap > 0 &&
-                        reserved >= cap)
-                    }
-                    onClick={handleReserve}
-                    className={`rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-md transition disabled:opacity-50 ${
-                      event.viewerState?.reserved
-                        ? 'bg-rose-600 hover:bg-rose-700'
-                        : 'bg-gradient-to-r from-cyan-600 to-fuchsia-600 hover:brightness-105'
-                    }`}
-                  >
-                    {event.viewerState?.reserved
-                      ? 'Cancel reservation'
-                      : 'Reserve my seat'}
-                  </button>
-                  {!user ? (
-                    <p className="mt-2 text-xs text-slate-500">
-                      Sign in to reserve.
-                    </p>
-                  ) : null}
+                  {isOrganizer ? (
+                    <>
+                      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-stretch">
+                        <div className="relative min-w-0 flex-1">
+                          <input
+                            ref={guestSearchInputRef}
+                            type="search"
+                            value={guestQuery}
+                            onChange={(e) => setGuestQuery(e.target.value)}
+                            placeholder="Search by name or username…"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                          />
+                          {guestQuery.trim().length >= 2 &&
+                          guestResults.length > 0 ? (
+                            <ul className="absolute z-30 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg dark:border-slate-600 dark:bg-slate-900">
+                              {guestResults.map((g) => (
+                                <li key={g.id}>
+                                  <button
+                                    type="button"
+                                    disabled={
+                                      actionLoading ||
+                                      attendees.some((a) => a.id === g.id)
+                                    }
+                                    onClick={() => addGuest(g.id)}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-cyan-50 dark:hover:bg-slate-800 disabled:opacity-50"
+                                  >
+                                    <img
+                                      src={g.avatar || defaultProfile}
+                                      alt=""
+                                      className="h-8 w-8 rounded-full object-cover"
+                                    />
+                                    <span className="font-semibold text-slate-900 dark:text-white">
+                                      {g.name}
+                                    </span>
+                                    <span className="text-xs text-slate-500">
+                                      @{g.username}
+                                    </span>
+                                    {attendees.some((a) => a.id === g.id) ? (
+                                      <span className="ml-auto text-[11px] font-bold uppercase text-emerald-600">
+                                        Added
+                                      </span>
+                                    ) : (
+                                      <span className="ml-auto text-[11px] font-bold uppercase text-cyan-600">
+                                        Add
+                                      </span>
+                                    )}
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : null}
+                          {guestSearchBusy ? (
+                            <p className="mt-1 text-xs text-slate-500">
+                              Searching…
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setGuestsOpen(true);
+                            guestSearchInputRef.current?.focus();
+                          }}
+                          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-fuchsia-600 px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:brightness-105 sm:w-auto"
+                        >
+                          <UserPlus className="h-4 w-4" aria-hidden />
+                          Add guest
+                        </button>
+                      </div>
+                      {attendees.length === 0 ? (
+                        <p className="text-sm text-slate-500">No guests yet.</p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {attendees.map((a) => (
+                            <li
+                              key={a.id}
+                              className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/90 px-3 py-2 dark:border-slate-700 dark:bg-slate-950/40"
+                            >
+                              <img
+                                src={a.avatar || defaultProfile}
+                                alt=""
+                                className="h-9 w-9 rounded-full object-cover"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <Link
+                                  to={`/users/${a.id}`}
+                                  className="font-semibold text-slate-900 hover:underline dark:text-white"
+                                >
+                                  {a.name}
+                                </Link>
+                                <p className="text-xs text-slate-500">
+                                  @{a.username}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={actionLoading}
+                                onClick={() => removeAttendee(a.id)}
+                                className="rounded-lg px-2 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                              >
+                                Remove
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
+                        {peopleAttendingLabel}.
+                        {cap != null && cap > 0
+                          ? ` Capacity is ${cap}.`
+                          : ''}{' '}
+                        Guest names are visible only to the host.
+                      </p>
+                      {user ? (
+                        <button
+                          type="button"
+                          disabled={
+                            actionLoading ||
+                            (!event.viewerState?.reserved &&
+                              cap != null &&
+                              cap > 0 &&
+                              reserved >= cap)
+                          }
+                          onClick={handleReserve}
+                          className={`rounded-2xl px-5 py-3 text-sm font-bold text-white shadow-md transition disabled:opacity-50 ${
+                            event.viewerState?.reserved
+                              ? 'bg-rose-600 hover:bg-rose-700'
+                              : 'bg-gradient-to-r from-cyan-600 to-fuchsia-600 hover:brightness-105'
+                          }`}
+                        >
+                          {event.viewerState?.reserved
+                            ? 'Leave this event'
+                            : "I'm attending"}
+                        </button>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Sign in to RSVP.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </CollapsibleSection>
 
                 <CollapsibleSection
