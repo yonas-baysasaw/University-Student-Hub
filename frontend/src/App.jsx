@@ -24,6 +24,8 @@ import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
 import ClassroomResources from './pages/ClassroomResources';
+import EventDetail from './pages/EventDetail';
+import Events from './pages/Events';
 import ExamPractice from './pages/ExamPractice';
 import Exams from './pages/Exams';
 import Home from './pages/Home';
@@ -88,6 +90,8 @@ function AppRoutes() {
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/library" element={<Library />} />
             <Route path="/library/:bookId" element={<BookDetail />} />
+            <Route path="/events" element={<Events />} />
+            <Route path="/events/:eventId" element={<EventDetail />} />
             <Route path="/liqu-ai" element={<LiquAI />} />
             <Route path="/liqu-ai/study-buddy" element={<StudyBuddy />} />
             <Route
@@ -158,6 +162,8 @@ function AppRoutes() {
           />
           <Route path="/library" element={<RedirectToLogin />} />
           <Route path="/library/:bookId" element={<BookDetail />} />
+          <Route path="/events" element={<RedirectToLogin />} />
+          <Route path="/events/:eventId" element={<EventDetail />} />
           <Route path="/liqu-ai" element={<RedirectToLogin />} />
           <Route path="/liqu-ai/study-buddy" element={<RedirectToLogin />} />
           <Route path="/liqu-ai/did-exit" element={<RedirectToLogin />} />

@@ -335,6 +335,12 @@ function Home() {
       icon: Library,
     },
     {
+      to: '/events',
+      label: 'Events',
+      hint: 'Campus gatherings',
+      icon: CalendarDays,
+    },
+    {
       to: '/liqu-ai',
       label: 'Liqu AI',
       hint: 'Study assistant',
