@@ -716,7 +716,7 @@ function ClassroomResourcesContent({ chatId }) {
   );
 
   const tabBtn =
-    'rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide transition';
+    'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide transition max-md:px-2.5';
 
   return (
     <div className="classroom-ambient relative page-surface flex justify-center px-4 pb-14 pt-6 md:px-6 md:pt-8">
@@ -742,6 +742,7 @@ function ClassroomResourcesContent({ chatId }) {
           <div className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-1.5 dark:border-slate-700 dark:bg-slate-900/40">
             <button
               type="button"
+              aria-label="Materials"
               className={`${tabBtn} ${
                 workspaceTab === 'materials'
                   ? 'bg-gradient-to-r from-slate-900 to-cyan-900 text-white shadow-md ring-1 ring-white/10 dark:from-slate-800 dark:to-cyan-950'
@@ -749,13 +750,12 @@ function ClassroomResourcesContent({ chatId }) {
               }`}
               onClick={() => setWorkspaceTab('materials')}
             >
-              <span className="inline-flex items-center gap-2">
-                <BookOpen className="h-4 w-4" aria-hidden />
-                Materials
-              </span>
+              <BookOpen className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="hidden md:inline">Materials</span>
             </button>
             <button
               type="button"
+              aria-label="Assignments"
               className={`${tabBtn} ${
                 workspaceTab === 'assignments'
                   ? 'bg-gradient-to-r from-slate-900 to-cyan-900 text-white shadow-md ring-1 ring-white/10 dark:from-slate-800 dark:to-cyan-950'
@@ -763,19 +763,18 @@ function ClassroomResourcesContent({ chatId }) {
               }`}
               onClick={() => setWorkspaceTab('assignments')}
             >
-              <span className="inline-flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" aria-hidden />
-                Assignments
-              </span>
+              <ClipboardList className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="hidden md:inline">Assignments</span>
             </button>
             {viewerCanManageClassroom ? (
               <button
                 type="button"
-                className={`${tabBtn} ml-auto inline-flex items-center gap-2 border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 text-white shadow-lg shadow-cyan-900/20 hover:brightness-110 dark:from-cyan-700 dark:to-indigo-950`}
+                aria-label="Liqu AI"
+                className={`${tabBtn} ml-auto gap-2 border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 text-white shadow-lg shadow-cyan-900/20 hover:brightness-110 dark:from-cyan-700 dark:to-indigo-950`}
                 onClick={() => setLiquDrawerOpen(true)}
               >
                 <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-                Liqu AI
+                <span className="hidden md:inline">Liqu AI</span>
               </button>
             ) : null}
           </div>

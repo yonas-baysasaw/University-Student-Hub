@@ -37,6 +37,7 @@ function ClassroomTabs({ trailing = null }) {
                 <NavLink
                   to={tab.to}
                   end={tab.end}
+                  aria-label={tab.label}
                   className={({ isActive }) =>
                     `flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition md:px-4 ${
                       isActive
@@ -45,8 +46,11 @@ function ClassroomTabs({ trailing = null }) {
                     }`
                   }
                 >
-                  <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                  <span>{tab.label}</span>
+                  <Icon
+                    className="h-4 w-4 shrink-0 opacity-90 max-md:h-5 max-md:w-5"
+                    aria-hidden
+                  />
+                  <span className="hidden md:inline">{tab.label}</span>
                 </NavLink>
               </li>
             );

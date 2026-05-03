@@ -1,4 +1,7 @@
+import { Moon, Sun } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { setThemePreference } from '../../theme.js';
 
 const navLinks = [
   { href: '#announcements', label: 'Announcements' },
@@ -8,6 +11,16 @@ const navLinks = [
 ];
 
 function LandingNav() {
+  const [dark, setDark] = useState(
+    () => document.documentElement.classList.contains('dark'),
+  );
+
+  function toggleTheme() {
+    const nextDark = !document.documentElement.classList.contains('dark');
+    setThemePreference(nextDark ? 'dark' : 'light');
+    setDark(nextDark);
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200/90 bg-white/95 backdrop-blur-md dark:border-slate-700/90 dark:bg-slate-900/95">
       <div className="mx-auto flex h-[3.5rem] max-w-6xl items-center gap-4 px-4 md:h-16 md:px-6">
@@ -51,6 +64,18 @@ function LandingNav() {
         </nav>
 
         <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200/90 bg-white/90 text-slate-600 shadow-sm outline-none transition hover:border-cyan-300/80 hover:text-slate-900 focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-300 dark:hover:border-cyan-600/50 dark:hover:text-white dark:focus-visible:ring-offset-slate-900"
+            aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {dark ? (
+              <Sun className="h-4 w-4" strokeWidth={2} aria-hidden />
+            ) : (
+              <Moon className="h-4 w-4" strokeWidth={2} aria-hidden />
+            )}
+          </button>
           <Link
             to="/login"
             className="btn-primary px-3 py-2 text-xs sm:px-4 sm:text-sm"

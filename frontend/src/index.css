@@ -511,6 +511,12 @@ a {
   opacity: 0;
 }
 
+@media (max-width: 767px) {
+  .support-fab-ring::before {
+    inset: -4px;
+  }
+}
+
 .support-fab-float {
   animation: supportFabFloat 5.75s ease-in-out infinite;
   will-change: transform;
