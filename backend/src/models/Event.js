@@ -82,6 +82,37 @@ const eventSchema = new mongoose.Schema(
         message: 'At most 12 images allowed per event.',
       },
     },
+
+    visibility: {
+      type: String,
+      enum: ['public', 'private', 'unlisted'],
+      default: 'public',
+      index: true,
+    },
+
+    /** Catalog metadata (required on create; legacy events may omit) */
+    academicTrack: {
+      type: String,
+      trim: true,
+      default: '',
+      index: true,
+    },
+    department: {
+      type: String,
+      trim: true,
+      maxlength: 160,
+      default: '',
+    },
+    publishYear: {
+      type: Number,
+      default: null,
+    },
+    courseSubject: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: '',
+    },
   },
   { timestamps: true },
 );

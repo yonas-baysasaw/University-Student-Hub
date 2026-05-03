@@ -19,7 +19,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
+import { academicTrackLabel } from '../utils/bookUploadMeta';
 import { readJsonOrThrow } from '../utils/http';
+import { visibilityLabel, visibilityTone } from '../utils/formatLabels';
 
 const MAX_EVENT_MEDIA = 12;
 
@@ -579,9 +581,26 @@ export default function EventDetail() {
           <>
             <article className="panel-card space-y-4 rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-br from-white via-white to-cyan-50/15 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/25 sm:p-7">
               <div className="flex flex-wrap items-start justify-between gap-3">
-                <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-                  {event.title}
-                </h1>
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    <span className="rounded-lg bg-cyan-500/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-900 ring-1 ring-cyan-500/25 dark:bg-cyan-500/15 dark:text-cyan-100 dark:ring-cyan-400/30">
+                      Event
+                    </span>
+                    {event.academicTrack ? (
+                      <span className="rounded-lg bg-indigo-500/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-900 ring-1 ring-indigo-500/25 dark:bg-indigo-500/15 dark:text-indigo-100 dark:ring-indigo-400/30">
+                        {academicTrackLabel(event.academicTrack)}
+                      </span>
+                    ) : null}
+                    <span
+                      className={`rounded-lg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${visibilityTone(event.visibility)}`}
+                    >
+                      {visibilityLabel(event.visibility)}
+                    </span>
+                  </div>
+                  <h1 className="font-display text-2xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
+                    {event.title}
+                  </h1>
+                </div>
                 {user ? (
                   <div className="flex flex-wrap gap-2">
                     <button
@@ -643,6 +662,53 @@ export default function EventDetail() {
                   <ExternalLink className="h-4 w-4" aria-hidden />
                   Join link
                 </a>
+              ) : null}
+
+              {event.academicTrack ||
+              event.department ||
+              event.courseSubject ||
+              (event.publishYear != null &&
+                Number.isFinite(Number(event.publishYear))) ? (
+                <div className="rounded-xl border border-slate-100 bg-slate-50/95 px-3 py-3 dark:border-slate-600/70 dark:bg-slate-800/65">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                    Catalog
+                  </p>
+                  <ul className="mt-1.5 space-y-1 text-[12px] font-medium leading-snug text-slate-800 dark:text-slate-100">
+                    {event.academicTrack ? (
+                      <li>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          Field ·{' '}
+                        </span>
+                        {academicTrackLabel(event.academicTrack)}
+                      </li>
+                    ) : null}
+                    {event.department ? (
+                      <li>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          Dept ·{' '}
+                        </span>
+                        {event.department}
+                      </li>
+                    ) : null}
+                    {event.courseSubject ? (
+                      <li>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          Course ·{' '}
+                        </span>
+                        {event.courseSubject}
+                      </li>
+                    ) : null}
+                    {event.publishYear != null &&
+                    Number.isFinite(Number(event.publishYear)) ? (
+                      <li>
+                        <span className="text-slate-600 dark:text-slate-300">
+                          Year ·{' '}
+                        </span>
+                        {event.publishYear}
+                      </li>
+                    ) : null}
+                  </ul>
+                </div>
               ) : null}
 
               {event.description ? (

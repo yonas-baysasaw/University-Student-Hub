@@ -7,6 +7,10 @@ import EventReview from '../models/EventReview.js';
 import User from '../models/User.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import {
+  parsePublishYear,
+  validateEventCatalogMeta,
+} from '../utils/bookCatalogMeta.js';
 
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -220,12 +224,40 @@ export const createEvent = asyncHandler(async (req, res) => {
     location,
     meetingUrl,
     capacity,
+    academicTrack,
+    department,
+    publishYear,
+    courseSubject,
+    visibility: visibilityRaw,
   } = req.body ?? {};
 
   const t = typeof title === 'string' ? title.trim() : '';
   if (!t) {
     return res.status(400).json({ message: 'Title is required.' });
   }
+
+  const dept =
+    typeof department === 'string' ? department.trim().slice(0, 160) : '';
+  const course =
+    typeof courseSubject === 'string'
+      ? courseSubject.trim().slice(0, 200)
+      : '';
+  const py = parsePublishYear(publishYear);
+  const catalogErr = validateEventCatalogMeta({
+    academicTrack,
+    department: dept,
+    publishYear: py,
+    courseSubject: course,
+  });
+  if (catalogErr) {
+    return res.status(400).json({ message: catalogErr });
+  }
+
+  const visEnum = ['public', 'private', 'unlisted'];
+  const visNorm = String(visibilityRaw ?? 'public')
+    .trim()
+    .toLowerCase();
+  const visibility = visEnum.includes(visNorm) ? visNorm : 'public';
 
   const start = startsAt ? new Date(startsAt) : null;
   if (!start || Number.isNaN(start.getTime())) {
@@ -255,6 +287,8 @@ export const createEvent = asyncHandler(async (req, res) => {
     cap = n === 0 ? null : Math.floor(n);
   }
 
+  const track = String(academicTrack || '').trim().toLowerCase();
+
   const event = await Event.create({
     userId: req.user._id,
     title: t,
@@ -268,6 +302,11 @@ export const createEvent = asyncHandler(async (req, res) => {
       typeof meetingUrl === 'string' ? meetingUrl.trim().slice(0, 2000) : '',
     capacity: cap,
     mediaUrls: [],
+    visibility,
+    academicTrack: track,
+    department: dept,
+    publishYear: Math.floor(py),
+    courseSubject: course,
   });
   await event.populate('userId', 'username name avatar');
   res.status(201).json({
