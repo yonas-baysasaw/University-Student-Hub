@@ -125,32 +125,18 @@ const TRACK_IDS = ['engineering', 'social', 'natural'];
  * Client-side catalog check for events (matches backend validateEventCatalogMeta).
  * @returns {string|null} Error message or null when valid.
  */
-export function validateEventCatalogFields({
-  academicTrack,
-  department,
-  publishYear,
-  courseSubject,
-}) {
-  const track = String(academicTrack || '').trim().toLowerCase();
+export function validateEventCatalogFields({ academicTrack, department }) {
+  const track = String(academicTrack || "").trim().toLowerCase();
   if (!TRACK_IDS.includes(track)) {
-    return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
+    return "Choose a field: Engineering, Social sciences, or Natural sciences.";
   }
 
-  const dept = String(department || '').trim();
+  const dept = String(department || "").trim();
   if (!dept || dept.length > 160) {
-    return 'Department or discipline is required.';
+    return "Pick a school, faculty, or department.";
   }
-  if (dept === 'Other') {
-    return 'Specify your department when selecting Other.';
-  }
-
-  const y = Number(publishYear);
-  if (!Number.isFinite(y) || y < 1950 || y > 2035) {
-    return 'Enter a valid year (1950–2035).';
-  }
-
-  if (!String(courseSubject || '').trim()) {
-    return 'Course or subject is required (e.g. Operating Systems, Java).';
+  if (dept === "Other") {
+    return "Specify your department when selecting Other.";
   }
 
   return null;

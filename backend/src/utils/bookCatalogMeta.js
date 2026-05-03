@@ -1,4 +1,4 @@
-const TRACKS = ['engineering', 'social', 'natural'];
+﻿const TRACKS = ['engineering', 'social', 'natural'];
 
 /**
  * Shared validation for library catalog fields (upload + PATCH metadata).
@@ -48,15 +48,11 @@ export function validateBookCatalogMeta({
 }
 
 /**
- * Catalog validation for events (same rules as books, without title).
+ * Minimal catalog validation for events: field + department only.
+ * Event year is taken from start time; course/subject is not collected for events.
  * @returns {string|null} Error message or null when valid.
  */
-export function validateEventCatalogMeta({
-  academicTrack,
-  department,
-  publishYear,
-  courseSubject,
-}) {
+export function validateEventCatalogMeta({ academicTrack, department }) {
   const track = String(academicTrack || '').trim().toLowerCase();
   if (!TRACKS.includes(track)) {
     return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
@@ -64,25 +60,10 @@ export function validateEventCatalogMeta({
 
   const dept = String(department || '').trim();
   if (!dept || dept.length > 160) {
-    return 'Department or discipline is required.';
+    return 'Pick a school, faculty, or department.';
   }
   if (dept === 'Other') {
     return 'Specify your department when selecting Other.';
-  }
-
-  const py =
-    publishYear === '' ||
-    publishYear === undefined ||
-    publishYear === null ||
-    Number.isNaN(publishYear)
-      ? NaN
-      : Number(publishYear);
-  if (!Number.isFinite(py) || py < 1950 || py > 2035) {
-    return 'Enter a valid year (1950–2035).';
-  }
-
-  if (!String(courseSubject || '').trim()) {
-    return 'Course or subject is required (e.g. Operating Systems, Java).';
   }
 
   return null;
