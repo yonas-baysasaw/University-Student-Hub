@@ -127,7 +127,7 @@ function AppRoutes() {
       
     );
   }
-
+// hi this is yabsra
   const hideGlobalNavForLanding = location.pathname === '/';
 
   return (
