@@ -371,7 +371,7 @@ function ClassRoom() {
 
   if (loading) {
     return (
-      <div className="classroom-ambient relative page-surface px-4 py-10 md:px-6">
+      <div className="classroom-ambient relative page-surface px-3 py-6 md:px-6 md:py-10">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(280px,36vh)] workspace-hero-mesh opacity-80 dark:opacity-50" />
         <div className="relative z-[2] mx-auto max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
@@ -390,7 +390,7 @@ function ClassRoom() {
 
   if (error) {
     return (
-      <div className="classroom-ambient relative page-surface px-4 py-10 md:px-6">
+      <div className="classroom-ambient relative page-surface px-3 py-6 md:px-6 md:py-10">
         <div className="relative z-[2] mx-auto max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
             <p className="text-sm font-medium text-rose-600">{error}</p>
@@ -408,7 +408,7 @@ function ClassRoom() {
   }
 
   return (
-    <div className="classroom-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 text-slate-900 md:px-6 md:pt-8 dark:text-slate-100">
+    <div className="classroom-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 text-slate-900 md:px-6 md:pb-14 md:pt-8 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(320px,42vh)] workspace-hero-mesh opacity-90 dark:opacity-60" />
 
       <div className="relative z-[2] mx-auto max-w-6xl space-y-8">

@@ -719,7 +719,7 @@ function ClassroomResourcesContent({ chatId }) {
     'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide transition max-md:px-2.5';
 
   return (
-    <div className="classroom-ambient relative page-surface flex justify-center px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="classroom-ambient relative page-surface flex justify-center px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(260px,34vh)] workspace-hero-mesh opacity-85 dark:opacity-55" />
 
       <div className="relative z-[2] w-full max-w-6xl">
@@ -1931,7 +1931,7 @@ function ClassroomResources() {
 
   if (!chatId) {
     return (
-      <div className="classroom-ambient relative page-surface flex justify-center px-4 py-10">
+      <div className="classroom-ambient relative page-surface flex justify-center px-3 py-6 md:px-6 md:py-10">
         <div className="relative z-[2] w-full max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
             <p className="font-medium text-rose-600">Classroom not found.</p>

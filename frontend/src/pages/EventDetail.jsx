@@ -551,7 +551,7 @@ export default function EventDetail() {
     reserved === 1 ? '1 person attending' : `${reserved} people attending`;
 
   return (
-    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <div className="mx-auto max-w-3xl space-y-6">
         <Link
           to="/events"

@@ -148,7 +148,7 @@ function Exams() {
   const [tab, setTab] = useState('vault');
 
   return (
-    <div className="liqu-ai-ambient page-surface px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="liqu-ai-ambient page-surface px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-4">
           <Link

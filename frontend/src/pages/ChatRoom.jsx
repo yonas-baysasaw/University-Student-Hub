@@ -1168,7 +1168,7 @@ function ChatRoom() {
 
   if (loading) {
     return (
-      <div className="classroom-ambient relative page-surface flex justify-center px-4 py-10">
+      <div className="classroom-ambient relative page-surface flex justify-center px-3 py-6 md:px-6 md:py-10">
         <div className="relative z-[2] w-full max-w-6xl">
           <div className="panel-card rounded-3xl p-10">
             <div className="flex items-center gap-3 text-sm font-medium text-slate-600 dark:text-slate-400">
@@ -1183,7 +1183,7 @@ function ChatRoom() {
 
   if (error) {
     return (
-      <div className="classroom-ambient relative page-surface flex justify-center px-4 py-10">
+      <div className="classroom-ambient relative page-surface flex justify-center px-3 py-6 md:px-6 md:py-10">
         <div className="relative z-[2] w-full max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
             <p className="font-medium text-rose-600">{error}</p>
@@ -1231,7 +1231,7 @@ function ChatRoom() {
   );
 
   return (
-    <div className="classroom-ambient relative page-surface flex justify-center px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="classroom-ambient relative page-surface flex justify-center px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(260px,34vh)] workspace-hero-mesh opacity-85 dark:opacity-55" />
 
       <div className="relative z-[2] w-full max-w-6xl">

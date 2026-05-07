@@ -578,7 +578,7 @@ function BookDetail() {
   }, [comments]);
 
   return (
-    <div className="library-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-12 pt-3 text-slate-900 md:px-6 md:pb-16 md:pt-5 dark:text-slate-100">
+    <div className="library-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-3 text-slate-900 md:px-6 md:pb-16 md:pt-5 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[min(240px,32vh)] workspace-hero-mesh opacity-90 dark:opacity-70" />
 
       <div className="relative z-[2] mx-auto max-w-6xl space-y-6 md:space-y-8">

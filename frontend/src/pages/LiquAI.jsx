@@ -30,7 +30,7 @@ const options = [
 
 function LiquAI() {
   return (
-    <div className="liqu-ai-ambient page-surface px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="liqu-ai-ambient page-surface px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <section className="mx-auto max-w-6xl space-y-8">
         <div className="panel-card relative overflow-hidden rounded-3xl p-6 md:p-10">
           <div

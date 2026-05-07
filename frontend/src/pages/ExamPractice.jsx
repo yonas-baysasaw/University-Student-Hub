@@ -583,7 +583,7 @@ function ExamPractice() {
 
   if (loading) {
     return (
-      <div className="page-surface flex items-center justify-center py-24 text-slate-500">
+      <div className="page-surface flex items-center justify-center py-14 md:py-24 text-slate-500">
         <span className="loading loading-spinner mr-2" />
         Loading exam…
       </div>
@@ -592,7 +592,7 @@ function ExamPractice() {
 
   if (error) {
     return (
-      <div className="page-surface px-4 py-16 text-center">
+      <div className="page-surface px-3 py-10 text-center md:px-6 md:py-16">
         <p className="text-rose-600">{error}</p>
         <div className="mt-6 flex justify-center">
           <BackToExamHubLink />
@@ -623,7 +623,7 @@ function ExamPractice() {
     exam.processingStatus === 'pending';
 
   return (
-    <div className="page-surface flex flex-col items-center justify-center px-4 py-16 text-center md:py-24">
+    <div className="page-surface flex flex-col items-center justify-center px-3 py-10 text-center md:px-6 md:py-24">
       <div className="mb-8 w-full max-w-md">
         <BackToExamHubLink />
       </div>
@@ -1951,7 +1951,7 @@ function ResultsScreen({
   }
 
   return (
-    <div className="page-surface relative min-h-[calc(100vh-3.5rem)] overflow-hidden px-4 pb-14 pt-5 md:px-6 md:pb-16 md:pt-6">
+    <div className="page-surface relative min-h-[calc(100vh-3.5rem)] overflow-hidden px-3 pb-10 pt-4 md:px-6 md:pb-16 md:pt-6">
       <div
         className="pointer-events-none absolute inset-0 opacity-90 dark:opacity-100"
         aria-hidden

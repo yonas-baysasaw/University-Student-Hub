@@ -636,7 +636,7 @@ function Profile() {
   }, []);
 
   return (
-    <div className="library-ambient page-surface px-4 pb-14 pt-8 md:px-6">
+    <div className="library-ambient page-surface px-3 pb-10 pt-6 md:px-6">
       <section className="relative z-[1] mx-auto max-w-6xl space-y-8">
         {/* Hero */}
         <div className="relative overflow-hidden rounded-3xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/90 to-cyan-50/40 shadow-[0_24px_60px_-20px_rgba(15,23,42,0.18)] dark:border-slate-600/70 dark:from-slate-900 dark:via-slate-900/95 dark:to-slate-900/80 dark:shadow-[0_28px_70px_-24px_rgba(0,0,0,0.55)]">
@@ -890,7 +890,7 @@ function Profile() {
             </div>
 
             {mainTab === 'activity' ? (
-              <div className="panel-card rounded-3xl p-6 md:p-8">
+              <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
                 <div className="flex flex-wrap items-end justify-between gap-3">
                   <div>
                     <h3 className="font-display text-xl text-slate-900 dark:text-white">
@@ -980,7 +980,7 @@ function Profile() {
               </p>
             ) : null}
 
-            <div className="panel-card mb-6 scroll-mt-28 rounded-3xl p-6 md:p-8">
+            <div className="panel-card mb-6 scroll-mt-28 rounded-2xl p-4 md:rounded-3xl md:p-8">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-3">
                   <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-500/15 text-indigo-700 ring-1 ring-indigo-500/25 dark:bg-indigo-500/12 dark:text-indigo-200">
@@ -1082,7 +1082,7 @@ function Profile() {
 
             <div
               id="profile-shared-books"
-              className="panel-card scroll-mt-28 rounded-3xl p-6 md:p-8"
+              className="panel-card scroll-mt-28 rounded-2xl p-4 md:rounded-3xl md:p-8"
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div>

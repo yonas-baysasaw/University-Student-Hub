@@ -87,9 +87,9 @@ function Navbar({ children }) {
   }, [menuOpen]);
 
   return (
-    <div className="pb-8">
+    <div className="pb-4 md:pb-8">
       <header className="nav-shell sticky top-0 z-50">
-        <div className="mx-auto flex min-h-[3.75rem] max-w-6xl items-center gap-3 px-4 py-2.5 sm:gap-4 sm:px-6">
+        <div className="mx-auto flex min-h-[3.35rem] max-w-6xl items-center gap-2 px-3 py-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 sm:py-2.5 md:gap-4 md:px-6">
           <Link
             to="/"
             className="group flex shrink-0 items-center gap-3 rounded-xl outline-none ring-cyan-500/0 transition hover:ring-cyan-500/25 focus-visible:ring-2 focus-visible:ring-cyan-500"
@@ -123,7 +123,7 @@ function Navbar({ children }) {
                   to={to}
                   end={end}
                   className={({ isActive }) =>
-                    `relative shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-150 sm:px-3.5 sm:text-[13px] ${
+                    `relative shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors duration-150 sm:px-3 sm:py-2 sm:text-[13px] ${
                       isActive
                         ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-slate-700 dark:text-white dark:ring-slate-600/90'
                         : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100'

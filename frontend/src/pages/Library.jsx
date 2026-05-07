@@ -1281,7 +1281,7 @@ function Library() {
   }, [libraryView, gridCols]);
 
   return (
-    <div className="library-ambient library-vibrant relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-12 pt-3 text-slate-900 md:px-6 md:pb-14 md:pt-5 dark:text-slate-100">
+    <div className="library-ambient library-vibrant relative page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-3 text-slate-900 md:px-6 md:pb-14 md:pt-5 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[min(240px,32vh)] workspace-hero-mesh opacity-90 dark:opacity-70" />
 
       <section className="relative z-[2] mx-auto max-w-6xl space-y-5 md:space-y-6">

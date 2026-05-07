@@ -107,7 +107,7 @@ export default function Notifications() {
   const { today: todayKey, yesterday: yesterdayKey } = todayYesterdayKeys();
 
   return (
-    <div className="dashboard-ambient page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-12 pt-6 md:px-6 md:pb-14 md:pt-8">
+    <div className="dashboard-ambient page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-5 md:px-6 md:pb-14 md:pt-8">
       <header className="mx-auto mb-8 max-w-3xl">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-4">

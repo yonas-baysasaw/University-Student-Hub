@@ -10,7 +10,7 @@ const nav = [
 
 export default function AdminLayout() {
   return (
-    <div className="dashboard-ambient page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-12 pt-6 md:px-6 md:pb-14 md:pt-8">
+    <div className="dashboard-ambient page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-5 md:px-6 md:pb-14 md:pt-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[min(200px,28vh)] workspace-hero-mesh opacity-75 dark:opacity-55" />
       <div className="relative z-[2] mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-start">
         <aside className="w-full shrink-0 md:max-w-[220px]">

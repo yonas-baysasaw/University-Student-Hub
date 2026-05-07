@@ -146,7 +146,7 @@ function PublicProfile() {
   };
 
   return (
-    <div className="library-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 text-slate-900 md:px-6 md:pb-16 md:pt-8 dark:text-slate-100">
+    <div className="library-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 text-slate-900 md:px-6 md:pb-16 md:pt-8 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[min(260px,36vh)] workspace-hero-mesh opacity-90 dark:opacity-65" />
 
       <section className="relative z-[1] mx-auto max-w-6xl space-y-8 md:space-y-10">

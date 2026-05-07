@@ -254,7 +254,7 @@ function Settings() {
   ];
 
   return (
-    <div className="page-surface px-4 pb-10 pt-8 md:px-6">
+    <div className="page-surface px-3 pb-8 pt-6 md:px-6">
       <section className="mx-auto max-w-3xl space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
@@ -276,7 +276,7 @@ function Settings() {
           </Link>
         </div>
 
-        <div className="panel-card rounded-3xl p-6 md:p-8">
+        <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-700 dark:text-cyan-400">
               <Palette className="h-5 w-5" aria-hidden />
@@ -311,7 +311,7 @@ function Settings() {
         </div>
 
         {user?.accountType === 'student' ? (
-          <div className="panel-card rounded-3xl p-6 md:p-8">
+          <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
             <div className="flex items-start gap-3">
               <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-400">
                 <GraduationCap className="h-5 w-5" aria-hidden />
@@ -396,7 +396,7 @@ function Settings() {
           </div>
         ) : null}
 
-        <div className="panel-card rounded-3xl p-6 md:p-8">
+        <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-400">
               <Sparkles className="h-5 w-5" aria-hidden />
@@ -513,7 +513,7 @@ function Settings() {
           </div>
         </div>
 
-        <div className="panel-card rounded-3xl p-6 md:p-8">
+        <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
           <div className="flex items-start gap-3">
             <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-500/15 text-slate-700 dark:text-slate-300">
               <Shield className="h-5 w-5" aria-hidden />

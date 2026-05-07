@@ -55,15 +55,15 @@ function AppRoutes() {
 
   if (checkingAuth) {
     return (
-      <div className="page-surface flex items-center justify-center px-4 py-10">
-        <div className="panel-card w-full max-w-md rounded-3xl p-8 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">
+      <div className="page-surface flex items-center justify-center px-3 py-6 md:px-6 md:py-10">
+        <div className="panel-card w-full max-w-md rounded-2xl p-5 text-center sm:rounded-3xl sm:p-8">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-700 sm:text-xs">
             University Student Hub
           </p>
-          <h2 className="mt-2 font-display text-2xl text-slate-900">
+          <h2 className="mt-2 font-display text-xl text-slate-900 sm:text-2xl dark:text-slate-50">
             Loading your session
           </h2>
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-xs text-slate-500 sm:text-sm">
             Please wait while we set up your workspace.
           </p>
         </div>
