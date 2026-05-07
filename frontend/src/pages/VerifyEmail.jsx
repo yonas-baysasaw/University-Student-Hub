@@ -53,7 +53,7 @@ function VerifyEmail() {
         }
         const nextSafe = safeInternalPath(nextParam);
         const fallback =
-          data.user?.isStaff === true ? "/admin" : "/";
+          data.user?.isAdmin === true ? "/admin" : "/";
         const target = nextSafe ?? fallback;
         setAdminRedirect(target === "/admin" || target.startsWith("/admin/"));
         if (!cancelled) {
@@ -115,7 +115,7 @@ function VerifyEmail() {
                 to="/admin/login"
                 className="font-medium text-violet-700 underline hover:text-violet-600 dark:text-violet-400"
               >
-                Staff portal sign-in
+                Admin portal sign-in
               </Link>
             </div>
           ) : null}

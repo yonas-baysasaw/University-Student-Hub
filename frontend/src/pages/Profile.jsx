@@ -36,162 +36,162 @@ import {
   Upload,
   UserRound,
   X,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
-import defaultProfile from '../assets/profile.png';
-import { useAuth } from '../contexts/AuthContext';
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import defaultProfile from "../assets/profile.png";
+import { useAuth } from "../contexts/AuthContext";
 
 const tabs = [
-  { id: 'overview', label: 'Overview', Icon: LayoutDashboard },
-  { id: 'activity', label: 'Activity', Icon: Activity },
-  { id: 'security', label: 'Security', Icon: ShieldCheck },
-  { id: 'about', label: 'About', Icon: UserRound },
+  { id: "overview", label: "Overview", Icon: LayoutDashboard },
+  { id: "activity", label: "Activity", Icon: Activity },
+  { id: "security", label: "Security", Icon: ShieldCheck },
+  { id: "about", label: "About", Icon: UserRound },
 ];
 
 const mockAcademic = {
-  gpa: '3.72',
-  currentSemester: 'Spring 2026',
+  gpa: "3.72",
+  currentSemester: "Spring 2026",
   enrolledCourses: 6,
   completedCourses: 38,
   attendance: 92,
-  standing: 'Good',
+  standing: "Good",
   credits: 114,
   graduationProgress: 78,
 };
 
 const mockSessions = [
   {
-    id: 'current',
-    device: 'Chrome on Windows',
-    location: 'Addis Ababa campus network',
-    time: 'Active now',
+    id: "current",
+    device: "Chrome on Windows",
+    location: "Addis Ababa campus network",
+    time: "Active now",
     current: true,
   },
   {
-    id: 'mobile',
-    device: 'Mobile app on Android',
-    location: 'Main campus Wi-Fi',
-    time: 'Today, 8:12 AM',
+    id: "mobile",
+    device: "Mobile app on Android",
+    location: "Main campus Wi-Fi",
+    time: "Today, 8:12 AM",
   },
   {
-    id: 'library',
-    device: 'Edge on Library PC',
-    location: 'Digital library lab',
-    time: 'Yesterday, 4:44 PM',
+    id: "library",
+    device: "Edge on Library PC",
+    location: "Digital library lab",
+    time: "Yesterday, 4:44 PM",
   },
   {
-    id: 'tablet',
-    device: 'Safari on iPad',
-    location: 'Remote',
-    time: 'Apr 30, 2026, 9:10 PM',
+    id: "tablet",
+    device: "Safari on iPad",
+    location: "Remote",
+    time: "Apr 30, 2026, 9:10 PM",
   },
   {
-    id: 'lab',
-    device: 'Firefox on Linux',
-    location: 'Computer science lab',
-    time: 'Apr 28, 2026, 2:25 PM',
+    id: "lab",
+    device: "Firefox on Linux",
+    location: "Computer science lab",
+    time: "Apr 28, 2026, 2:25 PM",
   },
 ];
 
 const mockActivities = [
   {
-    id: 'material-1',
-    type: 'Material',
-    title: 'Opened Data Structures lecture pack',
-    meta: 'Algorithms and Complexity',
-    time: '18 min ago',
+    id: "material-1",
+    type: "Material",
+    title: "Opened Data Structures lecture pack",
+    meta: "Algorithms and Complexity",
+    time: "18 min ago",
     Icon: BookOpen,
   },
   {
-    id: 'assignment-1',
-    type: 'Assignment',
-    title: 'Submitted Operating Systems lab report',
-    meta: 'Submitted before deadline',
-    time: '2 hours ago',
+    id: "assignment-1",
+    type: "Assignment",
+    title: "Submitted Operating Systems lab report",
+    meta: "Submitted before deadline",
+    time: "2 hours ago",
     Icon: FileCheck2,
   },
   {
-    id: 'quiz-1',
-    type: 'Quiz',
-    title: 'Completed Database Systems quiz',
-    meta: 'Score pending instructor review',
-    time: 'Yesterday',
+    id: "quiz-1",
+    type: "Quiz",
+    title: "Completed Database Systems quiz",
+    meta: "Score pending instructor review",
+    time: "Yesterday",
     Icon: Medal,
   },
   {
-    id: 'study-1',
-    type: 'Study',
-    title: 'Reached 74% progress in Liqu AI study plan',
-    meta: 'Machine Learning fundamentals',
-    time: 'Apr 30, 2026',
+    id: "study-1",
+    type: "Study",
+    title: "Reached 74% progress in Liqu AI study plan",
+    meta: "Machine Learning fundamentals",
+    time: "Apr 30, 2026",
     Icon: Sparkles,
   },
 ];
 
 const achievements = [
-  { label: 'Active Learner', detail: '14-day learning streak', Icon: Trophy },
+  { label: "Active Learner", detail: "14-day learning streak", Icon: Trophy },
   {
-    label: 'Top Contributor',
-    detail: 'Shared 12 study resources',
+    label: "Top Contributor",
+    detail: "Shared 12 study resources",
     Icon: Award,
   },
-  { label: 'Milestone', detail: '75% degree progress', Icon: Target },
+  { label: "Milestone", detail: "75% degree progress", Icon: Target },
   {
-    label: 'Certificate Ready',
-    detail: 'Future credential vault',
+    label: "Certificate Ready",
+    detail: "Future credential vault",
     Icon: FileText,
   },
 ];
 
 function formatDateTime(value) {
-  if (!value) return 'Not available';
+  if (!value) return "Not available";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Not available';
+  if (Number.isNaN(date.getTime())) return "Not available";
   return date.toLocaleString([], {
-    dateStyle: 'medium',
-    timeStyle: 'short',
+    dateStyle: "medium",
+    timeStyle: "short",
   });
 }
 
 function initialsFor(name, username) {
-  const source = String(name || username || 'Student').trim();
+  const source = String(name || username || "Student").trim();
   const parts = source.split(/\s+/).filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function normalizeActivity(item, index) {
-  const title = item?.title || item?.action || 'Student activity recorded';
+  const title = item?.title || item?.action || "Student activity recorded";
   const meta =
     item?.subtitle ||
     item?.description ||
     item?.type ||
-    'University Student Hub';
+    "University Student Hub";
   return {
     id: item?.id || item?._id || `api-activity-${index}`,
-    type: item?.type ? String(item.type).replace(/_/g, ' ') : 'Activity',
+    type: item?.type ? String(item.type).replace(/_/g, " ") : "Activity",
     title,
     meta,
     time: item?.at
       ? formatDateTime(item.at)
       : item?.createdAt
         ? formatDateTime(item.createdAt)
-        : 'Recently',
+        : "Recently",
     Icon: Activity,
   };
 }
 
-function StatCard({ icon: Icon, label, value, hint, progress, tone = 'cyan' }) {
+function StatCard({ icon: Icon, label, value, hint, progress, tone = "cyan" }) {
   const toneMap = {
-    cyan: 'bg-cyan-500/12 text-cyan-700 ring-cyan-500/20 dark:text-cyan-200',
+    cyan: "bg-cyan-500/12 text-cyan-700 ring-cyan-500/20 dark:text-cyan-200",
     emerald:
-      'bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200',
+      "bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-200",
     amber:
-      'bg-amber-500/12 text-amber-700 ring-amber-500/20 dark:text-amber-200',
+      "bg-amber-500/12 text-amber-700 ring-amber-500/20 dark:text-amber-200",
     indigo:
-      'bg-indigo-500/12 text-indigo-700 ring-indigo-500/20 dark:text-indigo-200',
+      "bg-indigo-500/12 text-indigo-700 ring-indigo-500/20 dark:text-indigo-200",
   };
 
   return (
@@ -216,7 +216,7 @@ function StatCard({ icon: Icon, label, value, hint, progress, tone = 'cyan' }) {
           <Icon className="h-5 w-5" aria-hidden />
         </span>
       </div>
-      {typeof progress === 'number' ? (
+      {typeof progress === "number" ? (
         <div
           className="mt-4"
           role="progressbar"
@@ -242,7 +242,7 @@ function FieldRow({
   name,
   value,
   editing,
-  type = 'text',
+  type = "text",
   onChange,
   error,
   readOnly = false,
@@ -274,7 +274,7 @@ function FieldRow({
         />
       ) : (
         <span className="mt-2 block min-h-[2.6rem] rounded-xl bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 dark:bg-slate-800/70 dark:text-slate-100">
-          {value || 'Not provided'}
+          {value || "Not provided"}
         </span>
       )}
       {error ? (
@@ -351,7 +351,7 @@ function ConfirmModal({
 function Profile() {
   const { user, setUser, logout } = useAuth();
   const fileInputRef = useRef(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState("overview");
   const [editingIdentity, setEditingIdentity] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
@@ -364,33 +364,33 @@ function Profile() {
   );
 
   const displayName =
-    user?.displayName || user?.name || user?.username || 'Amina Bekele';
-  const username = user?.username || 'amina.bekele';
+    user?.displayName || user?.name || user?.username || "Amina Bekele";
+  const username = user?.username || "amina.bekele";
 
   const initialProfile = useMemo(
     () => ({
       fullName: displayName,
       username,
-      status: 'Active Student',
-      department: user?.department || 'Computer Science',
-      studentId: user?.studentId || user?.id || 'USH-2026-0147',
-      academicLevel: user?.academicLevel || 'Year 3',
-      email: user?.email || 'student@university.edu',
-      phone: user?.phone || '+251 91 234 5678',
-      location: user?.campus || 'Main Campus',
+      status: "Active Student",
+      department: user?.department || "Computer Science",
+      studentId: user?.studentId || user?.id || "USH-2026-0147",
+      academicLevel: user?.academicLevel || "Year 3",
+      email: user?.email || "student@university.edu",
+      phone: user?.phone || "+251 91 234 5678",
+      location: user?.campus || "Main Campus",
       emergencyContact:
-        user?.emergencyContact || 'Mekdes Bekele - +251 91 555 0182',
+        user?.emergencyContact || "Mekdes Bekele - +251 91 555 0182",
       bio:
         user?.bio ||
-        'Computer science student focused on applied AI, distributed systems, and building helpful campus tools.',
+        "Computer science student focused on applied AI, distributed systems, and building helpful campus tools.",
       interests:
-        user?.interests || 'AI tutoring, systems design, academic communities',
+        user?.interests || "AI tutoring, systems design, academic communities",
       careerGoals:
         user?.careerGoals ||
-        'Become a software engineer working on education technology.',
+        "Become a software engineer working on education technology.",
       skills:
         user?.skills ||
-        'React, Node.js, Python, data structures, research writing',
+        "React, Node.js, Python, data structures, research writing",
     }),
     [displayName, user, username],
   );
@@ -411,10 +411,10 @@ function Profile() {
     const loadActivity = async () => {
       try {
         setLoadingActivity(true);
-        const response = await fetch('/api/profile/activity?limit=10', {
-          credentials: 'include',
+        const response = await fetch("/api/profile/activity?limit=10", {
+          credentials: "include",
         });
-        if (!response.ok) throw new Error('Activity unavailable');
+        if (!response.ok) throw new Error("Activity unavailable");
         const payload = await response.json();
         if (!active) return;
         const apiItems = Array.isArray(payload.activity)
@@ -438,22 +438,22 @@ function Profile() {
 
   useEffect(() => {
     return () => {
-      if (avatarPreview?.startsWith('blob:'))
+      if (avatarPreview?.startsWith("blob:"))
         URL.revokeObjectURL(avatarPreview);
     };
   }, [avatarPreview]);
 
-  const lastLogin = formatDateTime(user?.lastSeen) || 'Today, 9:24 AM';
+  const lastLogin = formatDateTime(user?.lastSeen) || "Today, 9:24 AM";
   const initials = initialsFor(profile.fullName, profile.username);
   const bioRemaining = 240 - draft.bio.length;
 
   const validateContact = () => {
     const nextErrors = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
-      nextErrors.email = 'Enter a valid email address.';
+      nextErrors.email = "Enter a valid email address.";
     }
     if (!/^[+()\-\s0-9]{7,20}$/.test(draft.phone)) {
-      nextErrors.phone = 'Enter a valid phone number.';
+      nextErrors.phone = "Enter a valid phone number.";
     }
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -465,8 +465,8 @@ function Profile() {
   };
 
   const saveProfile = (scope) => {
-    if (scope === 'contact' && !validateContact()) {
-      toast.error('Please fix the highlighted fields.');
+    if (scope === "contact" && !validateContact()) {
+      toast.error("Please fix the highlighted fields.");
       return;
     }
 
@@ -485,7 +485,7 @@ function Profile() {
     setEditingContact(false);
     setEditingBio(false);
     setErrors({});
-    toast.success('Profile updated');
+    toast.success("Profile updated");
   };
 
   const cancelEdit = () => {
@@ -499,16 +499,16 @@ function Profile() {
   const uploadAvatar = (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      toast.error('Choose an image file for your profile picture.');
+    if (!file.type.startsWith("image/")) {
+      toast.error("Choose an image file for your profile picture.");
       return;
     }
     const nextUrl = URL.createObjectURL(file);
     setAvatarPreview((current) => {
-      if (current?.startsWith('blob:')) URL.revokeObjectURL(current);
+      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
       return nextUrl;
     });
-    toast.success('Profile picture ready to save');
+    toast.success("Profile picture ready to save");
   };
 
   const removeSession = (sessionId) => {
@@ -516,13 +516,13 @@ function Profile() {
       current.filter((session) => session.id !== sessionId),
     );
     setConfirm(null);
-    toast.success('Device session signed out');
+    toast.success("Device session signed out");
   };
 
   const handleLogout = async () => {
     setConfirm(null);
     await logout();
-    toast.success('Signed out');
+    toast.success("Signed out");
   };
 
   return (
@@ -624,11 +624,11 @@ function Profile() {
                         </span>
                       </div>
                       <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
-                        @{profile.username} / {profile.department} /{' '}
+                        @{profile.username} / {profile.department} /{" "}
                         {profile.academicLevel}
                       </p>
                       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Student ID:{' '}
+                        Student ID:{" "}
                         <span className="font-semibold text-slate-800 dark:text-slate-200">
                           {profile.studentId}
                         </span>
@@ -652,7 +652,7 @@ function Profile() {
                     <button
                       type="button"
                       className="btn-primary gap-2 px-4 py-2 text-sm"
-                      onClick={() => saveProfile('identity')}
+                      onClick={() => saveProfile("identity")}
                     >
                       <Save className="h-4 w-4" aria-hidden />
                       Save
@@ -692,10 +692,10 @@ function Profile() {
                 onClick={() => setActiveTab(id)}
                 className={`inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-cyan-500 ${
                   activeTab === id
-                    ? 'bg-cyan-600 text-white shadow-md shadow-cyan-500/20'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                    ? "bg-cyan-600 text-white shadow-md shadow-cyan-500/20"
+                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
                 }`}
-                aria-current={activeTab === id ? 'page' : undefined}
+                aria-current={activeTab === id ? "page" : undefined}
               >
                 <Icon className="h-4 w-4" aria-hidden />
                 {label}
@@ -704,7 +704,7 @@ function Profile() {
           </div>
         </nav>
 
-        {activeTab === 'overview' ? (
+        {activeTab === "overview" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-6">
               <section aria-labelledby="academic-title">
@@ -799,7 +799,7 @@ function Profile() {
                         <button
                           type="button"
                           className="btn-primary gap-2 px-4 py-2 text-sm"
-                          onClick={() => saveProfile('contact')}
+                          onClick={() => saveProfile("contact")}
                         >
                           <Save className="h-4 w-4" aria-hidden />
                           Save
@@ -929,7 +929,7 @@ function Profile() {
                   <button
                     type="button"
                     className="btn-secondary justify-start gap-2 px-4 py-2.5 text-sm"
-                    onClick={() => toast.success('Data export request queued')}
+                    onClick={() => toast.success("Data export request queued")}
                   >
                     <Download className="h-4 w-4" aria-hidden />
                     Download my data
@@ -939,10 +939,10 @@ function Profile() {
                     className="inline-flex items-center justify-start gap-2 rounded-full border border-rose-200 bg-white px-4 py-2.5 text-sm font-bold text-rose-700 transition hover:bg-rose-50 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-950/40"
                     onClick={() =>
                       setConfirm({
-                        title: 'Log out of University Student Hub?',
+                        title: "Log out of University Student Hub?",
                         description:
-                          'You will need to sign in again to access classrooms, library materials, and AI study tools.',
-                        actionLabel: 'Logout',
+                          "You will need to sign in again to access classrooms, library materials, and AI study tools.",
+                        actionLabel: "Logout",
                         onConfirm: handleLogout,
                       })
                     }
@@ -1006,7 +1006,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {activeTab === 'activity' ? (
+        {activeTab === "activity" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
             <section aria-labelledby="student-activity-title">
               <div className="mb-4 flex items-center gap-2">
@@ -1024,10 +1024,10 @@ function Profile() {
               <div className="space-y-3">
                 {loadingActivity
                   ? [
-                      'activity-skeleton-1',
-                      'activity-skeleton-2',
-                      'activity-skeleton-3',
-                      'activity-skeleton-4',
+                      "activity-skeleton-1",
+                      "activity-skeleton-2",
+                      "activity-skeleton-3",
+                      "activity-skeleton-4",
                     ].map((key) => (
                       <div
                         key={key}
@@ -1133,9 +1133,9 @@ function Profile() {
                             className="rounded-full border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 dark:border-slate-700 dark:text-slate-300 dark:hover:border-rose-900 dark:hover:bg-rose-950/40 dark:hover:text-rose-300"
                             onClick={() =>
                               setConfirm({
-                                title: 'Logout this device?',
+                                title: "Logout this device?",
                                 description: `This ends the active session for ${session.device}.`,
-                                actionLabel: 'Logout device',
+                                actionLabel: "Logout device",
                                 onConfirm: () => removeSession(session.id),
                               })
                             }
@@ -1152,7 +1152,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {activeTab === 'security' ? (
+        {activeTab === "security" ? (
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               icon={Mail}
@@ -1210,7 +1210,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {activeTab === 'about' ? (
+        {activeTab === "about" ? (
           <section
             className="mt-6 rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60"
             aria-labelledby="about-title"
@@ -1241,7 +1241,7 @@ function Profile() {
                   <button
                     type="button"
                     className="btn-primary gap-2 px-4 py-2 text-sm"
-                    onClick={() => saveProfile('bio')}
+                    onClick={() => saveProfile("bio")}
                   >
                     <Save className="h-4 w-4" aria-hidden />
                     Save
@@ -1275,7 +1275,7 @@ function Profile() {
                       aria-label="Short bio"
                     />
                     <span
-                      className={`mt-1 block text-right text-xs font-semibold ${bioRemaining < 20 ? 'text-amber-600' : 'text-slate-500 dark:text-slate-400'}`}
+                      className={`mt-1 block text-right text-xs font-semibold ${bioRemaining < 20 ? "text-amber-600" : "text-slate-500 dark:text-slate-400"}`}
                     >
                       {bioRemaining} characters remaining
                     </span>

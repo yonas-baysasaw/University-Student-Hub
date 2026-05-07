@@ -26,16 +26,16 @@ function inviteKeysMatch(provided, expected) {
   }
 }
 
-async function countStaffLikeRoles() {
-  return User.countDocuments({ role: { $in: ["admin", "staff"] } });
+async function countExistingAdmins() {
+  return User.countDocuments({ role: "admin" });
 }
 
 router.get(
   "/meta",
   asyncHandler(async (_req, res) => {
     const secretOn = ENV.ADMIN_REGISTRATION_SECRET.length > 0;
-    const staffLike = await countStaffLikeRoles();
-    const acceptingRegistrations = secretOn || staffLike === 0;
+    const existingAdmins = await countExistingAdmins();
+    const acceptingRegistrations = secretOn || existingAdmins === 0;
     const inviteKeyRequired = secretOn;
     res.json({ acceptingRegistrations, inviteKeyRequired });
   }),
@@ -46,7 +46,7 @@ router.post(
   registerLimiter,
   asyncHandler(async (req, res) => {
     const secretOn = ENV.ADMIN_REGISTRATION_SECRET.length > 0;
-    const staffLike = await countStaffLikeRoles();
+    const existingAdmins = await countExistingAdmins();
 
     let authorized = false;
     if (secretOn) {
@@ -54,7 +54,7 @@ router.post(
         req.body?.adminInviteKey,
         ENV.ADMIN_REGISTRATION_SECRET,
       );
-    } else if (staffLike === 0) {
+    } else if (existingAdmins === 0) {
       authorized = true;
     }
 
@@ -76,7 +76,7 @@ router.post(
     res.status(201).json({
       user: toPublicUser(user),
       message:
-        "Administrator account created. Sign in at the staff portal to open the admin dashboard.",
+        "Administrator account created. Sign in at the admin portal to open the dashboard.",
     });
   }),
 );

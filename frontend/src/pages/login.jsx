@@ -200,12 +200,12 @@ function SignIn() {
           </Link>
         </div>
         <p className="mt-3 text-center text-[11px] text-slate-500 dark:text-slate-400">
-          Administrator or staff?{' '}
+          Administrator?{' '}
           <Link
             to="/admin/login"
             className="font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-400"
           >
-            Staff portal sign-in
+            Admin portal sign-in
           </Link>
         </p>
 

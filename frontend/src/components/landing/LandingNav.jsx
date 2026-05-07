@@ -86,7 +86,7 @@ function LandingNav() {
             to="/admin/login"
             className="inline-flex rounded-lg border border-violet-300/70 px-2 py-2 text-[10px] font-semibold leading-none text-violet-800 transition hover:bg-violet-50 dark:border-violet-600/60 dark:text-violet-200 dark:hover:bg-violet-950/40 sm:px-2.5 sm:text-[11px]"
           >
-            Staff
+            Admin
           </Link>
           <Link
             to="/signup"

@@ -2,6 +2,25 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+const splitEnvEmails = (raw) =>
+  String(raw ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+
+const adminEmailsPrimary = splitEnvEmails(process.env.ADMIN_EMAILS);
+const adminEmailsLegacy = splitEnvEmails(process.env.STAFF_EMAILS);
+
+const ADMIN_EMAILS_RESOLVED = adminEmailsPrimary.length
+  ? adminEmailsPrimary
+  : adminEmailsLegacy;
+
+if (!adminEmailsPrimary.length && adminEmailsLegacy.length) {
+  console.warn(
+    "[env] STAFF_EMAILS is deprecated; set ADMIN_EMAILS instead (comma-separated addresses promoted on startup).",
+  );
+}
+
 export const ENV = {
   PORT: process.env.PORT,
   NODE_ENV: process.env.NODE_ENV,
@@ -59,18 +78,13 @@ export const ENV = {
     return Number.isFinite(n) && n >= 5_000 ? n : 90_000;
   })(),
   /**
-   * Comma-separated emails promoted to staff on server start (no auto-demotion).
+   * Comma-separated emails promoted to `role: admin` on server start (no auto-demotion).
+   * Legacy: if empty, `STAFF_EMAILS` is used once with a deprecation warning.
    */
-  STAFF_EMAILS: (() => {
-    const raw = process.env.STAFF_EMAILS || "";
-    return raw
-      .split(",")
-      .map((e) => e.trim().toLowerCase())
-      .filter(Boolean);
-  })(),
+  ADMIN_EMAILS: ADMIN_EMAILS_RESOLVED,
   /**
    * When set, every admin self-registration must send this key (body.adminInviteKey).
-   * When unset, only the first admin/staff bootstrap is allowed (no existing admin or staff).
+   * When unset, only first-admin bootstrap is allowed (zero existing administrators).
    */
   ADMIN_REGISTRATION_SECRET: String(
     process.env.ADMIN_REGISTRATION_SECRET ?? "",

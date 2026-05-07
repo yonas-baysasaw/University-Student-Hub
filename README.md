@@ -60,7 +60,7 @@ University Student Hub is a collaborative platform that enables students to:
 - **File Sharing**: Upload and share resources (images, documents)
 - **Presence**: See who's online in real-time
 - **Library**: Manage and access shared books/materials
-- **Staff admin** (`/admin`, `STAFF_EMAILS`): Moderation UI for instructors/students (read-only locks) and library deletion; staff bypass write restrictions
+- **Administrator console** (`/admin`, `ADMIN_EMAILS`): Moderation UI for instructors/students (read-only locks) and library deletion; administrators bypass platform write restrictions when applied
 
 ## Prerequisites
 
@@ -97,15 +97,34 @@ AWS_BUCKET_NAME=your_s3_bucket_name
 AWS_ACCESS_KEY_ID=your_access_key_id
 AWS_SECRET_ACCESS_KEY=your_secret_access_key
 
-# Optional: comma-separated emails promoted to staff on each server start (no auto-demotion)
-# STAFF_EMAILS=admin@university.edu
+# Optional: comma-separated existing-user emails promoted to role admin on each server start (no auto-demotion)
+# ADMIN_EMAILS=admin@university.edu
+
+# Legacy (deprecated): if ADMIN_EMAILS is empty, STAFF_EMAILS is still read once with a startup warning
+# STAFF_EMAILS=legacy@university.edu
 ```
 
 Optional (supported by code):
 
 - `MONGODB_URI` (alternative to `MONGODB_URL`)
 - `VITE_API_TARGET` in `frontend/.env` for Vite API proxy target
-- `STAFF_EMAILS` — comma-separated list of user emails (lowercase) promoted to the `staff` role on each server start (users are not demoted when removed from this list)
+- `ADMIN_EMAILS` — comma-separated user emails (lowercase) promoted to `role: admin` on each server start (users are not demoted when removed from this list)
+- `STAFF_EMAILS` — deprecated alias used only when `ADMIN_EMAILS` is unset
+- `ADMIN_REGISTRATION_SECRET` — invite key for `/admin/signup` when an administrator already exists
+
+One-time DB migration if you previously used role `staff` (before removing it from the schema):
+
+```bash
+node backend/scripts/migrate-staff-to-admin.mjs
+```
+
+(Run from the repository root; requires `MONGODB_URL` / `MONGODB_URI` in env.)
+
+Alternatively:
+
+```bash
+npm run migrate-staff-to-admin --prefix backend
+```
 
 ## Installation
 

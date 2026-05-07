@@ -22,11 +22,11 @@ import {
   updateDepartment,
   updateSettings,
 } from '../controllers/adminController.js';
-import { requireStaff } from '../middlewares/authMiddleware.js';
+import { requireAdmin } from '../middlewares/authMiddleware.js';
 
 const router = express.Router();
 
-router.use(requireStaff);
+router.use(requireAdmin);
 
 router.get('/stats', getAdminStats);
 router.get('/analytics', getAnalytics);

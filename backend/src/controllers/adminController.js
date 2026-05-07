@@ -70,7 +70,7 @@ export const getAdminStats = asyncHandler(async (_req, res) => {
     User.countDocuments({
       accountType: 'student',
       status: { $ne: 'deleted' },
-      role: { $nin: ['staff', 'admin'] },
+      role: { $nin: ['admin'] },
     }),
     User.countDocuments({ status: 'suspended' }),
     User.countDocuments({
@@ -149,14 +149,14 @@ export const listAdminUsers = asyncHandler(async (req, res) => {
       { accountType: 'student' },
       { accountType: { $exists: false } },
     ];
-    filter.role = { $nin: ['staff', 'admin'] };
+    filter.role = { $nin: ['admin'] };
   } else if (accountTypeRaw === 'instructor') {
     filter.accountType = 'instructor';
   }
   if (statusRaw && ['active', 'suspended', 'deleted'].includes(statusRaw)) {
     filter.status = statusRaw;
   }
-  if (roleRaw && ['user', 'staff', 'admin', 'lecturer'].includes(roleRaw)) {
+  if (roleRaw && ['user', 'admin', 'lecturer'].includes(roleRaw)) {
     filter.role = roleRaw;
   }
   if (q) {
@@ -229,7 +229,7 @@ export const patchAdminUser = asyncHandler(async (req, res) => {
     }
   }
   if (body.role !== undefined) {
-    if (!['user', 'staff', 'admin', 'lecturer'].includes(body.role)) {
+    if (!['user', 'admin', 'lecturer'].includes(body.role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
     target.role = body.role;
@@ -306,7 +306,7 @@ export const suspendAdminUsers = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: 'No valid user ids supplied' });
   }
   await User.updateMany(
-    { _id: { $in: validIds }, role: { $nin: ['staff', 'admin'] } },
+    { _id: { $in: validIds }, role: { $nin: ['admin'] } },
     {
       $set: {
         status: 'suspended',

@@ -1,7 +1,7 @@
 /** @param {import('mongoose').Document | Record<string, unknown> | null | undefined} user */
 export function isUserWriteBlocked(user) {
   if (!user) return true;
-  if (user.role === 'staff') return false;
+  if (user.role === 'admin') return false;
   if (user.platformReadOnly === true) return true;
   if (
     user.accountType === 'instructor' &&

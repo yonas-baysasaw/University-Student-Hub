@@ -8,7 +8,7 @@ import {
 import { Toaster } from 'sonner';
 import Nav from './components/Nav';
 import Navbar from './components/Navbar';
-import StaffRoute from './components/StaffRoute';
+import AdminRoute from './components/AdminRoute';
 import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
@@ -117,7 +117,7 @@ function AppRoutes() {
             <Route
               path="/admin/signup"
               element={
-                user.isStaff ? (
+                user.isAdmin ? (
                   <Navigate to="/admin" replace />
                 ) : (
                   <Navigate to="/" replace />
@@ -127,7 +127,7 @@ function AppRoutes() {
             <Route
               path="/admin/login"
               element={
-                user.isStaff ? (
+                user.isAdmin ? (
                   <Navigate to="/admin" replace />
                 ) : (
                   <Navigate to="/" replace />
@@ -137,9 +137,9 @@ function AppRoutes() {
             <Route
               path="/admin"
               element={
-                <StaffRoute>
+                <AdminRoute>
                   <AdminLayout />
-                </StaffRoute>
+                </AdminRoute>
               }
             >
               <Route index element={<AdminWelcome />} />

@@ -10,7 +10,7 @@ import {
   SkeletonRows,
 } from './adminShared';
 
-const roleOptions = ['user', 'lecturer', 'staff', 'admin'];
+const roleOptions = ['user', 'lecturer', 'admin'];
 
 export default function AdminUsersPage({
   accountType = 'student',

@@ -71,7 +71,7 @@ router.post(
         user.emailVerificationExpires = Date.now() + 48 * 3600000;
         await user.save();
         const verifyNext =
-          user.role === "admin" || user.role === "staff" ? "/admin" : undefined;
+          user.role === "admin" ? "/admin" : undefined;
         await sendVerificationEmail({
           to: user.email,
           token,

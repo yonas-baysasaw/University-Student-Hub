@@ -32,7 +32,7 @@ import supportRoutes from "./routes/supportRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import vaultRoutes from "./routes/vaultRoutes.js";
 import verifyEmailRoutes from "./routes/verifyEmailRoutes.js";
-import { syncStaffRolesFromEnv } from "./services/syncStaffRoles.js";
+import { syncAdminEmailsFromEnv } from "./services/syncAdminEmailsFromEnv.js";
 import { initSocketServer } from "./socket/index.js";
 
 const __dirname = path.resolve();
@@ -125,7 +125,7 @@ const server = http.createServer(app);
 
 const start = async () => {
   await connectDB();
-  await syncStaffRolesFromEnv();
+  await syncAdminEmailsFromEnv();
 
   await initSocketServer(server, sessionMiddleware);
   server.listen(ENV.PORT, () => {

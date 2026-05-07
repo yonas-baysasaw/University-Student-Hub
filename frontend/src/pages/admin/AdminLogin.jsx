@@ -55,14 +55,14 @@ export default function AdminLogin() {
         throw new Error(payload.message || 'Invalid credentials');
       }
 
-      if (!payload.user?.isStaff) {
+      if (!payload.user?.isAdmin) {
         await fetch('/api/auth/logout', {
           credentials: 'include',
           redirect: 'manual',
         });
         await refreshAuth();
         setError(
-          'This portal is for administrators and staff only. Use the main campus sign-in for student and instructor accounts.',
+          'This portal is for administrators only. Use the main campus sign-in for student and instructor accounts.',
         );
         return;
       }
@@ -113,8 +113,8 @@ export default function AdminLogin() {
   return (
     <AuthShell
       variant="admin"
-      title="Staff portal"
-      subtitle="Administrator & staff sign-in"
+      title="Admin portal"
+      subtitle="Administrator sign-in"
     >
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         <div>

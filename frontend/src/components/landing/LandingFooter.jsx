@@ -9,7 +9,7 @@ function LandingFooter() {
             University Student Hub
           </p>
           <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">
-            Centralized academic workspace for AAiT students and staff.
+            Centralized academic workspace for AAiT students and instructors.
           </p>
         </div>
         <div>

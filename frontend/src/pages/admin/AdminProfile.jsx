@@ -23,7 +23,7 @@ export default function AdminProfile() {
               </p>
               <p className="text-sm text-slate-500">{user?.email}</p>
               <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700 dark:text-cyan-300">
-                {user?.role || 'staff'} · protected admin session
+                {user?.role || 'admin'} · protected administrator session
               </p>
             </div>
           </div>
@@ -41,7 +41,7 @@ export default function AdminProfile() {
           Security
         </h2>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Admin routes are protected by server-side staff/admin checks and every
+          Admin routes are protected by server-side administrator checks and every
           sensitive action is written to the SystemLog collection.
         </p>
       </AdminCard>

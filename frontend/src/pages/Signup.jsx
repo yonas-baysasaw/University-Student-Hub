@@ -464,7 +464,7 @@ function Signup() {
                 to="/admin/signup"
                 className="font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-400"
               >
-                Staff portal registration
+                Admin portal registration
               </Link>
             </p>
 

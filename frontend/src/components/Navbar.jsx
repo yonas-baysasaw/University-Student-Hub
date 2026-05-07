@@ -38,7 +38,7 @@ function Navbar({ children }) {
 
   const byokActive = !!user?.geminiConfigured;
 
-  const navLinks = user?.isStaff
+  const navLinks = user?.isAdmin
     ? [
         ...baseNavLinks,
         { to: '/admin', label: 'Admin', end: false, icon: Shield },

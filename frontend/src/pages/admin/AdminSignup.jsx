@@ -99,7 +99,7 @@ export default function AdminSignup() {
       }
       setSuccess(
         data.message ||
-          'Administrator account created. Sign in at the staff portal to continue.',
+          'Administrator account created. Sign in at the admin portal to continue.',
       );
       setUsername('');
       setEmail('');
@@ -118,7 +118,7 @@ export default function AdminSignup() {
     return (
       <AuthShell
         variant="admin"
-        title="Staff portal"
+        title="Admin portal"
         subtitle="Loading registration options…"
       >
         <p className="text-center text-sm text-slate-500 dark:text-slate-400">
@@ -132,7 +132,7 @@ export default function AdminSignup() {
     return (
       <AuthShell
         variant="admin"
-        title="Staff portal"
+        title="Admin portal"
         subtitle="Administrator registration"
       >
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-5 text-sm text-slate-700 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-200">
@@ -140,19 +140,44 @@ export default function AdminSignup() {
             Self-registration is closed
           </p>
           <p className="mt-2 text-slate-600 dark:text-slate-400">
-            An administrator account already exists and this server does not use
-            an invite key. Ask an existing admin to promote your account, or set{' '}
-            <code className="rounded bg-slate-200/80 px-1 py-0.5 text-xs dark:bg-slate-700">
-              ADMIN_REGISTRATION_SECRET
-            </code>{' '}
-            on the server to enable keyed registration.
+            At least one administrator exists and this server does not use an
+            invite key. Pick one path below:
           </p>
+          <ol className="mt-4 list-decimal space-y-3 pl-5 text-slate-600 dark:text-slate-400">
+            <li>
+              Add{' '}
+              <code className="rounded bg-slate-200/80 px-1 py-0.5 text-xs dark:bg-slate-700">
+                ADMIN_REGISTRATION_SECRET
+              </code>{' '}
+              to backend <code className="text-xs">.env</code>, restart, then use{' '}
+              <strong>/admin/signup</strong> with that invite key.
+            </li>
+            <li>
+              List your email in{' '}
+              <code className="rounded bg-slate-200/80 px-1 py-0.5 text-xs dark:bg-slate-700">
+                ADMIN_EMAILS
+              </code>{' '}
+              (comma-separated), restart once — matching accounts become administrators.
+            </li>
+            <li>
+              Ask an existing administrator to set your account{' '}
+              <code className="text-xs">role</code> to{' '}
+              <code className="text-xs">admin</code> (campus sign-in may still apply until promoted).
+            </li>
+            <li className="text-xs opacity-90">
+              Development only: set{' '}
+              <code className="rounded bg-slate-200/80 px-1 dark:bg-slate-700">
+                role: &quot;admin&quot;
+              </code>{' '}
+              in MongoDB for your user document if appropriate.
+            </li>
+          </ol>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
               to="/admin/login"
               className="btn-primary inline-flex h-10 items-center px-4 text-sm"
             >
-              Staff sign in
+              Administrator sign in
             </Link>
             <Link
               to="/login"
@@ -335,7 +360,7 @@ export default function AdminSignup() {
                   to="/admin/login"
                   className="font-semibold underline underline-offset-2"
                 >
-                  Staff sign in
+                  Administrator sign in
                 </Link>{' '}
                 — not the main campus login.
               </p>
@@ -349,7 +374,7 @@ export default function AdminSignup() {
           to="/admin/login"
           className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
         >
-          Staff sign in
+          Administrator sign in
         </Link>
         <Link
           to="/signup"

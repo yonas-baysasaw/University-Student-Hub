@@ -86,7 +86,7 @@ function AccessPanelsSection() {
                     to="/admin/login"
                     className="text-sm font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
                   >
-                    Staff & administrator portal →
+                    Administrator portal →
                   </Link>
                 </p>
               </div>
