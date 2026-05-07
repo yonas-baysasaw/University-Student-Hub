@@ -527,26 +527,26 @@ function Profile() {
 
   return (
     <main className="dashboard-ambient min-h-screen pb-16">
-      <section className="relative z-10 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <section className="relative z-20 mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <div className="overflow-hidden rounded-[2rem] border border-slate-200/90 bg-white shadow-xl shadow-slate-200/60 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30">
-          <div className="relative h-40 bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 sm:h-52">
+          <div className="relative z-0 h-40 bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 sm:h-52">
             <div
-              className="absolute inset-0 workspace-hero-mesh opacity-80"
+              className="absolute inset-0 z-0 workspace-hero-mesh opacity-80"
               aria-hidden
             />
-            <div className="absolute bottom-5 right-5 hidden items-center gap-2 rounded-full bg-white/14 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-white ring-1 ring-white/25 backdrop-blur sm:flex">
+            <div className="absolute bottom-5 right-5 z-[1] hidden items-center gap-2 rounded-full bg-white/14 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-white ring-1 ring-white/25 backdrop-blur sm:flex">
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
               Student record synced
             </div>
           </div>
 
-          <div className="px-4 pb-5 sm:px-6 lg:px-8">
-            <div className="-mt-14 flex flex-col gap-5 sm:-mt-16 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+          <div className="relative z-10 min-h-[10rem] bg-white px-4 pb-6 pt-8 sm:min-h-[11rem] sm:px-6 sm:pb-7 sm:pt-10 lg:px-8 dark:bg-slate-900">
+            <div className="-mt-8 flex flex-col gap-5 sm:-mt-10 lg:flex-row lg:items-end lg:justify-between">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-end lg:items-start">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="group relative h-28 w-28 shrink-0 overflow-hidden rounded-3xl bg-slate-100 text-left profile-avatar-ring sm:h-32 sm:w-32"
+                  className="group relative z-10 h-28 w-28 shrink-0 overflow-hidden rounded-3xl bg-slate-100 text-left ring-2 ring-white/80 profile-avatar-ring dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32"
                   aria-label="Upload profile picture"
                   title="Change profile picture"
                 >
@@ -557,7 +557,7 @@ function Profile() {
                       className="h-full w-full object-cover"
                     />
                   ) : (
-                    <span className="flex h-full w-full items-center justify-center font-display text-3xl font-bold text-cyan-800">
+                    <span className="flex h-full w-full items-center justify-center font-display text-3xl font-bold text-cyan-800 dark:text-cyan-200">
                       {initials}
                     </span>
                   )}
@@ -574,9 +574,9 @@ function Profile() {
                   onChange={uploadAvatar}
                 />
 
-                <div className="min-w-0 pt-2">
+                <div className="relative z-10 min-w-0 pt-2 lg:pt-0">
                   {editingIdentity ? (
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 rounded-2xl border border-slate-200/90 bg-slate-50/90 p-4 sm:grid-cols-2 dark:border-slate-600/80 dark:bg-slate-800/80">
                       <input
                         className="input-field"
                         name="fullName"
@@ -615,15 +615,15 @@ function Profile() {
                   ) : (
                     <>
                       <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="font-display text-3xl font-bold text-slate-950 sm:text-4xl dark:text-white">
-                          {profile.fullName}
+                        <h1 className="relative z-10 max-w-full text-balance break-words font-display text-3xl font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                          {profile.fullName || profile.username || "Student"}
                         </h1>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-200 dark:ring-emerald-400/20">
+                        <span className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/30">
                           <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                           {profile.status}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm font-semibold text-slate-600 dark:text-slate-400">
+                      <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-400">
                         @{profile.username} / {profile.department} /{" "}
                         {profile.academicLevel}
                       </p>
@@ -638,7 +638,7 @@ function Profile() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="relative z-10 flex flex-wrap gap-2">
                 {editingIdentity ? (
                   <>
                     <button
