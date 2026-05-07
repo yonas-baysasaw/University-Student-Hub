@@ -181,24 +181,33 @@ function SignIn() {
         </div>
       </form>
 
-      <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
-        <Link
-          to="/password/reset"
-          className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
-        >
-          Forgot password?
-        </Link>
-        <Link
-          to={
-            nextSafe
-              ? `/signup?next=${encodeURIComponent(nextSafe)}`
-              : "/signup"
-          }
-          className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
-        >
-          Create account
-        </Link>
-      </div>
+        <div className="mt-4 flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
+          <Link
+            to="/password/reset"
+            className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
+          >
+            Forgot password?
+          </Link>
+          <Link
+            to={
+              nextSafe
+                ? `/signup?next=${encodeURIComponent(nextSafe)}`
+                : "/signup"
+            }
+            className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
+          >
+            Create account
+          </Link>
+        </div>
+        <p className="mt-3 text-center text-[11px] text-slate-500 dark:text-slate-400">
+          Administrator or staff?{' '}
+          <Link
+            to="/admin/login"
+            className="font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-400"
+          >
+            Staff portal sign-in
+          </Link>
+        </p>
 
       <div className="my-5 flex items-center gap-3">
         <div className="h-px flex-1 bg-slate-200 dark:bg-slate-600" />

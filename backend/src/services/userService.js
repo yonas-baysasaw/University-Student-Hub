@@ -93,6 +93,51 @@ export const createLocalUser = async ({
   return user;
 };
 
+/**
+ * Creates an administrator account (local password, email verification required).
+ * Does not enforce bootstrap / invite-key rules — callers must authorize first.
+ */
+export const createPortalAdminUser = async ({ username, email, password }) => {
+  if (!email || !password) {
+    const error = new Error("Email and password are required");
+    error.status = 400;
+    throw error;
+  }
+
+  const normalizedEmail = String(email).trim().toLowerCase();
+
+  const existing = await User.findOne({ email: normalizedEmail });
+  if (existing) {
+    const error = new Error("Email already in use");
+    error.status = 409;
+    throw error;
+  }
+
+  const token = crypto.randomBytes(20).toString("hex");
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const user = await User.create({
+    username: typeof username === "string" ? username.trim() : username,
+    email: normalizedEmail,
+    password: hashedPassword,
+    provider: ["local"],
+    accountType: "instructor",
+    role: "admin",
+    email_verified: false,
+    emailVerificationToken: token,
+    emailVerificationExpires: Date.now() + 48 * 3600000,
+  });
+
+  try {
+    await sendVerificationEmail({ to: user.email, token });
+  } catch (err) {
+    await User.deleteOne({ _id: user._id });
+    throw err;
+  }
+
+  return user;
+};
+
 export const findOrLinkGoogleUser = async (profile) => {
   const email = profile.emails?.[0]?.value?.trim?.().toLowerCase?.() ?? null;
   let user = await User.findOne({ googleId: profile.id });

@@ -458,6 +458,15 @@ function Signup() {
                 Sign in
               </Link>
             </div>
+            <p className="mt-3 text-center text-[11px] text-slate-500 dark:text-slate-400">
+              Need an admin account?{' '}
+              <Link
+                to="/admin/signup"
+                className="font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-400"
+              >
+                Staff portal registration
+              </Link>
+            </p>
 
             <div className="my-5 flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200 dark:bg-slate-600" />

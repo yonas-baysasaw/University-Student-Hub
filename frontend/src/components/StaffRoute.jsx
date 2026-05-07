@@ -24,7 +24,7 @@ export default function StaffRoute({ children }) {
   }
 
   if (!user) {
-    return <Navigate to="/login?next=/admin" replace />;
+    return <Navigate to="/admin/login?next=/admin" replace />;
   }
 
   if (!user.isStaff) {

@@ -68,4 +68,11 @@ export const ENV = {
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
   })(),
+  /**
+   * When set, every admin self-registration must send this key (body.adminInviteKey).
+   * When unset, only the first admin/staff bootstrap is allowed (no existing admin or staff).
+   */
+  ADMIN_REGISTRATION_SECRET: String(
+    process.env.ADMIN_REGISTRATION_SECRET ?? "",
+  ).trim(),
 };

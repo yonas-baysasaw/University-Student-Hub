@@ -26,6 +26,7 @@ import presenceRoutes from "./routes/presenceRoutes.js";
 import profileRoutes from "./routes/profileRoutes.js";
 import readingListRoutes from "./routes/readingListRoutes.js";
 import resetPasswordRoutes from "./routes/resetPasswordRoutes.js";
+import adminRegisterRoutes from "./routes/adminRegisterRoutes.js";
 import signUpRouter from "./routes/signUpRoutes.js";
 import supportRoutes from "./routes/supportRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
@@ -88,6 +89,7 @@ if (ENV.NODE_ENV === "development") {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/register", signUpRouter);
+app.use("/api/register-admin", adminRegisterRoutes);
 app.use("/api", verifyEmailRoutes);
 app.use("/api/profile", profileRoutes);
 app.use("/api/dashboard", dashboardRoutes);

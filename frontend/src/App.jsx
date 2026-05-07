@@ -18,10 +18,12 @@ import AdminDepartments from './pages/admin/AdminDepartments.jsx';
 import AdminInstructors from './pages/admin/AdminInstructors.jsx';
 import AdminLayout from './pages/admin/AdminLayout.jsx';
 import AdminLibrary from './pages/admin/AdminLibrary.jsx';
+import AdminLogin from './pages/admin/AdminLogin.jsx';
 import AdminLogs from './pages/admin/AdminLogs.jsx';
 import AdminNotifications from './pages/admin/AdminNotifications.jsx';
 import AdminProfile from './pages/admin/AdminProfile.jsx';
 import AdminSettings from './pages/admin/AdminSettings.jsx';
+import AdminSignup from './pages/admin/AdminSignup.jsx';
 import AdminStudents from './pages/admin/AdminStudents.jsx';
 import AdminWelcome from './pages/admin/AdminWelcome.jsx';
 import BookDetail from './pages/BookDetail';
@@ -113,6 +115,26 @@ function AppRoutes() {
             <Route path="/exams/:examId" element={<ExamPractice />} />
             <Route path="/profile" element={<Profile />} />
             <Route
+              path="/admin/signup"
+              element={
+                user.isStaff ? (
+                  <Navigate to="/admin" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
+              path="/admin/login"
+              element={
+                user.isStaff ? (
+                  <Navigate to="/admin" replace />
+                ) : (
+                  <Navigate to="/" replace />
+                )
+              }
+            />
+            <Route
               path="/admin"
               element={
                 <StaffRoute>
@@ -153,9 +175,11 @@ function AppRoutes() {
       <div key={location.pathname} className="route-fade">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/admin/signup" element={<AdminSignup />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"
-            element={<Navigate to="/login?next=/admin" replace />}
+            element={<Navigate to="/admin/login?next=/admin" replace />}
           />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
