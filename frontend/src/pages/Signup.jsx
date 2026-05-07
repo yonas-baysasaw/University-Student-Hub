@@ -138,11 +138,7 @@ function Signup() {
               id="signup-role-title"
               className="font-display text-xl text-slate-900 dark:text-slate-100"
             >
-              How will you use University Student Hub?
-            </p>
-            <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-              Choose one to continue sign-up. You can complete student details on
-              the next step.
+              Are You Student or Instructor
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               <button
@@ -153,9 +149,6 @@ function Signup() {
                 <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Student
                 </span>
-                <span className="mt-1 block text-xs text-slate-600 dark:text-slate-400">
-                  Department and year required
-                </span>
               </button>
               <button
                 type="button"
@@ -164,9 +157,6 @@ function Signup() {
               >
                 <span className="block text-sm font-semibold text-slate-900 dark:text-slate-100">
                   Instructor
-                </span>
-                <span className="mt-1 block text-xs text-slate-600 dark:text-slate-400">
-                  Teach or manage classes
                 </span>
               </button>
             </div>
