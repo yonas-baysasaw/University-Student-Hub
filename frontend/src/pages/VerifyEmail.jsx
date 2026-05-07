@@ -1,20 +1,20 @@
-import { useEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import AuthShell from '../components/AuthShell';
-import { useAuth } from '../contexts/AuthContext';
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import AuthShell from "../components/AuthShell";
+import { useAuth } from "../contexts/AuthContext";
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const token = searchParams.get("token");
   const navigate = useNavigate();
   const { refreshAuth, setUser } = useAuth();
-  const [status, setStatus] = useState('loading');
-  const [message, setMessage] = useState('');
+  const [status, setStatus] = useState("loading");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!token || !token.trim()) {
-      setStatus('error');
-      setMessage('Missing verification link. Open the link from your email.');
+      setStatus("error");
+      setMessage("Missing verification link. Open the link from your email.");
       return;
     }
 
@@ -22,25 +22,25 @@ function VerifyEmail() {
 
     (async () => {
       try {
-        const res = await fetch('/api/verify-email', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+        const res = await fetch("/api/verify-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
           body: JSON.stringify({ token: token.trim() }),
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
-          setStatus('error');
+          setStatus("error");
           setMessage(
             data.message ||
-              'This link is invalid or has expired. Request a new one from sign-in.',
+              "This link is invalid or has expired. Request a new one from sign-in.",
           );
           return;
         }
-        setStatus('ok');
-        setMessage(data.message || 'Your email is verified.');
-        if (data.user && typeof data.user === 'object') {
+        setStatus("ok");
+        setMessage(data.message || "Your email is verified.");
+        if (data.user && typeof data.user === "object") {
           setUser(data.user);
         }
         try {
@@ -49,12 +49,12 @@ function VerifyEmail() {
           // Session cookie should still work; landing page will reload auth.
         }
         if (!cancelled) {
-          navigate('/', { replace: true });
+          navigate("/", { replace: true });
         }
       } catch {
         if (!cancelled) {
-          setStatus('error');
-          setMessage('Something went wrong. Try again later.');
+          setStatus("error");
+          setMessage("Something went wrong. Try again later.");
         }
       }
     })();
@@ -70,16 +70,16 @@ function VerifyEmail() {
       subtitle="Confirming your University Student Hub account"
     >
       <div aria-live="polite">
-        {status === 'loading' ? (
+        {status === "loading" ? (
           <p className="text-center text-sm text-slate-600 dark:text-slate-400">
             Verifying your email…
           </p>
         ) : (
           <div
             className={`rounded-xl px-3 py-3 text-sm ${
-              status === 'ok'
-                ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200'
-                : 'bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200'
+              status === "ok"
+                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
+                : "bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200"
             }`}
           >
             {message}
@@ -87,7 +87,7 @@ function VerifyEmail() {
         )}
       </div>
 
-      {status === 'ok' ? (
+      {status === "ok" ? (
         <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
           Taking you to your workspace…
         </p>

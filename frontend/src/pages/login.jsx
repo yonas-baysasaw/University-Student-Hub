@@ -1,92 +1,92 @@
-import { useState } from 'react';
-import { FaGoogle } from 'react-icons/fa';
-import { HiOutlineMail } from 'react-icons/hi';
-import { Link, useSearchParams } from 'react-router-dom';
-import AuthShell from '../components/AuthShell';
-import { safeInternalPath } from '../utils/safeRedirect';
+import { useState } from "react";
+import { FaGoogle } from "react-icons/fa";
+import { HiOutlineMail } from "react-icons/hi";
+import { Link, useSearchParams } from "react-router-dom";
+import AuthShell from "../components/AuthShell";
+import { safeInternalPath } from "../utils/safeRedirect";
 
 function SignIn() {
   const [searchParams] = useSearchParams();
-  const nextRaw = searchParams.get('next');
+  const nextRaw = searchParams.get("next");
   const nextSafe = safeInternalPath(nextRaw);
 
-  const [identifier, setIdentifier] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
-  const [status, setStatus] = useState('');
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(false);
   const [resendLoading, setResendLoading] = useState(false);
-  const [resendMsg, setResendMsg] = useState('');
+  const [resendMsg, setResendMsg] = useState("");
 
-  const needsEmailVerify = error.startsWith('VERIFY_EMAIL:');
+  const needsEmailVerify = error.startsWith("VERIFY_EMAIL:");
   const displayError = needsEmailVerify
-    ? error.replace(/^VERIFY_EMAIL:\s*/, '')
+    ? error.replace(/^VERIFY_EMAIL:\s*/, "")
     : error;
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setError('');
-    setStatus('');
-    setResendMsg('');
+    setError("");
+    setStatus("");
+    setResendMsg("");
 
     const trimmedIdentifier = identifier.trim();
     if (!trimmedIdentifier || !password) {
-      setError('Enter your username/email and password.');
+      setError("Enter your username/email and password.");
       return;
     }
 
     setLoading(true);
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ identifier: trimmedIdentifier, password }),
       });
 
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(payload.message || 'Invalid credentials');
+        throw new Error(payload.message || "Invalid credentials");
       }
 
-      setStatus('Signed in successfully. Redirecting...');
-      const target = nextSafe ?? '/';
+      setStatus("Signed in successfully. Redirecting...");
+      const target = nextSafe ?? "/";
       setTimeout(() => {
         window.location.href = target;
       }, 450);
     } catch (submitError) {
       console.error(submitError);
-      setError(submitError.message || 'Unable to sign in');
+      setError(submitError.message || "Unable to sign in");
     } finally {
       setLoading(false);
     }
   };
 
   async function handleResendVerification() {
-    setResendMsg('');
+    setResendMsg("");
     const raw = identifier.trim();
-    const email = raw.includes('@') ? raw.toLowerCase() : '';
+    const email = raw.includes("@") ? raw.toLowerCase() : "";
     if (!email) {
       setResendMsg(
-        'Enter your email address in the first field (not only username), then try again.',
+        "Enter your email address in the first field (not only username), then try again.",
       );
       return;
     }
     setResendLoading(true);
     try {
-      const res = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+      const res = await fetch("/api/auth/resend-verification", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ email }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.message || 'Could not send email.');
+        throw new Error(data.message || "Could not send email.");
       }
-      setResendMsg(data.message || 'Check your inbox.');
+      setResendMsg(data.message || "Check your inbox.");
     } catch (e) {
-      setResendMsg(e.message || 'Could not send email.');
+      setResendMsg(e.message || "Could not send email.");
     } finally {
       setResendLoading(false);
     }
@@ -139,13 +139,13 @@ function SignIn() {
           disabled={loading}
           className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? "Signing in..." : "Sign in"}
         </button>
 
         <div aria-live="polite" className="space-y-2">
           {(displayError || status) && (
             <p
-              className={`rounded-xl px-3 py-2 text-center text-sm ${status && !displayError ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200' : 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300'}`}
+              className={`rounded-xl px-3 py-2 text-center text-sm ${status && !displayError ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200" : "bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"}`}
             >
               {status || displayError}
             </p>
@@ -157,7 +157,8 @@ function SignIn() {
                 Verify your email
               </p>
               <p className="mt-1 text-xs text-amber-900/85 dark:text-amber-200/90">
-                We sent a confirmation link — check spam too. Tap below to resend.
+                We sent a confirmation link — check spam too. Tap below to
+                resend.
               </p>
               <button
                 type="button"
@@ -166,7 +167,9 @@ function SignIn() {
                 className="btn-primary mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-[13px] font-semibold text-white shadow-md shadow-cyan-500/20 ring-1 ring-white/25 transition hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 dark:from-cyan-500 dark:to-cyan-400 dark:text-slate-900 dark:ring-cyan-300/40"
               >
                 <HiOutlineMail className="text-lg opacity-95" aria-hidden />
-                {resendLoading ? 'Sending email…' : 'Send verification email again'}
+                {resendLoading
+                  ? "Sending email…"
+                  : "Send verification email again"}
               </button>
               {resendMsg ? (
                 <p className="mt-2 rounded-lg bg-white/60 px-2 py-2 text-xs text-amber-900 dark:bg-black/25 dark:text-amber-100/95">
@@ -189,7 +192,7 @@ function SignIn() {
           to={
             nextSafe
               ? `/signup?next=${encodeURIComponent(nextSafe)}`
-              : '/signup'
+              : "/signup"
           }
           className="font-medium transition hover:text-slate-700 hover:underline dark:hover:text-slate-200"
         >

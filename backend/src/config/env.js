@@ -1,11 +1,11 @@
-import dotenv from 'dotenv';
+import dotenv from "dotenv";
 
 dotenv.config();
 
 export const ENV = {
   PORT: process.env.PORT,
   NODE_ENV: process.env.NODE_ENV,
-  isProduction: process.env.NODE_ENV === 'production',
+  isProduction: process.env.NODE_ENV === "production",
   SESSION_SECRET: process.env.SESSION_SECRET,
   MONGODB_URL: process.env.MONGODB_URL,
   GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
@@ -19,38 +19,41 @@ export const ENV = {
   FRONTEND_URL: process.env.FRONTEND_URL,
   /** Rate limits (per-window max requests). */
   RATE_LIMIT_WINDOW_MS: (() => {
-    const n = parseInt(String(process.env.RATE_LIMIT_WINDOW_MS || '900000'), 10);
+    const n = parseInt(
+      String(process.env.RATE_LIMIT_WINDOW_MS || "900000"),
+      10,
+    );
     return Number.isFinite(n) && n > 0 ? n : 900_000;
   })(),
   RATE_LIMIT_REGISTER_MAX: (() => {
-    const n = parseInt(String(process.env.RATE_LIMIT_REGISTER_MAX || '5'), 10);
+    const n = parseInt(String(process.env.RATE_LIMIT_REGISTER_MAX || "5"), 10);
     return Number.isFinite(n) && n > 0 ? n : 5;
   })(),
   RATE_LIMIT_FORGOT_MAX: (() => {
-    const n = parseInt(String(process.env.RATE_LIMIT_FORGOT_MAX || '5'), 10);
+    const n = parseInt(String(process.env.RATE_LIMIT_FORGOT_MAX || "5"), 10);
     return Number.isFinite(n) && n > 0 ? n : 5;
   })(),
   RATE_LIMIT_RESEND_MAX: (() => {
-    const n = parseInt(String(process.env.RATE_LIMIT_RESEND_MAX || '5'), 10);
+    const n = parseInt(String(process.env.RATE_LIMIT_RESEND_MAX || "5"), 10);
     return Number.isFinite(n) && n > 0 ? n : 5;
   })(),
-  SESSION_COOKIE_SECURE: process.env.SESSION_COOKIE_SECURE === 'true',
+  SESSION_COOKIE_SECURE: process.env.SESSION_COOKIE_SECURE === "true",
   AWS_REGION: process.env.AWS_REGION,
   AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || 'gemini-2.0-flash',
+  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || "gemini-2.0-flash",
   /** RAG `embedContent` model id (path segment after `models/`). */
   GEMINI_EMBEDDING_MODEL:
-    process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001',
+    process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001",
   /**
    * Milliseconds for TCP/TLS connect to `generativelanguage.googleapis.com`.
    * Node’s default `fetch` (Undici) uses 10s — too low on slow networks.
    */
   GEMINI_HTTP_CONNECT_TIMEOUT_MS: (() => {
     const n = parseInt(
-      String(process.env.GEMINI_HTTP_CONNECT_TIMEOUT_MS || '90000'),
+      String(process.env.GEMINI_HTTP_CONNECT_TIMEOUT_MS || "90000"),
       10,
     );
     return Number.isFinite(n) && n >= 5_000 ? n : 90_000;
@@ -59,9 +62,9 @@ export const ENV = {
    * Comma-separated emails promoted to staff on server start (no auto-demotion).
    */
   STAFF_EMAILS: (() => {
-    const raw = process.env.STAFF_EMAILS || '';
+    const raw = process.env.STAFF_EMAILS || "";
     return raw
-      .split(',')
+      .split(",")
       .map((e) => e.trim().toLowerCase())
       .filter(Boolean);
   })(),

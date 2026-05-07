@@ -100,32 +100,34 @@ function StatInteractiveCard({
   const inner = (
     <>
       <div
-        className={`flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ring-inset ${accent}`}
+        className={`flex h-8 w-8 items-center justify-center rounded-xl ring-1 ring-inset ${accent}`}
       >
-        <Icon className="h-5 w-5" aria-hidden />
+        <Icon className="h-4 w-4" aria-hidden />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+        <p className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
           {label}
         </p>
-        <p className="font-display text-3xl tabular-nums text-slate-900 dark:text-slate-50">
-          {value}
-        </p>
-        {hint ? (
-          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-            {hint}
+        <div className="mt-0.5 flex min-w-0 items-baseline gap-2">
+          <p className="font-display text-xl leading-none tabular-nums text-slate-900 dark:text-slate-50">
+            {value}
           </p>
-        ) : null}
+          {hint ? (
+            <p className="min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400">
+              {hint}
+            </p>
+          ) : null}
+        </div>
       </div>
       <ChevronRight
-        className="h-5 w-5 shrink-0 text-slate-300 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-slate-600"
+        className="h-4 w-4 shrink-0 text-slate-300 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-slate-600"
         aria-hidden
       />
     </>
   );
 
   const className =
-    'group relative flex cursor-pointer items-center gap-4 overflow-hidden rounded-2xl border border-slate-200/90 bg-white/90 p-5 text-left shadow-sm transition hover:border-cyan-400/35 hover:shadow-md dark:border-slate-600/80 dark:bg-slate-900/40 dark:hover:border-cyan-500/35';
+    'group relative flex min-h-[3.75rem] cursor-pointer items-center gap-3 overflow-hidden rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2 text-left shadow-sm transition hover:border-cyan-400/35 hover:shadow-md dark:border-slate-600/80 dark:bg-slate-900/40 dark:hover:border-cyan-500/35';
 
   if (href) {
     return (
@@ -757,7 +759,7 @@ function Profile() {
         </div>
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-2 md:grid-cols-3">
           <StatInteractiveCard
             icon={BookOpen}
             label="Books uploaded"

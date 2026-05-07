@@ -17,8 +17,8 @@ export const serializeCurrentUser = (user) => {
   if (!user) return null;
   const u = user.toObject ? user.toObject() : { ...user };
   const hasLocalPassword = !!u.password;
-  const geminiConfigured = !!String(u.geminiApiKey || '').trim();
-  const role = u.role === 'staff' ? 'staff' : 'user';
+  const geminiConfigured = !!String(u.geminiApiKey || "").trim();
+  const role = u.role === "staff" ? "staff" : "user";
 
   return {
     id: u._id,
@@ -31,12 +31,12 @@ export const serializeCurrentUser = (user) => {
     avatar: u.avatar || null,
     lastSeen: u.lastSeen || null,
     geminiConfigured,
-    geminiModelId: u.geminiModelId || '',
+    geminiModelId: u.geminiModelId || "",
     hasLocalPassword,
-    isStaff: role === 'staff',
-    accountType: u.accountType === 'instructor' ? 'instructor' : 'student',
-    department: u.department || '',
-    schoolYear: typeof u.schoolYear === 'number' ? u.schoolYear : null,
+    isStaff: role === "staff",
+    accountType: u.accountType === "instructor" ? "instructor" : "student",
+    department: u.department || "",
+    schoolYear: typeof u.schoolYear === "number" ? u.schoolYear : null,
     emailVerified: !hasLocalPassword || u.email_verified !== false,
     platformReadOnly: !!u.platformReadOnly,
     instructorPostingSuspended: !!u.instructorPostingSuspended,

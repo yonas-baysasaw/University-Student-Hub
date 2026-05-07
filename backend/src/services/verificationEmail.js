@@ -1,15 +1,15 @@
-import { ENV } from '../config/env.js';
+import { ENV } from "../config/env.js";
 import {
   createMailTransporter,
   getMailFrom,
-} from '../services/mailTransporter.js';
+} from "../services/mailTransporter.js";
 
 function escapeHtml(s) {
   return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 /**
@@ -19,14 +19,14 @@ export async function sendVerificationEmail({ to, token }) {
   const transport = createMailTransporter();
   const from = getMailFrom();
   if (!transport || !from) {
-    const err = new Error('Email is not configured on the server');
+    const err = new Error("Email is not configured on the server");
     err.status = 503;
     throw err;
   }
 
-  const base = (ENV.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+  const base = (ENV.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
   const verifyUrl = `${base}/verify-email?token=${encodeURIComponent(token)}`;
-  const subject = 'Confirm your University Student Hub account';
+  const subject = "Confirm your University Student Hub account";
 
   const text = `Welcome to University Student Hub.\n\nConfirm your email by opening this link (valid for 48 hours):\n${verifyUrl}\n\nIf you did not create an account, you can ignore this message.\n`;
 

@@ -1,38 +1,38 @@
-import http from 'node:http';
-import path from 'node:path';
-import cors from 'cors';
-import express from 'express';
-import session from 'express-session';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import passport from 'passport';
-import 'dotenv/config';
-import connectDB from './config/db.js';
-import { ENV } from './config/env.js';
-import configurePassport from './config/passport.js';
-import { getAllBooks, getBookById } from './controllers/libraryController.js';
-import { errorHandler, notFound } from './middlewares/errorHandler.js';
-import adminRoutes from './routes/adminRoutes.js';
-import aiRoutes from './routes/aiRoutes.js';
-import authRoutes from './routes/authRoutes.js';
-import chatRoutes from './routes/chatRoutes.js';
-import dashboardRoutes from './routes/dashboardRoutes.js';
-import eventRoutes from './routes/eventRoutes.js';
-import examRoutes from './routes/examRoutes.js';
-import forgotPasswordRoutes from './routes/forgotPasswordRoutes.js';
-import booksRoutes from './routes/libraryRoutes.js';
-import notificationsRoutes from './routes/notificationsRoutes.js';
-import presenceRoutes from './routes/presenceRoutes.js';
-import profileRoutes from './routes/profileRoutes.js';
-import readingListRoutes from './routes/readingListRoutes.js';
-import resetPasswordRoutes from './routes/resetPasswordRoutes.js';
-import signUpRouter from './routes/signUpRoutes.js';
-import supportRoutes from './routes/supportRoutes.js';
-import uploadRoutes from './routes/uploadRoutes.js';
-import vaultRoutes from './routes/vaultRoutes.js';
-import verifyEmailRoutes from './routes/verifyEmailRoutes.js';
-import { syncStaffRolesFromEnv } from './services/syncStaffRoles.js';
-import { initSocketServer } from './socket/index.js';
+import http from "node:http";
+import path from "node:path";
+import cors from "cors";
+import express from "express";
+import session from "express-session";
+import helmet from "helmet";
+import morgan from "morgan";
+import passport from "passport";
+import "dotenv/config";
+import connectDB from "./config/db.js";
+import { ENV } from "./config/env.js";
+import configurePassport from "./config/passport.js";
+import { getAllBooks, getBookById } from "./controllers/libraryController.js";
+import { errorHandler, notFound } from "./middlewares/errorHandler.js";
+import adminRoutes from "./routes/adminRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
+import authRoutes from "./routes/authRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import eventRoutes from "./routes/eventRoutes.js";
+import examRoutes from "./routes/examRoutes.js";
+import forgotPasswordRoutes from "./routes/forgotPasswordRoutes.js";
+import booksRoutes from "./routes/libraryRoutes.js";
+import notificationsRoutes from "./routes/notificationsRoutes.js";
+import presenceRoutes from "./routes/presenceRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
+import readingListRoutes from "./routes/readingListRoutes.js";
+import resetPasswordRoutes from "./routes/resetPasswordRoutes.js";
+import signUpRouter from "./routes/signUpRoutes.js";
+import supportRoutes from "./routes/supportRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import vaultRoutes from "./routes/vaultRoutes.js";
+import verifyEmailRoutes from "./routes/verifyEmailRoutes.js";
+import { syncStaffRolesFromEnv } from "./services/syncStaffRoles.js";
+import { initSocketServer } from "./socket/index.js";
 
 const __dirname = path.resolve();
 const app = express();
@@ -43,7 +43,7 @@ const s3ImageOrigin =
 
 const sessionCookieSettings = {
   secure: ENV.SESSION_COOKIE_SECURE,
-  sameSite: ENV.SESSION_COOKIE_SECURE ? 'none' : 'lax',
+  sameSite: ENV.SESSION_COOKIE_SECURE ? "none" : "lax",
 };
 
 const sessionMiddleware = session({
@@ -59,10 +59,10 @@ app.use(
       directives: {
         imgSrc: [
           "'self'",
-          'data:',
+          "data:",
           ...(s3ImageOrigin ? [s3ImageOrigin] : []),
-          'https://lh3.googleusercontent.com',
-          'https://*.googleusercontent.com',
+          "https://lh3.googleusercontent.com",
+          "https://*.googleusercontent.com",
         ],
       },
     },
@@ -82,37 +82,37 @@ configurePassport();
 app.use(passport.initialize());
 app.use(passport.session());
 
-if (ENV.NODE_ENV === 'development') {
-  app.use(morgan('dev'));
+if (ENV.NODE_ENV === "development") {
+  app.use(morgan("dev"));
 }
 
-app.use('/api/auth', authRoutes);
-app.use('/api/register', signUpRouter);
-app.use('/api', verifyEmailRoutes);
-app.use('/api/profile', profileRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/notifications', notificationsRoutes);
-app.use('/api/forgot-password', forgotPasswordRoutes);
-app.use('/api/reset-password', resetPasswordRoutes);
-app.use('/api/chats', chatRoutes);
-app.use('/api/presence', presenceRoutes);
-app.use('/api/upload', uploadRoutes);
-app.use('/api/ai', aiRoutes);
-app.use('/api/support', supportRoutes);
-app.use('/api/exams', examRoutes);
-app.use('/api/vault', vaultRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/reading-lists', readingListRoutes);
-app.get('/api/books', getAllBooks);
-app.get('/api/books/:bookId', getBookById);
-app.use('/api/books', booksRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/register", signUpRouter);
+app.use("/api", verifyEmailRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/events", eventRoutes);
+app.use("/api/notifications", notificationsRoutes);
+app.use("/api/forgot-password", forgotPasswordRoutes);
+app.use("/api/reset-password", resetPasswordRoutes);
+app.use("/api/chats", chatRoutes);
+app.use("/api/presence", presenceRoutes);
+app.use("/api/upload", uploadRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/api/exams", examRoutes);
+app.use("/api/vault", vaultRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/reading-lists", readingListRoutes);
+app.get("/api/books", getAllBooks);
+app.get("/api/books/:bookId", getBookById);
+app.use("/api/books", booksRoutes);
 
 if (ENV.isProduction) {
-  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
   app.get(/^\/.*$/, (_req, res) => {
-    res.sendFile(path.join(__dirname, '../frontend', 'dist', 'index.html'));
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
   });
 }
 
@@ -128,20 +128,16 @@ const start = async () => {
   await initSocketServer(server, sessionMiddleware);
   server.listen(ENV.PORT, () => {
     console.log(`Server listening on port ${ENV.PORT}`);
-    const front = (ENV.FRONTEND_URL || '').trim();
-    if (
-      ENV.isProduction &&
-      front &&
-      /localhost|127\.0\.0\.1/i.test(front)
-    ) {
+    const front = (ENV.FRONTEND_URL || "").trim();
+    if (ENV.isProduction && front && /localhost|127\.0\.0\.1/i.test(front)) {
       console.warn(
-        '[email] FRONTEND_URL targets localhost — links in signup, verify, and password-reset emails will not work for real users.',
+        "[email] FRONTEND_URL targets localhost — links in signup, verify, and password-reset emails will not work for real users.",
       );
     }
   });
 };
 
 start().catch((error) => {
-  console.error('Failed to start server', error);
+  console.error("Failed to start server", error);
   process.exit(1);
 });

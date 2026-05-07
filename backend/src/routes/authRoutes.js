@@ -1,12 +1,12 @@
-import crypto from 'node:crypto';
-import express from 'express';
-import passport from 'passport';
-import { loginSuccess, logout } from '../controllers/authcontroller.js';
-import { ENV } from '../config/env.js';
-import asyncHandler from '../middlewares/asyncHandler.js';
-import { createRateLimiter } from '../middlewares/rateLimit.js';
-import User from '../models/User.js';
-import { sendVerificationEmail } from '../services/verificationEmail.js';
+import crypto from "node:crypto";
+import express from "express";
+import passport from "passport";
+import { loginSuccess, logout } from "../controllers/authcontroller.js";
+import { ENV } from "../config/env.js";
+import asyncHandler from "../middlewares/asyncHandler.js";
+import { createRateLimiter } from "../middlewares/rateLimit.js";
+import User from "../models/User.js";
+import { sendVerificationEmail } from "../services/verificationEmail.js";
 
 const router = express.Router();
 
@@ -15,7 +15,7 @@ const resendLimiter = createRateLimiter({
   max: ENV.RATE_LIMIT_RESEND_MAX,
   keyFn: (req) => {
     const raw = req.body?.email;
-    const email = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
     return `resend:${req.ip}:${email}`;
   },
 });
@@ -31,71 +31,67 @@ const ensureIdentifier = (req, _res, next) => {
   next();
 };
 
-router.post(
-  '/login',
-  ensureIdentifier,
-  (req, res, next) => {
-    passport.authenticate('local', (err, user, info) => {
-      if (err) return next(err);
-      if (!user) {
-        return res.status(401).json({
-          message: info?.message || 'Invalid credentials',
-        });
-      }
-      return req.login(user, (loginErr) => {
-        if (loginErr) return next(loginErr);
-        return loginSuccess(req, res);
+router.post("/login", ensureIdentifier, (req, res, next) => {
+  passport.authenticate("local", (err, user, info) => {
+    if (err) return next(err);
+    if (!user) {
+      return res.status(401).json({
+        message: info?.message || "Invalid credentials",
       });
-    })(req, res, next);
-  },
-);
+    }
+    return req.login(user, (loginErr) => {
+      if (loginErr) return next(loginErr);
+      return loginSuccess(req, res);
+    });
+  })(req, res, next);
+});
 
 router.post(
-  '/resend-verification',
+  "/resend-verification",
   resendLimiter,
   asyncHandler(async (req, res) => {
     const raw = req.body?.email;
-    const email = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+    const email = typeof raw === "string" ? raw.trim().toLowerCase() : "";
 
     const genericMessage =
-      'If this address has an unverified account, we sent a new confirmation link.';
+      "If this address has an unverified account, we sent a new confirmation link.";
 
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ message: 'Please provide a valid email.' });
+    if (!email || !email.includes("@")) {
+      return res.status(400).json({ message: "Please provide a valid email." });
     }
 
     try {
       const user = await User.findOne({ email }).select(
-        '+emailVerificationToken +emailVerificationExpires',
+        "+emailVerificationToken +emailVerificationExpires",
       );
 
       if (user?.password && user.email_verified === false) {
-        const token = crypto.randomBytes(20).toString('hex');
+        const token = crypto.randomBytes(20).toString("hex");
         user.emailVerificationToken = token;
         user.emailVerificationExpires = Date.now() + 48 * 3600000;
         await user.save();
         await sendVerificationEmail({ to: user.email, token });
       }
     } catch (e) {
-      console.error('[resend-verification]', e);
+      console.error("[resend-verification]", e);
     }
 
     res.json({ message: genericMessage });
   }),
 );
 
-router.get('/logout', logout);
+router.get("/logout", logout);
 
 router.get(
-  '/google',
-  passport.authenticate('google', { scope: ['profile', 'email'] }),
+  "/google",
+  passport.authenticate("google", { scope: ["profile", "email"] }),
 );
 
 router.get(
-  '/google/callback',
-  passport.authenticate('google', { failureRedirect: '/login' }),
+  "/google/callback",
+  passport.authenticate("google", { failureRedirect: "/login" }),
   (_req, res) => {
-    res.redirect('/');
+    res.redirect("/");
   },
 );
 
