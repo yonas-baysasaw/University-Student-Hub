@@ -4,44 +4,50 @@ import {
   Route,
   Routes,
   useLocation,
-} from "react-router-dom";
-import { Toaster } from "sonner";
-import Nav from "./components/Nav";
-import Navbar from "./components/Navbar";
-import StaffRoute from "./components/StaffRoute";
-import SupportChatWidget from "./components/SupportChatWidget";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import { ProcessingProvider } from "./contexts/ProcessingContext";
-import { SocketProvider } from "./contexts/SocketContext";
-import Landing from "./pages/Landing";
-import AdminInstructors from "./pages/admin/AdminInstructors.jsx";
-import AdminLayout from "./pages/admin/AdminLayout.jsx";
-import AdminLibrary from "./pages/admin/AdminLibrary.jsx";
-import AdminStudents from "./pages/admin/AdminStudents.jsx";
-import AdminWelcome from "./pages/admin/AdminWelcome.jsx";
-import BookDetail from "./pages/BookDetail";
-import ChatRoom from "./pages/ChatRoom";
-import ClassRoom from "./pages/ClassRoom";
-import ClassroomAnnouncements from "./pages/ClassroomAnnouncements";
-import ClassroomResources from "./pages/ClassroomResources";
-import EventDetail from "./pages/EventDetail";
-import Events from "./pages/Events";
-import ExamPractice from "./pages/ExamPractice";
-import Exams from "./pages/Exams";
-import Home from "./pages/Home";
-import Library from "./pages/Library";
-import LiquAI from "./pages/LiquAI";
-import Login from "./pages/login";
-import Notifications from "./pages/Notifications";
-import NotFound from "./pages/NotFound";
-import PasswordReset from "./pages/PasswordReset";
-import Profile from "./pages/Profile";
-import PublicProfile from "./pages/PublicProfile";
-import Reset from "./pages/Reset";
-import Settings from "./pages/Settings";
-import Signup from "./pages/Signup";
-import StudyBuddy from "./pages/StudyBuddy";
-import VerifyEmail from "./pages/VerifyEmail";
+} from 'react-router-dom';
+import { Toaster } from 'sonner';
+import Nav from './components/Nav';
+import Navbar from './components/Navbar';
+import StaffRoute from './components/StaffRoute';
+import SupportChatWidget from './components/SupportChatWidget';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ProcessingProvider } from './contexts/ProcessingContext';
+import { SocketProvider } from './contexts/SocketContext';
+import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
+import AdminDepartments from './pages/admin/AdminDepartments.jsx';
+import AdminInstructors from './pages/admin/AdminInstructors.jsx';
+import AdminLayout from './pages/admin/AdminLayout.jsx';
+import AdminLibrary from './pages/admin/AdminLibrary.jsx';
+import AdminLogs from './pages/admin/AdminLogs.jsx';
+import AdminNotifications from './pages/admin/AdminNotifications.jsx';
+import AdminProfile from './pages/admin/AdminProfile.jsx';
+import AdminSettings from './pages/admin/AdminSettings.jsx';
+import AdminStudents from './pages/admin/AdminStudents.jsx';
+import AdminWelcome from './pages/admin/AdminWelcome.jsx';
+import BookDetail from './pages/BookDetail';
+import ChatRoom from './pages/ChatRoom';
+import ClassRoom from './pages/ClassRoom';
+import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
+import ClassroomResources from './pages/ClassroomResources';
+import EventDetail from './pages/EventDetail';
+import Events from './pages/Events';
+import ExamPractice from './pages/ExamPractice';
+import Exams from './pages/Exams';
+import Home from './pages/Home';
+import Landing from './pages/Landing';
+import Library from './pages/Library';
+import LiquAI from './pages/LiquAI';
+import Login from './pages/login';
+import NotFound from './pages/NotFound';
+import Notifications from './pages/Notifications';
+import PasswordReset from './pages/PasswordReset';
+import Profile from './pages/Profile';
+import PublicProfile from './pages/PublicProfile';
+import Reset from './pages/Reset';
+import Settings from './pages/Settings';
+import Signup from './pages/Signup';
+import StudyBuddy from './pages/StudyBuddy';
+import VerifyEmail from './pages/VerifyEmail';
 
 function RedirectToLogin() {
   const { pathname, search } = useLocation();
@@ -117,6 +123,12 @@ function AppRoutes() {
               <Route index element={<AdminWelcome />} />
               <Route path="instructors" element={<AdminInstructors />} />
               <Route path="students" element={<AdminStudents />} />
+              <Route path="departments" element={<AdminDepartments />} />
+              <Route path="analytics" element={<AdminAnalytics />} />
+              <Route path="logs" element={<AdminLogs />} />
+              <Route path="notifications" element={<AdminNotifications />} />
+              <Route path="settings" element={<AdminSettings />} />
+              <Route path="profile" element={<AdminProfile />} />
               <Route path="library" element={<AdminLibrary />} />
             </Route>
             <Route path="/settings" element={<Settings />} />
@@ -133,7 +145,7 @@ function AppRoutes() {
     );
   }
 
-  const hideGlobalNavForLanding = location.pathname === "/";
+  const hideGlobalNavForLanding = location.pathname === '/';
 
   return (
     <>

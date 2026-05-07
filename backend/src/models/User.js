@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
@@ -74,33 +74,37 @@ const userSchema = new mongoose.Schema(
     subscriptions: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
       },
     ],
     subscribers: [
       {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
+        ref: 'User',
       },
     ],
     geminiApiKey: {
       type: String,
-      default: "",
+      default: '',
     },
     geminiModelId: {
       type: String,
-      default: "",
+      default: '',
     },
     role: {
       type: String,
-      enum: ["user", "staff"],
-      default: "user",
+      enum: ['user', 'staff', 'admin', 'lecturer'],
+      default: 'user',
       index: true,
+    },
+    permissions: {
+      type: [String],
+      default: () => [],
     },
     accountType: {
       type: String,
-      enum: ["student", "instructor"],
-      default: "student",
+      enum: ['student', 'instructor'],
+      default: 'student',
       index: true,
     },
     platformReadOnly: {
@@ -110,6 +114,24 @@ const userSchema = new mongoose.Schema(
     instructorPostingSuspended: {
       type: Boolean,
       default: false,
+    },
+    status: {
+      type: String,
+      enum: ['active', 'suspended', 'deleted'],
+      default: 'active',
+      index: true,
+    },
+    suspendedAt: {
+      type: Date,
+    },
+    suspendedReason: {
+      type: String,
+      trim: true,
+      maxlength: 240,
+    },
+    deletedAt: {
+      type: Date,
+      index: true,
     },
   },
   { timestamps: true },
@@ -125,4 +147,4 @@ userSchema.methods.toJSON = function () {
   return obj;
 };
 
-export default mongoose.model("User", userSchema);
+export default mongoose.model('User', userSchema);
