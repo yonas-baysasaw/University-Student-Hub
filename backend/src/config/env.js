@@ -15,6 +15,7 @@ export const ENV = {
   EMAIL_PASS: process.env.EMAIL_PASS,
   /** Optional display/from address (must be allowed by Gmail). */
   EMAIL_FROM: process.env.EMAIL_FROM,
+  /** Base URL for links in transactional email (verify, reset). Omit trailing slash. */
   FRONTEND_URL: process.env.FRONTEND_URL,
   /** Rate limits (per-window max requests). */
   RATE_LIMIT_WINDOW_MS: (() => {

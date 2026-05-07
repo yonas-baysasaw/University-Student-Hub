@@ -128,6 +128,16 @@ const start = async () => {
   await initSocketServer(server, sessionMiddleware);
   server.listen(ENV.PORT, () => {
     console.log(`Server listening on port ${ENV.PORT}`);
+    const front = (ENV.FRONTEND_URL || '').trim();
+    if (
+      ENV.isProduction &&
+      front &&
+      /localhost|127\.0\.0\.1/i.test(front)
+    ) {
+      console.warn(
+        '[email] FRONTEND_URL targets localhost — links in signup, verify, and password-reset emails will not work for real users.',
+      );
+    }
   });
 };
 

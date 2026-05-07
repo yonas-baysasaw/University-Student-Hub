@@ -640,19 +640,20 @@ function Settings() {
                 ) : (
                   <p className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-800/50 dark:text-slate-300">
                     Your account does not use a local password (for example,
-                    Google sign-in only). Use “Reset via email” below if you
-                    need to set a password via reset link.
+                    Google sign-in only). Use “Reset password by email” below
+                    if you need to set a password via reset link.
                   </p>
                 )}
               </div>
 
               <div className="border-t border-slate-200 pt-8 dark:border-slate-600">
                 <h3 className="font-display text-lg text-slate-900 dark:text-slate-100">
-                  Reset via email
+                  Reset password by email
                 </h3>
                 <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  We will send a secure link to reset your password (works while
-                  signed in).
+                  Enter the email on your account. We send a one-time link that
+                  opens the set-new-password screen (valid about one hour),
+                  signed in or not.
                 </p>
                 <form
                   className="mt-4 space-y-3"
@@ -671,7 +672,7 @@ function Settings() {
                     disabled={resetLoading}
                     className="btn-secondary h-11 w-full max-w-sm text-sm disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {resetLoading ? 'Sending…' : 'Send reset link'}
+                    {resetLoading ? 'Sending email…' : 'Email password reset link'}
                   </button>
                   {(resetError || resetStatus) && (
                     <p

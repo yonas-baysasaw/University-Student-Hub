@@ -80,14 +80,17 @@ NODE_ENV=development
 SESSION_SECRET=your_session_secret
 MONGODB_URL=mongodb://127.0.0.1:27017/university-student-hub
 
+# Must match where users load the SPA. Production must be your real HTTPS origin or links in signup/reset emails fail.
 FRONTEND_URL=http://localhost:5173
 
 GOOGLE_CLIENT_ID=your_google_client_id
 GOOGLE_CLIENT_SECRET=your_google_client_secret
 GOOGLE_CALLBACK_URL=http://localhost:5000/api/auth/google/callback
 
-EMAIL_USER=your_email@gmail.com
+# Gmail + App Password (2-Step Verification on). EMAIL_FROM improves the display name in inboxes.
+EMAIL_USER=university.students.hub.et1@gmail.com
 EMAIL_PASS=your_gmail_app_password
+EMAIL_FROM="University Student Hub <university.students.hub.et1@gmail.com>"
 
 AWS_REGION=your_aws_region
 AWS_BUCKET_NAME=your_s3_bucket_name
