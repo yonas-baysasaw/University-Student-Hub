@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
@@ -635,6 +636,14 @@ export default function EventDetail() {
                       />
                       {event.dislikesCount ?? 0}
                     </button>
+                    {event._id ? (
+                      <BookEventReportMenu
+                        targetType="event"
+                        targetId={String(event._id)}
+                        shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/${event._id}`}
+                        hideReport={isOrganizer}
+                      />
+                    ) : null}
                   </div>
                 ) : null}
               </div>

@@ -29,6 +29,7 @@ import {
   visibilityLabel,
   visibilityTone,
 } from '../utils/formatLabels';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import EditBookMetaModal from '../components/EditBookMetaModal';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
 import { safeInternalPath } from '../utils/safeRedirect';
@@ -735,23 +736,34 @@ function BookDetail() {
                         </p>
                       ) : null}
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleSave}
-                      disabled={actionLoading}
-                      title={isSaved ? 'Remove from saved' : 'Save to library'}
-                      className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold shadow-md ring-1 transition hover:brightness-105 disabled:opacity-60 ${
-                        isSaved
-                          ? 'bg-amber-400 text-amber-950 ring-amber-300/50 dark:bg-amber-500/90 dark:text-amber-950'
-                          : 'border border-slate-200 bg-white text-slate-800 ring-slate-200/80 hover:border-cyan-300/60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700'
-                      }`}
-                    >
-                      <Bookmark
-                        className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`}
-                        aria-hidden
-                      />
-                      {isSaved ? 'Saved' : 'Save'}
-                    </button>
+                    <div className="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-start">
+                      <button
+                        type="button"
+                        onClick={handleSave}
+                        disabled={actionLoading}
+                        title={isSaved ? 'Remove from saved' : 'Save to library'}
+                        className={`inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-bold shadow-md ring-1 transition hover:brightness-105 disabled:opacity-60 ${
+                          isSaved
+                            ? 'bg-amber-400 text-amber-950 ring-amber-300/50 dark:bg-amber-500/90 dark:text-amber-950'
+                            : 'border border-slate-200 bg-white text-slate-800 ring-slate-200/80 hover:border-cyan-300/60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:ring-slate-700'
+                        }`}
+                      >
+                        <Bookmark
+                          className={`h-4 w-4 ${isSaved ? 'fill-current' : ''}`}
+                          aria-hidden
+                        />
+                        {isSaved ? 'Saved' : 'Save'}
+                      </button>
+                      {user && book?._id ? (
+                        <BookEventReportMenu
+                          targetType="book"
+                          targetId={String(book._id)}
+                          shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/library/${book._id}`}
+                          hideReport={isOwner}
+                          showSave={false}
+                        />
+                      ) : null}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

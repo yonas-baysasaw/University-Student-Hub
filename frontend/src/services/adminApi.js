@@ -40,4 +40,32 @@ export const adminApi = {
     request('/notifications/announcements', { method: 'POST', body }),
   settings: () => request('/settings'),
   updateSettings: (body) => request('/settings', { method: 'PUT', body }),
+  reports: (params = {}) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && String(v).trim() !== '') {
+        qs.set(k, String(v));
+      }
+    });
+    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    return request(`/reports${suffix}`);
+  },
+  patchReport: (id, body) =>
+    request(`/reports/${encodeURIComponent(id)}`, { method: 'PATCH', body }),
+  deleteReport: (id) =>
+    request(`/reports/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  patchBookVisibility: (id, visibility) =>
+    request(`/books/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: { visibility },
+    }),
+  deleteAdminBook: (id) =>
+    request(`/books/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  deleteAdminEvent: (id) =>
+    request(`/events/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+  patchEventVisibility: (id, visibility) =>
+    request(`/events/${encodeURIComponent(id)}/visibility`, {
+      method: 'PATCH',
+      body: { visibility },
+    }),
 };

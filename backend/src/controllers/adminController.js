@@ -6,6 +6,9 @@ import BookReview from '../models/BookReview.js';
 import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Department from '../models/Department.js';
+import EventComment from '../models/EventComment.js';
+import EventReview from '../models/EventReview.js';
+import Event from '../models/Event.js';
 import Message from '../models/Message.js';
 import Report from '../models/Report.js';
 import Settings from '../models/Settings.js';
@@ -81,7 +84,9 @@ export const getAdminStats = asyncHandler(async (_req, res) => {
     Book.countDocuments(),
     Chat.countDocuments(),
     Message.countDocuments(),
-    Report.countDocuments({ status: { $in: ['open', 'reviewing'] } }),
+    Report.countDocuments({
+      status: { $in: ['pending', 'reviewed', 'open', 'reviewing'] },
+    }),
     SystemLog.countDocuments(),
     SystemLog.find({})
       .sort({ createdAt: -1 })
@@ -666,4 +671,60 @@ export const deleteAdminBook = asyncHandler(async (req, res) => {
     entityId: bookId,
   });
   res.json({ success: true, message: 'Book deleted' });
+});
+
+export const patchAdminBookVisibility = asyncHandler(async (req, res) => {
+  const { bookId } = req.params;
+  if (!objectIdOr400(bookId, res)) return;
+  const visibility = String(req.body?.visibility || '').trim();
+  if (!['public', 'private', 'unlisted'].includes(visibility)) {
+    return res.status(400).json({ message: 'Invalid visibility' });
+  }
+  const book = await Book.findById(bookId);
+  if (!book) return res.status(404).json({ message: 'Book not found' });
+  book.visibility = visibility;
+  await book.save();
+  await writeSystemLog(req, 'admin.book.visibility', {
+    entity: 'Book',
+    entityId: bookId,
+    metadata: { visibility },
+  });
+  res.json({ ok: true, id: String(book._id), visibility: book.visibility });
+});
+
+export const deleteAdminEvent = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  if (!objectIdOr400(eventId, res)) return;
+  const ev = await Event.findById(eventId);
+  if (!ev) return res.status(404).json({ message: 'Event not found' });
+  const bid = ev._id;
+  await Promise.all([
+    EventReview.deleteMany({ eventId: bid }),
+    EventComment.deleteMany({ eventId: bid }),
+  ]);
+  await ev.deleteOne();
+  await writeSystemLog(req, 'admin.event.delete', {
+    entity: 'Event',
+    entityId: eventId,
+  });
+  res.json({ ok: true, message: 'Event deleted' });
+});
+
+export const patchAdminEventVisibility = asyncHandler(async (req, res) => {
+  const { eventId } = req.params;
+  if (!objectIdOr400(eventId, res)) return;
+  const visibility = String(req.body?.visibility || '').trim();
+  if (!['public', 'private', 'unlisted'].includes(visibility)) {
+    return res.status(400).json({ message: 'Invalid visibility' });
+  }
+  const ev = await Event.findById(eventId);
+  if (!ev) return res.status(404).json({ message: 'Event not found' });
+  ev.visibility = visibility;
+  await ev.save();
+  await writeSystemLog(req, 'admin.event.visibility', {
+    entity: 'Event',
+    entityId: eventId,
+    metadata: { visibility },
+  });
+  res.json({ ok: true, id: String(ev._id), visibility: ev.visibility });
 });

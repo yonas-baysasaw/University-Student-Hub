@@ -25,6 +25,7 @@ import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
 import {
@@ -205,18 +206,29 @@ function EventListRow({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
           ) : (
             <p className="text-[10px] text-slate-500">Sign in to react.</p>
           )}
-          {isOrganizer ? (
-            <button
-              type="button"
-              disabled={deleteBusy === ev._id}
-              title="Delete event"
-              aria-label="Delete event"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/50"
-              onClick={() => onDelete(ev)}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {user && ev._id ? (
+              <BookEventReportMenu
+                targetType="event"
+                targetId={ev._id}
+                shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/${ev._id}`}
+                hideReport={isOrganizer}
+                align="right"
+              />
+            ) : null}
+            {isOrganizer ? (
+              <button
+                type="button"
+                disabled={deleteBusy === ev._id}
+                title="Delete event"
+                aria-label="Delete event"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/50"
+                onClick={() => onDelete(ev)}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         {ev.organizer ? (
@@ -398,6 +410,15 @@ function EventGridCard({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
               <Trash2 className="h-[18px] w-[18px]" aria-hidden />
               <span className="sr-only">Delete event</span>
             </button>
+          ) : user && ev._id ? (
+            <div className="absolute right-3 top-3 z-[3]">
+              <BookEventReportMenu
+                targetType="event"
+                targetId={ev._id}
+                shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/${ev._id}`}
+                className="[&_button]:h-10 [&_button]:w-10 [&_button]:rounded-xl [&_button]:shadow-lg [&_button]:backdrop-blur-md"
+              />
+            </div>
           ) : null}
         </div>
       </div>
@@ -460,8 +481,16 @@ function EventGridCard({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
           </p>
         ) : null}
         {user ? (
-          <div className="mt-2">
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
             <EventEngagementRow event={ev} onUpdated={mergeEvent} />
+            {ev._id && !isOrganizer ? (
+              <BookEventReportMenu
+                targetType="event"
+                targetId={ev._id}
+                shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/events/${ev._id}`}
+                align="right"
+              />
+            ) : null}
           </div>
         ) : (
           <p className="mt-2 text-[10px] text-slate-500">

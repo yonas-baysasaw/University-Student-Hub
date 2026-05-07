@@ -22,6 +22,7 @@ import AdminLogin from './pages/admin/AdminLogin.jsx';
 import AdminLogs from './pages/admin/AdminLogs.jsx';
 import AdminNotifications from './pages/admin/AdminNotifications.jsx';
 import AdminProfile from './pages/admin/AdminProfile.jsx';
+import AdminReports from './pages/admin/AdminReports.jsx';
 import AdminSettings from './pages/admin/AdminSettings.jsx';
 import AdminSignup from './pages/admin/AdminSignup.jsx';
 import AdminStudents from './pages/admin/AdminStudents.jsx';
@@ -148,6 +149,7 @@ function AppRoutes() {
               <Route path="departments" element={<AdminDepartments />} />
               <Route path="analytics" element={<AdminAnalytics />} />
               <Route path="logs" element={<AdminLogs />} />
+              <Route path="reports" element={<AdminReports />} />
               <Route path="notifications" element={<AdminNotifications />} />
               <Route path="settings" element={<AdminSettings />} />
               <Route path="profile" element={<AdminProfile />} />

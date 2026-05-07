@@ -11,6 +11,8 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
+import { useAuth } from '../contexts/AuthContext';
 import {
   formatLibraryDate,
   humanizeFormat,
@@ -21,6 +23,7 @@ import { academicTrackLabel } from '../utils/bookUploadMeta';
 
 function PublicProfile() {
   const { userId } = useParams();
+  const { user: viewer } = useAuth();
   const [profile, setProfile] = useState(null);
   const [sharedBooks, setSharedBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -256,6 +259,18 @@ function PublicProfile() {
                 </div>
 
                 <div className="flex w-full shrink-0 flex-col gap-3 sm:w-auto sm:min-w-[220px]">
+                  {viewer &&
+                  profile?.id &&
+                  String(viewer._id || viewer.id) !== String(profile.id) ? (
+                    <div className="flex justify-end sm:justify-start">
+                      <BookEventReportMenu
+                        targetType="user"
+                        targetId={String(profile.id)}
+                        shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/users/${profile.id}`}
+                        align="left"
+                      />
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     onClick={handleSubscribe}

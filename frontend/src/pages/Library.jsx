@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import UploadBookModal from '../components/UploadBookModal.jsx';
 import { useAuth } from '../contexts/AuthContext';
 import { useBookUploadModal } from '../hooks/useBookUploadModal.js';
@@ -371,18 +372,29 @@ function LibraryBookListRow({
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <LibraryEngagementTiny item={item} className="normal-case" />
-          {isOwner ? (
-            <button
-              type="button"
-              disabled={deleteBusy}
-              title="Delete this book from the library"
-              aria-label="Delete book"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/50"
-              onClick={() => onDeleteBook?.(itemKey)}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {item.bookId ? (
+              <BookEventReportMenu
+                targetType="book"
+                targetId={item.bookId}
+                shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/library/${item.bookId}`}
+                hideReport={isOwner}
+                align="right"
+              />
+            ) : null}
+            {isOwner ? (
+              <button
+                type="button"
+                disabled={deleteBusy}
+                title="Delete this book from the library"
+                aria-label="Delete book"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/50 dark:bg-slate-900 dark:text-rose-400 dark:hover:bg-rose-950/50"
+                onClick={() => onDeleteBook?.(itemKey)}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
@@ -723,18 +735,29 @@ function LibraryBookGridCard({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-y border-slate-200 py-3 dark:border-slate-600/80 lg:border-slate-200/80 dark:lg:border-white/15">
           <LibraryEngagementTiny item={item} className="normal-case" />
-          {isOwner ? (
-            <button
-              type="button"
-              disabled={deleteBusy}
-              title="Delete this book"
-              aria-label="Delete book"
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white/90 text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/40 dark:bg-slate-900/80 dark:text-rose-400 dark:hover:bg-rose-950/40"
-              onClick={() => onDeleteBook?.(itemKey)}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden />
-            </button>
-          ) : null}
+          <div className="flex items-center gap-2">
+            {item.bookId ? (
+              <BookEventReportMenu
+                targetType="book"
+                targetId={item.bookId}
+                shareUrl={`${typeof window !== 'undefined' ? window.location.origin : ''}/library/${item.bookId}`}
+                hideReport={isOwner}
+                align="right"
+              />
+            ) : null}
+            {isOwner ? (
+              <button
+                type="button"
+                disabled={deleteBusy}
+                title="Delete this book"
+                aria-label="Delete book"
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-rose-200/90 bg-white/90 text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50 dark:border-rose-900/40 dark:bg-slate-900/80 dark:text-rose-400 dark:hover:bg-rose-950/40"
+                onClick={() => onDeleteBook?.(itemKey)}
+              >
+                <Trash2 className="h-3.5 w-3.5" aria-hidden />
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-3 flex min-h-[40px] items-center gap-2">

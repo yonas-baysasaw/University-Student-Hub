@@ -1,9 +1,15 @@
 import express from 'express';
 import {
+  deleteAdminReport,
+  listAdminReports,
+  patchAdminReport,
+} from '../controllers/adminReportController.js';
+import {
   activateAdminUsers,
   assignDepartmentStudents,
   createDepartment,
   deleteAdminBook,
+  deleteAdminEvent,
   deleteDepartment,
   getAdminStats,
   getAdminUser,
@@ -14,6 +20,8 @@ import {
   listDepartments,
   listLogs,
   listNotifications,
+  patchAdminBookVisibility,
+  patchAdminEventVisibility,
   patchAdminUser,
   removeDepartmentStudent,
   sendAnnouncement,
@@ -57,7 +65,15 @@ router.post('/notifications/announcements', sendAnnouncement);
 router.get('/settings', getSettings);
 router.put('/settings', updateSettings);
 
+router.get('/reports', listAdminReports);
+router.patch('/reports/:reportId', patchAdminReport);
+router.delete('/reports/:reportId', deleteAdminReport);
+
 router.get('/books', listAdminBooks);
 router.delete('/books/:bookId', deleteAdminBook);
+router.patch('/books/:bookId/visibility', patchAdminBookVisibility);
+
+router.delete('/events/:eventId', deleteAdminEvent);
+router.patch('/events/:eventId/visibility', patchAdminEventVisibility);
 
 export default router;
