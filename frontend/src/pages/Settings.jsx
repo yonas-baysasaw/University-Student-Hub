@@ -1,4 +1,12 @@
-import { Cpu, Moon, Palette, Shield, Sparkles, Sun } from 'lucide-react';
+import {
+  Cpu,
+  GraduationCap,
+  Moon,
+  Palette,
+  Shield,
+  Sparkles,
+  Sun,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,6 +44,11 @@ function Settings() {
   const [resetError, setResetError] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
+  const [deptDraft, setDeptDraft] = useState('');
+  const [yearDraft, setYearDraft] = useState('1');
+  const [studyMsg, setStudyMsg] = useState('');
+  const [studySaving, setStudySaving] = useState(false);
+
   const strength = useMemo(
     () => getPasswordStrength(newPassword),
     [newPassword],
@@ -50,6 +63,15 @@ function Settings() {
   useEffect(() => {
     setResetEmail(user?.email ?? '');
   }, [user?.email]);
+
+  useEffect(() => {
+    setDeptDraft(user?.department ?? '');
+    setYearDraft(
+      user?.schoolYear != null && user.schoolYear >= 1 && user.schoolYear <= 7
+        ? String(user.schoolYear)
+        : '1',
+    );
+  }, [user?.department, user?.schoolYear]);
 
   useEffect(() => {
     setThemeChoiceState(getStoredThemePreference());
@@ -178,15 +200,50 @@ function Settings() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: trimmed }),
       });
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
         throw new Error(payload.message || 'Unable to send reset link.');
       }
-      setResetStatus('Check your inbox for a password reset link.');
+      setResetStatus(
+        payload.message ||
+          'If an account exists for this email, we sent reset instructions.',
+      );
     } catch (err) {
       setResetError(err.message || 'Unable to send reset email.');
     } finally {
       setResetLoading(false);
+    }
+  }
+
+  async function saveStudentProfile(event) {
+    event.preventDefault();
+    setStudyMsg('');
+    const d = deptDraft.trim();
+    if (!d) {
+      setStudyMsg('Department is required.');
+      return;
+    }
+    const y = Number(yearDraft);
+    if (!Number.isFinite(y) || y < 1 || y > 7) {
+      setStudyMsg('Choose a valid school year (1–7).');
+      return;
+    }
+    setStudySaving(true);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department: d, schoolYear: y }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Could not save profile.');
+      setStudyMsg('Saved.');
+      await refreshAuth();
+    } catch (err) {
+      setStudyMsg(err.message || 'Could not save profile.');
+    } finally {
+      setStudySaving(false);
     }
   }
 
@@ -252,6 +309,92 @@ function Settings() {
             </div>
           </div>
         </div>
+
+        {user?.accountType === 'student' ? (
+          <div className="panel-card rounded-3xl p-6 md:p-8">
+            <div className="flex items-start gap-3">
+              <span className="mt-0.5 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/15 text-indigo-700 dark:text-indigo-400">
+                <GraduationCap className="h-5 w-5" aria-hidden />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display text-xl text-slate-900 dark:text-slate-100">
+                  Student profile
+                </h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Department and year help classmates and staff recognize your
+                  cohort. Required at sign-up; update here anytime.
+                </p>
+                <form
+                  className="mt-5 space-y-4"
+                  onSubmit={saveStudentProfile}
+                >
+                  <div>
+                    <label
+                      htmlFor="settings-department"
+                      className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400"
+                    >
+                      Department
+                    </label>
+                    <input
+                      id="settings-department"
+                      type="text"
+                      value={deptDraft}
+                      onChange={(e) => setDeptDraft(e.target.value)}
+                      className="input-field text-sm"
+                      autoComplete="organization"
+                    />
+                  </div>
+                  <div>
+                    <label
+                      htmlFor="settings-school-year"
+                      className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.1em] text-slate-500 dark:text-slate-400"
+                    >
+                      School year
+                    </label>
+                    <select
+                      id="settings-school-year"
+                      value={yearDraft}
+                      onChange={(e) => setYearDraft(e.target.value)}
+                      className="input-field text-sm"
+                    >
+                      {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+                        <option key={n} value={String(n)}>
+                          {n}
+                          {n === 1
+                            ? 'st'
+                            : n === 2
+                              ? 'nd'
+                              : n === 3
+                                ? 'rd'
+                                : 'th'}{' '}
+                          year
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {studyMsg ? (
+                    <p
+                      className={`text-sm ${
+                        studyMsg === 'Saved.'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}
+                    >
+                      {studyMsg}
+                    </p>
+                  ) : null}
+                  <button
+                    type="submit"
+                    disabled={studySaving}
+                    className="btn-primary px-6 py-2.5 text-sm disabled:opacity-50"
+                  >
+                    {studySaving ? 'Saving…' : 'Save student details'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="panel-card rounded-3xl p-6 md:p-8">
           <div className="flex items-start gap-3">

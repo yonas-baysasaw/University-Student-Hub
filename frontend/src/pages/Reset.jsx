@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
-import { getPasswordStrength } from '../utils/passwordStrength';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  getPasswordStrength,
+  getPasswordSuggestions,
+} from '../utils/passwordStrength';
 
 function Reset() {
   const [password, setPassword] = useState('');
@@ -14,6 +18,15 @@ function Reset() {
   const successTimer = useRef();
   const { token } = useParams();
   const strength = useMemo(() => getPasswordStrength(password), [password]);
+  const suggestions = useMemo(
+    () => getPasswordSuggestions(password),
+    [password],
+  );
+  const { logout } = useAuth();
+
+  useEffect(() => {
+    void logout();
+  }, [logout]);
 
   useEffect(
     () => () => {
@@ -73,7 +86,7 @@ function Reset() {
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         {(error || success) && (
           <div
-            className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
+            className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300' : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200'}`}
           >
             {error || success}
           </div>
@@ -98,7 +111,7 @@ function Reset() {
         </div>
 
         <div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
             <div
               className={`h-full rounded-full transition-all ${strength.color}`}
               style={{ width: `${Math.max(8, strength.score * 20)}%` }}
@@ -107,6 +120,13 @@ function Reset() {
           <p className={`mt-1 text-xs font-semibold ${strength.text}`}>
             Password strength: {strength.label}
           </p>
+          {password && suggestions.length > 0 ? (
+            <ul className="mt-2 list-inside list-disc text-xs text-slate-600 dark:text-slate-400">
+              {suggestions.map((tip) => (
+                <li key={tip}>{tip}</li>
+              ))}
+            </ul>
+          ) : null}
         </div>
 
         <div className="relative">

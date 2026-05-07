@@ -576,31 +576,34 @@ function Home() {
         </section>
 
         {!dashLoading && !dashError && summary ? (
-          <section className="grid gap-4 sm:grid-cols-3">
+          <section
+            className="dashboard-card-lift fade-in-up panel-card flex flex-col divide-y divide-slate-200/90 overflow-hidden rounded-2xl ring-1 ring-slate-200/90 dark:divide-slate-600/90 dark:ring-slate-600 sm:flex-row sm:divide-x sm:divide-y-0"
+            aria-label="Dashboard summary"
+          >
             {statTiles.map(
               ({ label, value, hint, href, icon: Icon, accent }) => (
                 <Link
                   key={label}
                   to={href}
-                  className="dashboard-card-lift group fade-in-up panel-card flex items-start gap-4 rounded-2xl p-5 ring-1 ring-transparent transition hover:ring-cyan-500/20 dark:hover:ring-cyan-400/15"
+                  title={hint}
+                  className="group flex min-w-0 flex-1 items-center gap-3 px-4 py-2.5 transition hover:bg-slate-50/90 dark:hover:bg-slate-800/60"
                 >
                   <span
-                    className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1 ring-inset ${accent}`}
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${accent}`}
                   >
-                    <Icon className="h-6 w-6" aria-hidden />
+                    <Icon className="h-4 w-4" aria-hidden />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                      {label}
-                    </p>
-                    <p className="mt-1 font-display text-3xl tabular-nums text-slate-900 dark:text-slate-50">
-                      {value}
-                    </p>
-                    <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                      {hint}
+                    <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0">
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                        {label}
+                      </span>
+                      <span className="font-display text-xl font-bold tabular-nums leading-none text-slate-900 dark:text-slate-50">
+                        {value}
+                      </span>
                     </p>
                   </div>
-                  <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-slate-300 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-slate-600" />
+                  <ArrowRight className="h-4 w-4 shrink-0 text-slate-300 opacity-0 transition group-hover:translate-x-0.5 group-hover:opacity-100 dark:text-slate-600" />
                 </Link>
               ),
             )}

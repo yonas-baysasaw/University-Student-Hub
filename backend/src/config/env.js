@@ -13,7 +13,27 @@ export const ENV = {
   GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL,
   EMAIL_USER: process.env.EMAIL_USER,
   EMAIL_PASS: process.env.EMAIL_PASS,
+  /** Optional display/from address (must be allowed by Gmail). */
+  EMAIL_FROM: process.env.EMAIL_FROM,
   FRONTEND_URL: process.env.FRONTEND_URL,
+  /** Rate limits (per-window max requests). */
+  RATE_LIMIT_WINDOW_MS: (() => {
+    const n = parseInt(String(process.env.RATE_LIMIT_WINDOW_MS || '900000'), 10);
+    return Number.isFinite(n) && n > 0 ? n : 900_000;
+  })(),
+  RATE_LIMIT_REGISTER_MAX: (() => {
+    const n = parseInt(String(process.env.RATE_LIMIT_REGISTER_MAX || '5'), 10);
+    return Number.isFinite(n) && n > 0 ? n : 5;
+  })(),
+  RATE_LIMIT_FORGOT_MAX: (() => {
+    const n = parseInt(String(process.env.RATE_LIMIT_FORGOT_MAX || '5'), 10);
+    return Number.isFinite(n) && n > 0 ? n : 5;
+  })(),
+  RATE_LIMIT_RESEND_MAX: (() => {
+    const n = parseInt(String(process.env.RATE_LIMIT_RESEND_MAX || '5'), 10);
+    return Number.isFinite(n) && n > 0 ? n : 5;
+  })(),
+  SESSION_COOKIE_SECURE: process.env.SESSION_COOKIE_SECURE === 'true',
   AWS_REGION: process.env.AWS_REGION,
   AWS_BUCKET_NAME: process.env.AWS_BUCKET_NAME,
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,

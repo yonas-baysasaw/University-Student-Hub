@@ -1,6 +1,9 @@
-import nodemailer from 'nodemailer';
 import { ENV } from '../config/env.js';
 import User from '../models/User.js';
+import {
+  createMailTransporter,
+  getMailFrom,
+} from './mailTransporter.js';
 
 const MAX_BODY_CHARS = 4000;
 const MAX_SUBJECT_CHARS = 180;
@@ -38,13 +41,7 @@ function expiresSummaryLine(iso) {
  */
 function getOrCreateTransporter(transporter) {
   if (transporter) return transporter;
-  if (!ENV.EMAIL_USER || !ENV.EMAIL_PASS) {
-    return null;
-  }
-  return nodemailer.createTransport({
-    service: 'Gmail',
-    auth: { user: ENV.EMAIL_USER, pass: ENV.EMAIL_PASS },
-  });
+  return createMailTransporter();
 }
 
 /**
@@ -133,7 +130,13 @@ ${htmlMeta}
 <div style="white-space:pre-wrap;font-family:system-ui,sans-serif;">${escapeHtml(body)}</div>
 <p style="margin-top:1em;"><a href="${escapeHtml(appUrl)}">View in app</a></p>`;
 
-  const from = ENV.EMAIL_USER;
+  const from = getMailFrom();
+  if (!from) {
+    console.warn(
+      '[announcement-email] EMAIL_USER/EMAIL_FROM not set — skipping member emails',
+    );
+    return;
+  }
   const results = await Promise.allSettled(
     [...emailSet].map((to) =>
       transport.sendMail({ from, to, subject, text, html }),

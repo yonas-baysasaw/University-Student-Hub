@@ -41,6 +41,7 @@ import Reset from './pages/Reset';
 import Settings from './pages/Settings';
 import Signup from './pages/Signup';
 import StudyBuddy from './pages/StudyBuddy';
+import VerifyEmail from './pages/VerifyEmail';
 
 function RedirectToLogin() {
   const { pathname, search } = useLocation();
@@ -123,10 +124,8 @@ function AppRoutes() {
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/signup" element={<Navigate to="/" replace />} />
             <Route path="/password/reset" element={<PasswordReset />} />
-            <Route
-              path="/reset-password/:token"
-              element={<Navigate to="/" replace />}
-            />
+            <Route path="/verify-email" element={<VerifyEmail />} />
+            <Route path="/reset-password/:token" element={<Reset />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
@@ -149,6 +148,7 @@ function AppRoutes() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/password/reset" element={<PasswordReset />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password/:token" element={<Reset />} />
           <Route path="/classroom" element={<RedirectToLogin />} />
           <Route path="/classroom/:chatId" element={<RedirectToLogin />} />

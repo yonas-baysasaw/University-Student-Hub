@@ -1,8 +1,14 @@
 export const toPublicUser = (user) => {
   if (!user) return null;
   const data = user.toObject ? user.toObject() : { ...user };
-  const { password, resetPasswordToken, resetPasswordExpires, ...publicData } =
-    data;
+  const {
+    password,
+    resetPasswordToken,
+    resetPasswordExpires,
+    emailVerificationToken,
+    emailVerificationExpires,
+    ...publicData
+  } = data;
   return publicData;
 };
 
@@ -29,6 +35,9 @@ export const serializeCurrentUser = (user) => {
     hasLocalPassword,
     isStaff: role === 'staff',
     accountType: u.accountType === 'instructor' ? 'instructor' : 'student',
+    department: u.department || '',
+    schoolYear: typeof u.schoolYear === 'number' ? u.schoolYear : null,
+    emailVerified: !hasLocalPassword || u.email_verified !== false,
     platformReadOnly: !!u.platformReadOnly,
     instructorPostingSuspended: !!u.instructorPostingSuspended,
   };

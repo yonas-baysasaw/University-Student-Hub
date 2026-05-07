@@ -29,11 +29,14 @@ function PasswordReset() {
         body: JSON.stringify({ email: trimmedEmail }),
       });
 
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
         throw new Error(payload.message || 'Unable to send reset link.');
       }
-      setStatus('Check your inbox for a password reset link.');
+      setStatus(
+        payload.message ||
+          'If an account exists for this email, we sent reset instructions.',
+      );
     } catch (submitError) {
       console.error(submitError);
       setError(submitError.message || 'Unable to send reset email.');

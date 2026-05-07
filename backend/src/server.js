@@ -30,6 +30,7 @@ import signUpRouter from './routes/signUpRoutes.js';
 import supportRoutes from './routes/supportRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
 import vaultRoutes from './routes/vaultRoutes.js';
+import verifyEmailRoutes from './routes/verifyEmailRoutes.js';
 import { syncStaffRolesFromEnv } from './services/syncStaffRoles.js';
 import { initSocketServer } from './socket/index.js';
 
@@ -87,6 +88,7 @@ if (ENV.NODE_ENV === 'development') {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/register', signUpRouter);
+app.use('/api', verifyEmailRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/events', eventRoutes);

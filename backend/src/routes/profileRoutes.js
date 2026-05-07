@@ -356,21 +356,44 @@ router.put(
   ensureAuth,
   blockReadOnlyUser,
   asyncHandler(async (req, res) => {
-    const { username, displayName } = req.body;
+    const { username, displayName, department, schoolYear } = req.body;
 
     if (username !== undefined) req.user.username = username;
     if (displayName !== undefined) req.user.displayName = displayName;
+
+    if (req.user.accountType === 'student') {
+      if (department !== undefined) {
+        if (typeof department !== 'string') {
+          return res.status(400).json({ message: 'Invalid department' });
+        }
+        const d = department.trim();
+        if (d.length > 120) {
+          return res
+            .status(400)
+            .json({ message: 'Department must be at most 120 characters' });
+        }
+        req.user.department = d;
+      }
+      if (schoolYear !== undefined) {
+        const y = Number(schoolYear);
+        if (!Number.isFinite(y)) {
+          return res.status(400).json({ message: 'Invalid school year' });
+        }
+        const yi = Math.round(y);
+        if (yi < 1 || yi > 7) {
+          return res
+            .status(400)
+            .json({ message: 'School year must be between 1 and 7' });
+        }
+        req.user.schoolYear = yi;
+      }
+    }
 
     await req.user.save();
 
     res.json({
       message: 'Profile updated',
-      user: {
-        id: req.user._id,
-        username: req.user.username,
-        displayName: req.user.displayName,
-        avatar: req.user.avatar || null,
-      },
+      user: serializeCurrentUser(req.user),
     });
   }),
 );

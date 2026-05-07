@@ -28,6 +28,45 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    emailVerificationToken: {
+      type: String,
+      select: false,
+    },
+    emailVerificationExpires: {
+      type: Date,
+      select: false,
+    },
+    resetPasswordToken: {
+      type: String,
+      select: false,
+    },
+    resetPasswordExpires: {
+      type: Date,
+      select: false,
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      index: true,
+    },
+    provider: {
+      type: [String],
+      default: () => [],
+    },
+    displayName: {
+      type: String,
+      trim: true,
+    },
+    department: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+    },
+    schoolYear: {
+      type: Number,
+      min: 1,
+      max: 7,
+    },
     lastSeen: {
       type: Date,
       default: Date.now,
@@ -79,6 +118,10 @@ const userSchema = new mongoose.Schema(
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
+  delete obj.emailVerificationToken;
+  delete obj.emailVerificationExpires;
+  delete obj.resetPasswordToken;
+  delete obj.resetPasswordExpires;
   return obj;
 };
 
