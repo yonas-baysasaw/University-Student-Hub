@@ -94,8 +94,8 @@ export const createLocalUser = async ({
 };
 
 /**
- * Creates an administrator account (local password, email verification required).
- * Does not enforce bootstrap / invite-key rules — callers must authorize first.
+ * Creates an administrator account (local password). Email verification is not required for portal admins.
+ * Bootstrap / invite-key rules are enforced by the caller route only.
  */
 export const createPortalAdminUser = async ({ username, email, password }) => {
   if (!email || !password) {
@@ -113,7 +113,6 @@ export const createPortalAdminUser = async ({ username, email, password }) => {
     throw error;
   }
 
-  const token = crypto.randomBytes(20).toString("hex");
   const hashedPassword = await bcrypt.hash(password, 10);
 
   const user = await User.create({
@@ -123,21 +122,8 @@ export const createPortalAdminUser = async ({ username, email, password }) => {
     provider: ["local"],
     accountType: "instructor",
     role: "admin",
-    email_verified: false,
-    emailVerificationToken: token,
-    emailVerificationExpires: Date.now() + 48 * 3600000,
+    email_verified: true,
   });
-
-  try {
-    await sendVerificationEmail({
-      to: user.email,
-      token,
-      verifyNext: "/admin",
-    });
-  } catch (err) {
-    await User.deleteOne({ _id: user._id });
-    throw err;
-  }
 
   return user;
 };

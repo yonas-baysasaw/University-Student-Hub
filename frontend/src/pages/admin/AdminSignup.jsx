@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react';
-import { HiOutlineMail } from 'react-icons/hi';
 import { Link } from 'react-router-dom';
 import AuthShell from '../../components/AuthShell';
 import {
@@ -22,9 +21,6 @@ export default function AdminSignup() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [registeredEmail, setRegisteredEmail] = useState('');
-  const [verifyResendLoading, setVerifyResendLoading] = useState(false);
-  const [verifyResendMsg, setVerifyResendMsg] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
@@ -103,10 +99,8 @@ export default function AdminSignup() {
       }
       setSuccess(
         data.message ||
-          'Administrator account created. Verify your email before signing in.',
+          'Administrator account created. Sign in at the staff portal to continue.',
       );
-      setRegisteredEmail(email.trim().toLowerCase());
-      setVerifyResendMsg('');
       setUsername('');
       setEmail('');
       setPassword('');
@@ -119,32 +113,6 @@ export default function AdminSignup() {
       setLoading(false);
     }
   };
-
-  async function handleResendSignupVerification() {
-    setVerifyResendMsg('');
-    if (!registeredEmail) {
-      setVerifyResendMsg('Missing email — try registering again.');
-      return;
-    }
-    setVerifyResendLoading(true);
-    try {
-      const res = await fetch('/api/auth/resend-verification', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ email: registeredEmail }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.message || 'Could not send email.');
-      }
-      setVerifyResendMsg(data.message || 'Check your inbox (and spam).');
-    } catch (e) {
-      setVerifyResendMsg(e.message || 'Could not send email.');
-    } finally {
-      setVerifyResendLoading(false);
-    }
-  }
 
   if (metaLoading) {
     return (
@@ -357,12 +325,12 @@ export default function AdminSignup() {
             </p>
           )}
           {success ? (
-            <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50 to-orange-50/80 px-4 py-4 text-sm text-amber-950 shadow-sm dark:border-amber-700/60 dark:from-amber-950/40 dark:to-orange-950/25 dark:text-amber-50">
-              <p className="font-semibold dark:text-amber-100">
-                Verify your email
+            <div className="rounded-2xl border border-emerald-200/80 bg-emerald-50/90 px-4 py-4 text-sm text-emerald-950 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/35 dark:text-emerald-50">
+              <p className="font-semibold dark:text-emerald-100">
+                You&apos;re ready to sign in
               </p>
               <p className="mt-1 text-xs opacity-90">
-                Then use{' '}
+                Use{' '}
                 <Link
                   to="/admin/login"
                   className="font-semibold underline underline-offset-2"
@@ -371,20 +339,6 @@ export default function AdminSignup() {
                 </Link>{' '}
                 — not the main campus login.
               </p>
-              <button
-                type="button"
-                onClick={handleResendSignupVerification}
-                disabled={verifyResendLoading}
-                className="btn-primary mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-[13px] font-semibold text-white shadow-md shadow-cyan-500/20 ring-1 ring-white/25 transition hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 dark:from-cyan-500 dark:to-cyan-400 dark:text-slate-900 dark:ring-cyan-300/40"
-              >
-                <HiOutlineMail className="text-lg opacity-95" aria-hidden />
-                {verifyResendLoading ? 'Sending…' : 'Resend verification email'}
-              </button>
-              {verifyResendMsg ? (
-                <p className="mt-2 rounded-lg bg-white/60 px-2 py-2 text-xs dark:bg-black/25">
-                  {verifyResendMsg}
-                </p>
-              ) : null}
             </div>
           ) : null}
         </div>

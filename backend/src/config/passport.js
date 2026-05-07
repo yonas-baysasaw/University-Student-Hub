@@ -36,6 +36,9 @@ const configurePassport = () => {
           if (!match) {
             return done(null, false, { message: 'Invalid credentials' });
           }
+          if (['admin', 'staff'].includes(user.role)) {
+            return done(null, user);
+          }
           if (user.email_verified === false) {
             return done(null, false, {
               message:

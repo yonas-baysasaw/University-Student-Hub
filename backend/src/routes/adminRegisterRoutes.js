@@ -76,7 +76,7 @@ router.post(
     res.status(201).json({
       user: toPublicUser(user),
       message:
-        "Administrator account created. Verify your email before signing in to the staff portal.",
+        "Administrator account created. Sign in at the staff portal to open the admin dashboard.",
     });
   }),
 );
