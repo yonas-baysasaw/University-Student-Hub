@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
+import { useAuth } from '../contexts/AuthContext';
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+  const navigate = useNavigate();
+  const { refreshAuth, setUser } = useAuth();
   const [status, setStatus] = useState('loading');
   const [message, setMessage] = useState('');
 
@@ -22,6 +25,7 @@ function VerifyEmail() {
         const res = await fetch('/api/verify-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ token: token.trim() }),
         });
         const data = await res.json().catch(() => ({}));
@@ -36,6 +40,17 @@ function VerifyEmail() {
         }
         setStatus('ok');
         setMessage(data.message || 'Your email is verified.');
+        if (data.user && typeof data.user === 'object') {
+          setUser(data.user);
+        }
+        try {
+          await refreshAuth();
+        } catch {
+          // Session cookie should still work; landing page will reload auth.
+        }
+        if (!cancelled) {
+          navigate('/', { replace: true });
+        }
       } catch {
         if (!cancelled) {
           setStatus('error');
@@ -47,7 +62,7 @@ function VerifyEmail() {
     return () => {
       cancelled = true;
     };
-  }, [token]);
+  }, [token, refreshAuth, navigate]);
 
   return (
     <AuthShell
@@ -73,12 +88,9 @@ function VerifyEmail() {
       </div>
 
       {status === 'ok' ? (
-        <Link
-          to="/login"
-          className="btn-primary mt-4 flex h-11 w-full items-center justify-center text-sm"
-        >
-          Sign in
-        </Link>
+        <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
+          Taking you to your workspace…
+        </p>
       ) : (
         <div className="mt-4 space-y-2 text-center text-sm">
           <Link

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { FaGoogle } from 'react-icons/fa';
+import { HiOutlineMail } from 'react-icons/hi';
 import { Link, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import {
@@ -31,6 +32,9 @@ function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState('');
+  const [verifyResendLoading, setVerifyResendLoading] = useState(false);
+  const [verifyResendMsg, setVerifyResendMsg] = useState('');
   const [searchParams] = useSearchParams();
   const nextSafe = safeInternalPath(searchParams.get('next'));
 
@@ -103,6 +107,8 @@ function Signup() {
         data.message ||
           'Account created. Check your email and verify your address before signing in.',
       );
+      setRegisteredEmail(email.trim().toLowerCase());
+      setVerifyResendMsg('');
       setUsername('');
       setEmail('');
       setPassword('');
@@ -120,6 +126,32 @@ function Signup() {
   const loginHref = nextSafe
     ? `/login?next=${encodeURIComponent(nextSafe)}`
     : '/login';
+
+  async function handleResendSignupVerification() {
+    setVerifyResendMsg('');
+    if (!registeredEmail) {
+      setVerifyResendMsg('Missing email — try registering again.');
+      return;
+    }
+    setVerifyResendLoading(true);
+    try {
+      const res = await fetch('/api/auth/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: registeredEmail }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || 'Could not send email.');
+      }
+      setVerifyResendMsg(data.message || 'Check your inbox (and spam).');
+    } catch (e) {
+      setVerifyResendMsg(e.message || 'Could not send email.');
+    } finally {
+      setVerifyResendLoading(false);
+    }
+  }
 
   return (
     <>
@@ -188,6 +220,8 @@ function Signup() {
               setAccountType(null);
               setError('');
               setSuccess('');
+              setRegisteredEmail('');
+              setVerifyResendMsg('');
             }}
             className="mb-4 text-left text-xs font-semibold text-cyan-700 underline hover:text-cyan-600 dark:text-cyan-400"
           >
@@ -207,15 +241,44 @@ function Signup() {
           </div>
 
           {success ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <p className="text-sm text-slate-600 dark:text-slate-400">
-                After you verify your email, you can sign in below.
+                Open the link in your email to verify. After that you will be
+                signed in automatically.
               </p>
+              <div className="rounded-2xl border border-cyan-200/70 bg-gradient-to-b from-cyan-50/90 to-slate-50 px-4 py-4 shadow-sm dark:border-cyan-800/50 dark:from-cyan-950/35 dark:to-slate-900/50">
+                <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  Didn&apos;t receive the email?
+                </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                  Check spam, or resend the verification message to{' '}
+                  <span className="font-medium text-slate-800 dark:text-slate-200">
+                    {registeredEmail}
+                  </span>
+                  .
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendSignupVerification}
+                  disabled={verifyResendLoading}
+                  className="btn-primary mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-[13px] font-semibold text-white shadow-md shadow-cyan-500/20 ring-1 ring-white/25 transition hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 dark:from-cyan-500 dark:to-cyan-400 dark:text-slate-900 dark:ring-cyan-300/40"
+                >
+                  <HiOutlineMail className="text-lg opacity-95" aria-hidden />
+                  {verifyResendLoading
+                    ? 'Sending email…'
+                    : 'Send verification email again'}
+                </button>
+                {verifyResendMsg ? (
+                  <p className="mt-2 rounded-lg bg-white/70 px-2 py-2 text-xs text-slate-700 dark:bg-black/30 dark:text-slate-200">
+                    {verifyResendMsg}
+                  </p>
+                ) : null}
+              </div>
               <Link
                 to={loginHref}
-                className="btn-primary flex h-11 w-full items-center justify-center text-sm"
+                className="flex h-11 w-full items-center justify-center rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:border-slate-500 dark:hover:bg-slate-800/50"
               >
-                Continue to sign in
+                Go to sign in
               </Link>
             </div>
           ) : (

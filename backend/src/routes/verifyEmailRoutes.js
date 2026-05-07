@@ -1,6 +1,7 @@
 import express from 'express';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import User from '../models/User.js';
+import { serializeCurrentUser } from '../utils/userSerializer.js';
 
 const router = express.Router();
 
@@ -30,7 +31,14 @@ router.post(
     user.emailVerificationExpires = undefined;
     await user.save();
 
-    res.json({ message: 'Email verified. You can sign in now.' });
+    await new Promise((resolve, reject) => {
+      req.login(user, (loginErr) => (loginErr ? reject(loginErr) : resolve()));
+    });
+
+    res.json({
+      message: 'Email verified. Welcome back.',
+      user: serializeCurrentUser(user),
+    });
   }),
 );
 

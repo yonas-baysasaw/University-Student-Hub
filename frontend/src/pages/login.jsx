@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { FaGoogle } from 'react-icons/fa';
+import { HiOutlineMail } from 'react-icons/hi';
 import { Link, useSearchParams } from 'react-router-dom';
 import AuthShell from '../components/AuthShell';
 import { safeInternalPath } from '../utils/safeRedirect';
@@ -76,6 +77,7 @@ function SignIn() {
       const res = await fetch('/api/auth/resend-verification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       });
       const data = await res.json().catch(() => ({}));
@@ -150,18 +152,24 @@ function SignIn() {
           )}
 
           {needsEmailVerify ? (
-            <div className="rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
-              <p className="font-medium">Email not verified yet</p>
+            <div className="rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50 to-orange-50/80 px-4 py-4 text-sm text-amber-950 shadow-sm dark:border-amber-700/60 dark:from-amber-950/40 dark:to-orange-950/25 dark:text-amber-50">
+              <p className="font-semibold text-amber-950 dark:text-amber-100">
+                Verify your email
+              </p>
+              <p className="mt-1 text-xs text-amber-900/85 dark:text-amber-200/90">
+                We sent a confirmation link — check spam too. Tap below to resend.
+              </p>
               <button
                 type="button"
                 onClick={handleResendVerification}
                 disabled={resendLoading}
-                className="mt-2 text-sm font-semibold text-amber-900 underline hover:no-underline disabled:opacity-50 dark:text-amber-200"
+                className="btn-primary mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-cyan-600 to-cyan-500 text-[13px] font-semibold text-white shadow-md shadow-cyan-500/20 ring-1 ring-white/25 transition hover:brightness-105 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50 dark:from-cyan-500 dark:to-cyan-400 dark:text-slate-900 dark:ring-cyan-300/40"
               >
-                {resendLoading ? 'Sending…' : 'Resend confirmation email'}
+                <HiOutlineMail className="text-lg opacity-95" aria-hidden />
+                {resendLoading ? 'Sending email…' : 'Send verification email again'}
               </button>
               {resendMsg ? (
-                <p className="mt-2 text-xs text-amber-900/90 dark:text-amber-100/90">
+                <p className="mt-2 rounded-lg bg-white/60 px-2 py-2 text-xs text-amber-900 dark:bg-black/25 dark:text-amber-100/95">
                   {resendMsg}
                 </p>
               ) : null}
