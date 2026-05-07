@@ -129,7 +129,11 @@ export const createPortalAdminUser = async ({ username, email, password }) => {
   });
 
   try {
-    await sendVerificationEmail({ to: user.email, token });
+    await sendVerificationEmail({
+      to: user.email,
+      token,
+      verifyNext: "/admin",
+    });
   } catch (err) {
     await User.deleteOne({ _id: user._id });
     throw err;

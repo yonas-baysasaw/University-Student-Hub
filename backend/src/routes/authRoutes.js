@@ -70,7 +70,13 @@ router.post(
         user.emailVerificationToken = token;
         user.emailVerificationExpires = Date.now() + 48 * 3600000;
         await user.save();
-        await sendVerificationEmail({ to: user.email, token });
+        const verifyNext =
+          user.role === "admin" || user.role === "staff" ? "/admin" : undefined;
+        await sendVerificationEmail({
+          to: user.email,
+          token,
+          verifyNext,
+        });
       }
     } catch (e) {
       console.error("[resend-verification]", e);

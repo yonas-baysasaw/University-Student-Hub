@@ -2,14 +2,17 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthShell from "../components/AuthShell";
 import { useAuth } from "../contexts/AuthContext";
+import { safeInternalPath } from "../utils/safeRedirect";
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
   const token = searchParams.get("token");
+  const nextParam = searchParams.get("next");
   const navigate = useNavigate();
   const { refreshAuth, setUser } = useAuth();
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
+  const [adminRedirect, setAdminRedirect] = useState(false);
 
   useEffect(() => {
     if (!token || !token.trim()) {
@@ -48,8 +51,13 @@ function VerifyEmail() {
         } catch {
           // Session cookie should still work; landing page will reload auth.
         }
+        const nextSafe = safeInternalPath(nextParam);
+        const fallback =
+          data.user?.isStaff === true ? "/admin" : "/";
+        const target = nextSafe ?? fallback;
+        setAdminRedirect(target === "/admin" || target.startsWith("/admin/"));
         if (!cancelled) {
-          navigate("/", { replace: true });
+          navigate(target, { replace: true });
         }
       } catch {
         if (!cancelled) {
@@ -62,7 +70,7 @@ function VerifyEmail() {
     return () => {
       cancelled = true;
     };
-  }, [token, refreshAuth, navigate]);
+  }, [token, nextParam, refreshAuth, navigate]);
 
   return (
     <AuthShell
@@ -89,7 +97,9 @@ function VerifyEmail() {
 
       {status === "ok" ? (
         <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
-          Taking you to your workspace…
+          {adminRedirect
+            ? "Taking you to the admin dashboard…"
+            : "Taking you to your workspace…"}
         </p>
       ) : (
         <div className="mt-4 space-y-2 text-center text-sm">
@@ -99,6 +109,16 @@ function VerifyEmail() {
           >
             Back to sign in
           </Link>
+          {safeInternalPath(nextParam)?.startsWith("/admin") ? (
+            <div>
+              <Link
+                to="/admin/login"
+                className="font-medium text-violet-700 underline hover:text-violet-600 dark:text-violet-400"
+              >
+                Staff portal sign-in
+              </Link>
+            </div>
+          ) : null}
         </div>
       )}
     </AuthShell>

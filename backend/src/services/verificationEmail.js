@@ -3,6 +3,7 @@ import {
   createMailTransporter,
   getMailFrom,
 } from "../services/mailTransporter.js";
+import { safeInternalPath } from "../utils/safeRedirect.js";
 
 function escapeHtml(s) {
   return String(s)
@@ -13,9 +14,9 @@ function escapeHtml(s) {
 }
 
 /**
- * @param {{ to: string, token: string }} params
+ * @param {{ to: string, token: string, verifyNext?: string }} params
  */
-export async function sendVerificationEmail({ to, token }) {
+export async function sendVerificationEmail({ to, token, verifyNext }) {
   const transport = createMailTransporter();
   const from = getMailFrom();
   if (!transport || !from) {
@@ -25,7 +26,10 @@ export async function sendVerificationEmail({ to, token }) {
   }
 
   const base = (ENV.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
-  const verifyUrl = `${base}/verify-email?token=${encodeURIComponent(token)}`;
+  const safeNext = safeInternalPath(verifyNext);
+  const qs = new URLSearchParams({ token });
+  if (safeNext) qs.set("next", safeNext);
+  const verifyUrl = `${base}/verify-email?${qs.toString()}`;
   const subject = "Confirm your University Student Hub account";
 
   const text = `Welcome to University Student Hub.\n\nConfirm your email by opening this link (valid for 48 hours):\n${verifyUrl}\n\nIf you did not create an account, you can ignore this message.\n`;
