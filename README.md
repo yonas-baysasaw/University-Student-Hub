@@ -1,17 +1,17 @@
 # University Student Hub
 
-A full-stack web app for university students to collaborate in real time, share books/resources, and manage classroom discussions.
+A full-stack university collaboration platform that enables students to communicate in real time, share academic resources, upload and download books, participate in classroom discussions, and work together on projects through an interactive online environment.
 
 ## Features
 
-- Authentication with local login and Google OAuth
-- Classroom creation and joining with chat support
-- Real-time messaging with Socket.IO (typing/read receipts/presence)
-- Library with searchable shared books
-- Book upload to AWS S3
-- Automatic PDF first-page cover thumbnail generation on upload
-- Profile page with activity stats and shared books
-- Password reset via email
+- Secure authentication system with traditional email/password login and Google OAuth integration
+- Classroom creation and enrollment functionality with integrated real-time group chat support
+- Instant messaging system powered by Socket.IO featuring typing indicators, online presence tracking, and read receipts
+- Digital library module with advanced search functionality for shared books and academic resources
+- Cloud-based book and document upload system using AWS S3 storage services
+- Automatic generation of PDF cover thumbnails by extracting the first page during file upload
+- Personalized student profile pages displaying activity statistics, uploaded resources, and shared books
+- Secure password recovery and reset functionality through email verification
 
 ## Tech Stack
 
@@ -38,6 +38,8 @@ University Student Hub is a collaborative platform that enables students to:
 - Chat in real-time with group members
 - Share announcements and resources
 - Access a shared library of books and materials
+- Collaborate with students in an interactive online environment
+- Support academic discussions and resource management
 
 ## Tech Stack
 
@@ -306,3 +308,4 @@ The `package.json` root script runs the Heroku postbuild hook to build the front
 ## License
 
 ISC
+ush - 2026
