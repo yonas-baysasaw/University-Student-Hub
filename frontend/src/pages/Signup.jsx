@@ -76,6 +76,15 @@ function Signup() {
 
   return (
     <AuthShell title="Create account" subtitle="Set up your student workspace">
+
+  <div className="flex justify-center mt-2 mb-2">
+    <button
+      type="button"
+      className="btn-primary px-4 py-1.5 text-xs"
+    >
+      Change account type
+    </button>
+  </div>
       <form className="space-y-3.5" onSubmit={handleSubmit}>
         {(error || success) && (
           <div
