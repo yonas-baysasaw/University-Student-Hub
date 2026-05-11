@@ -1,4 +1,3 @@
-import { SchemaType } from '@google/generative-ai';
 import mongoose from 'mongoose';
 import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
@@ -372,7 +371,11 @@ async function runListMyExams(ctx, args) {
 
 // ── declarations + registry ────────────────────────────────────────────────
 
-const S = SchemaType;
+const S = {
+  OBJECT: 'object',
+  STRING: 'string',
+  INTEGER: 'integer',
+};
 
 const DECLARATIONS = {
   list_my_classrooms: {
@@ -521,9 +524,6 @@ const DECLARATIONS = {
   },
 };
 
-/**
- * @returns {import('@google/generative-ai').FunctionDeclaration[]}
- */
 export function getSupportFunctionDeclarations() {
   return Object.values(DECLARATIONS).map((e) => e.declaration);
 }

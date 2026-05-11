@@ -193,69 +193,13 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     // ── AI streaming chat ────────────────────────────────────────────────────
     socket.on('ai:chat', async ({ messages, sessionId, bookId }) => {
       try {
+        void messages;
+        void sessionId;
+        void bookId;
         assertCanWrite(user);
-        if (!Array.isArray(messages) || messages.length === 0) {
-          socket.emit('ai:error', { message: 'messages array is required' });
-          return;
-        }
-
-        // Lazy import to avoid circular deps at module load time
-        const { getGeminiServiceForUser } = await import(
-          '../services/geminiService.js'
-        );
-        const { augmentMessagesWithBookRag } = await import(
-          '../services/bookRagService.js'
-        );
-        const ChatSession = (await import('../models/ChatSession.js')).default;
-
-        // Resolve or create a chat session
-        let session = sessionId
-          ? await ChatSession.findOne({ _id: sessionId, userId: user._id })
-          : null;
-
-        if (!session) {
-          const firstUserMsg = messages.find((m) => m.role === 'user');
-          const title = firstUserMsg
-            ? firstUserMsg.content.slice(0, 60)
-            : 'New chat';
-          session = await ChatSession.create({
-            userId: user._id,
-            title,
-            messages: [],
-          });
-        }
-
-        const serviceToUse = await getGeminiServiceForUser(user);
-
-        let messagesForLlm = messages;
-        if (bookId && String(bookId).trim()) {
-          const aug = await augmentMessagesWithBookRag(
-            messages,
-            String(bookId).trim(),
-            user._id,
-            user,
-          );
-          messagesForLlm = aug.messages;
-        }
-
-        const resolvedSessionId = session._id.toString();
-        socket.emit('ai:sessionId', { sessionId: resolvedSessionId });
-
-        let fullResponse = '';
-        await serviceToUse.chatStream(messagesForLlm, (chunk) => {
-          fullResponse += chunk;
-          socket.emit('ai:chunk', { chunk, sessionId: resolvedSessionId });
+        socket.emit('ai:error', {
+          message: 'Liqu AI is disabled on this server.',
         });
-
-        // Persist messages
-        const userMsg = messages[messages.length - 1];
-        session.messages.push(
-          { role: userMsg.role, content: userMsg.content },
-          { role: 'assistant', content: fullResponse },
-        );
-        await session.save();
-
-        socket.emit('ai:done', { sessionId: resolvedSessionId, fullResponse });
       } catch (err) {
         console.error('ai:chat socket error:', err);
         socket.emit('ai:error', { message: err.message || 'AI error' });
@@ -276,3 +220,4 @@ export const initSocketServer = async (server, sessionMiddleware) => {
 
   return io;
 };
+

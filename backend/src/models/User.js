@@ -83,14 +83,6 @@ const userSchema = new mongoose.Schema(
         ref: 'User',
       },
     ],
-    geminiApiKey: {
-      type: String,
-      default: '',
-    },
-    geminiModelId: {
-      type: String,
-      default: '',
-    },
     role: {
       type: String,
       enum: ['user', 'admin', 'lecturer'],

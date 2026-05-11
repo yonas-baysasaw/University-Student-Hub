@@ -17,7 +17,6 @@ export const serializeCurrentUser = (user) => {
   if (!user) return null;
   const u = user.toObject ? user.toObject() : { ...user };
   const hasLocalPassword = !!u.password;
-  const geminiConfigured = !!String(u.geminiApiKey || '').trim();
   const role = u.role === 'admin' ? 'admin' : 'user';
 
   return {
@@ -30,8 +29,6 @@ export const serializeCurrentUser = (user) => {
     photo: u.avatar,
     avatar: u.avatar || null,
     lastSeen: u.lastSeen || null,
-    geminiConfigured,
-    geminiModelId: u.geminiModelId || '',
     hasLocalPassword,
     role,
     permissions: Array.isArray(u.permissions) ? u.permissions : [],

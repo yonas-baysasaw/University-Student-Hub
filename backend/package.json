@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "migrate-staff-to-admin": "node scripts/migrate-staff-to-admin.mjs"
+    "migrate-staff-to-admin": "node scripts/migrate-staff-to-admin.mjs",
+    "migrate:bookchunks:remove-embeddings": "node scripts/remove-bookchunk-embedding-fields.mjs"
   },
   "keywords": [],
   "author": "",
@@ -14,7 +15,6 @@
   "type": "module",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1021.0",
-    "@google/generative-ai": "^0.24.1",
     "@napi-rs/canvas": "^0.1.66",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",

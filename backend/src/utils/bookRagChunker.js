@@ -13,13 +13,26 @@ const DEFAULT_MAX = 1800;
 const DEFAULT_OVERLAP = 200;
 const DEFAULT_MAX_CHUNKS = 350;
 
+function cleanRagText(raw) {
+  return String(raw || '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\u00a0/g, ' ')
+    .replace(/^.*copyright.*$/gim, '')
+    .replace(/^.*all rights reserved.*$/gim, '')
+    .replace(/^.*isbn[^a-z0-9].*$/gim, '')
+    .replace(/^.*packt publishing.*$/gim, '')
+    .replace(/^.*publisher.*$/gim, '')
+    .replace(/^.*table of contents.*$/gim, '')
+    .replace(/^.*contributors?.*$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 /**
  * @param {string} raw
  */
 function normalizeText(raw) {
-  return String(raw)
-    .replace(/\r\n/g, '\n')
-    .replace(/\u00a0/g, ' ')
+  return cleanRagText(raw)
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
@@ -88,4 +101,59 @@ export function splitTextForRagEmbedding(rawText, options = {}) {
   }
 
   return chunks;
+}
+
+function isLikelyHeading(line) {
+  const s = String(line || '').trim();
+  if (!s) return false;
+  if (/^(chapter|unit|part)\s+\d+/i.test(s)) return true;
+  if (/^\d+(\.\d+){0,3}\s+[A-Z]/.test(s)) return true;
+  if (s.length <= 90 && /^[A-Z][A-Za-z0-9,:()\-/ ]+$/.test(s)) return true;
+  return false;
+}
+
+/**
+ * Split by heading blocks, then soft-chunk long blocks.
+ * Returns chunk records with chapter/section metadata.
+ */
+export function splitTextForRagWithMetadata(rawText, options = {}) {
+  const t = normalizeText(rawText);
+  if (!t) return [];
+
+  const lines = t.split('\n');
+  const blocks = [];
+  let current = { heading: '', lines: [] };
+  let activeChapter = '';
+
+  for (const line of lines) {
+    if (isLikelyHeading(line)) {
+      if (current.lines.length > 0) blocks.push(current);
+      const heading = String(line).trim();
+      if (/^(chapter|unit|part)\s+\d+/i.test(heading)) activeChapter = heading;
+      current = { heading, lines: [] };
+      continue;
+    }
+    current.lines.push(line);
+  }
+  if (current.lines.length > 0) blocks.push(current);
+
+  const out = [];
+  let chunkIndex = 0;
+  for (const b of blocks) {
+    const blockText = b.lines.join('\n').trim();
+    if (!blockText) continue;
+    const pieces = splitTextForRagEmbedding(blockText, options);
+    for (const piece of pieces) {
+      out.push({
+        chunkIndex,
+        text: piece,
+        chapter: /^(chapter|unit|part)\s+\d+/i.test(b.heading)
+          ? b.heading
+          : activeChapter,
+        section: b.heading || '',
+      });
+      chunkIndex += 1;
+    }
+  }
+  return out;
 }

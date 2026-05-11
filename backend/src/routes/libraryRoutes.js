@@ -17,6 +17,7 @@ import {
   getBookById,
   incrementBookDownload,
   reactToBook,
+  reindexMyBooks,
   toggleSaveBook,
   updateBook,
 } from '../controllers/libraryController.js';
@@ -25,6 +26,7 @@ import { isAuthenticated } from '../middlewares/authMiddleware.js';
 const router = Router();
 
 router.get('/', getAllBooks);
+router.post('/rag/reindex-mine', isAuthenticated, reindexMyBooks);
 router.get('/:bookId/rag/status', isAuthenticated, getBookRagStatus);
 router.post('/:bookId/rag/index', isAuthenticated, postIndexBookRag);
 router.get('/:bookId/reviews', listBookReviews);
