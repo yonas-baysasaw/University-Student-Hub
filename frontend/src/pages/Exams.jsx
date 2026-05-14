@@ -169,13 +169,8 @@ function Exams() {
               Liqu AI · Exam studio
             </p>
             <h1 className="mt-2 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50 md:text-4xl">
-              Vault &amp; shared papers
+              Welcome to the exam collections
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Author MCQs only you see in your vault, then publish snapshots to
-              the community bank when you&apos;re ready. Import PDFs for fast AI
-              extraction—all in one cohesive workspace.
-            </p>
           </div>
         </header>
 
@@ -599,11 +594,6 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
                 Your papers
               </h2>
             </div>
-            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              Imported PDFs and snapshots you curated — same shelf as drafts, with
-              a visibility lens so you see private imports, bank-ready papers, or
-              everything together.
-            </p>
           </div>
           <PapersVisibilityControl
             value={papersVisibility}
@@ -635,9 +625,6 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
               Import PDF
             </button>
           ) : null}
-          <span className="hidden whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:inline">
-            {myPapersTotal} · your uploads in this lens
-          </span>
         </div>
 
         {myPapersLoading ? (
@@ -1409,7 +1396,6 @@ function BankTab() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState('all');
   const pollRef = useRef(null);
 
   const fetchExams = useCallback(async () => {
@@ -1420,9 +1406,6 @@ function BankTab() {
       });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
-      if (visibilityFilter !== 'all') {
-        params.set('visibility', visibilityFilter);
-      }
 
       const res = await fetch(`/api/exams?${params}`, {
         credentials: 'include',
@@ -1435,7 +1418,7 @@ function BankTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, visibilityFilter]);
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -1457,29 +1440,6 @@ function BankTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="min-w-[200px] flex-1">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Who can browse
-          </span>
-          <PapersVisibilityControl
-            value={visibilityFilter}
-            onChange={(id) => {
-              setVisibilityFilter(id);
-              setPage(1);
-            }}
-          />
-        </div>
-        <span className="hidden text-[11px] leading-snug text-slate-400 dark:text-slate-500 md:block md:max-w-xs">
-          <strong className="text-slate-600 dark:text-slate-300">Public</strong>{' '}
-          is the whole bank.&nbsp;
-          <strong className="text-slate-600 dark:text-slate-300">
-            Private
-          </strong>{' '}
-          is only drafts you uploaded.
-        </span>
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
@@ -1529,11 +1489,7 @@ function BankTab() {
             No papers yet.
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {visibilityFilter === 'private'
-              ? 'Nothing private-import in this list — widen to All or add a PDF from your vault tab.'
-              : visibilityFilter === 'public'
-                ? 'No community papers match — invite classmates to publish or widen your lens.'
-                : 'Import a PDF or publish from your vault.'}
+            Import a PDF or publish from your vault.
           </p>
         </div>
       )}
