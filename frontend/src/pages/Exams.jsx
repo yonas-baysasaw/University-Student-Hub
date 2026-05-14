@@ -1819,8 +1819,32 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
   const [editSaving, setEditSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   const examKind = exam.examKind ?? 'pdf';
+  const canRetryExtraction =
+    exam.processingStatus === 'failed' &&
+    examKind !== 'vault_compiled' &&
+    !exam.isDuplicate;
+
+  async function retryExtraction() {
+    setReprocessing(true);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/reprocess`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await readJsonOrThrow(res, 'Retry failed');
+      onUpdate?.(data);
+      toast.success('Extraction started again');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setReprocessing(false);
+    }
+  }
 
   async function saveEdit() {
     setEditSaving(true);
@@ -1922,7 +1946,7 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                 >
                   ⋯
                 </button>
-                <ul className="menu dropdown-content menu-sm z-[999] mt-1 w-40 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                <ul className="menu dropdown-content menu-sm z-[999] mt-1 min-w-[11rem] rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
                   <li>
                     <button
                       type="button"
@@ -1942,6 +1966,20 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                       Edit / visibility…
                     </button>
                   </li>
+                  {canRetryExtraction ? (
+                    <li>
+                      <button
+                        type="button"
+                        disabled={reprocessing}
+                        onClick={() => {
+                          void retryExtraction();
+                        }}
+                        className="rounded-xl px-3 py-2 text-sm text-cyan-700 disabled:opacity-50 dark:text-cyan-300"
+                      >
+                        {reprocessing ? 'Starting…' : 'Retry extraction'}
+                      </button>
+                    </li>
+                  ) : null}
                   <li>
                     <button
                       type="button"
