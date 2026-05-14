@@ -1,4 +1,5 @@
 import {
+  Bell,
   ChevronDown,
   ExternalLink,
   LogOut,
@@ -17,11 +18,9 @@ const menuWidth = 272;
 const baseNavLinks = [
   { to: '/', label: 'Dashboard', end: true },
   { to: '/classroom', label: 'Classroom', end: false },
-  { to: '/notifications', label: 'Notifications', end: false },
   { to: '/events', label: 'Events', end: false },
   { to: '/library', label: 'Library', end: false },
   { to: '/liqu-ai', label: 'Liqu AI', end: false },
-  { to: '/profile', label: 'Profile', end: false },
 ];
 
 function Navbar({ children }) {
@@ -141,7 +140,21 @@ function Navbar({ children }) {
             </div>
           </nav>
 
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            <NavLink
+              to="/notifications"
+              title="Notifications"
+              aria-label="Notifications"
+              className={({ isActive }) =>
+                `flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-slate-600 transition-colors duration-150 dark:text-slate-400 ${
+                  isActive
+                    ? 'border-slate-200/90 bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:ring-slate-600/90'
+                    : 'border-slate-200/70 bg-white/90 hover:border-cyan-300/80 hover:text-slate-900 hover:shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:hover:border-cyan-600/50 dark:hover:text-slate-100'
+                }`
+              }
+            >
+              <Bell className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+            </NavLink>
             <div className="relative">
               <button
                 ref={buttonRef}

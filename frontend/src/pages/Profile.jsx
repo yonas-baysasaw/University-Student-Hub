@@ -183,6 +183,25 @@ function normalizeActivity(item, index) {
   };
 }
 
+function schoolYearToAcademicLevel(y) {
+  if (typeof y !== "number" || !Number.isFinite(y)) return null;
+  const yi = Math.round(y);
+  if (yi === 7) return "Graduate";
+  if (yi >= 1 && yi <= 6) return `Year ${yi}`;
+  return null;
+}
+
+function academicLevelToSchoolYear(level) {
+  const s = String(level ?? "").trim();
+  const m = /^Year\s+(\d)$/i.exec(s);
+  if (m) {
+    const n = Number(m[1]);
+    return Number.isFinite(n) ? n : NaN;
+  }
+  if (/^graduate$/i.test(s)) return 7;
+  return NaN;
+}
+
 function StatCard({ icon: Icon, label, value, hint, progress, tone = "cyan" }) {
   const toneMap = {
     cyan: "bg-cyan-500/12 text-cyan-700 ring-cyan-500/20 dark:text-cyan-200",
@@ -289,6 +308,129 @@ function FieldRow({
   );
 }
 
+function IdentityEditModal({
+  open,
+  title,
+  draft,
+  updateDraft,
+  isStudent,
+  saving,
+  onClose,
+  onSave,
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="identity-modal-title"
+        className="fade-in-up max-h-[min(90vh,640px)] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-200 bg-white p-5 shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+      >
+        <div className="flex items-start gap-3">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-50 text-cyan-700 ring-1 ring-cyan-200 dark:bg-cyan-500/10 dark:text-cyan-200 dark:ring-cyan-400/25">
+            <Edit3 className="h-5 w-5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2
+              id="identity-modal-title"
+              className="font-display text-xl font-bold text-slate-950 dark:text-white"
+            >
+              {title}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-400">
+              Update how you appear on your profile. Changes sync to your
+              account.
+            </p>
+          </div>
+          <button
+            type="button"
+            className="rounded-xl p-2 text-slate-500 transition hover:bg-slate-100 dark:hover:bg-slate-800"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+        </div>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            Full name
+            <input
+              className="input-field normal-case font-semibold tracking-normal"
+              name="fullName"
+              value={draft.fullName}
+              onChange={updateDraft}
+              autoComplete="name"
+              aria-label="Full name"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            Username
+            <input
+              className="input-field normal-case font-semibold tracking-normal"
+              name="username"
+              value={draft.username}
+              onChange={updateDraft}
+              autoComplete="username"
+              aria-label="Username"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 sm:col-span-2">
+            Department or major
+            <input
+              className="input-field normal-case font-semibold tracking-normal"
+              name="department"
+              value={draft.department}
+              onChange={updateDraft}
+              aria-label="Department or major"
+            />
+          </label>
+          {isStudent ? (
+            <label className="flex flex-col gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400 sm:col-span-2">
+              Academic level
+              <select
+                className="input-field normal-case font-semibold tracking-normal"
+                name="academicLevel"
+                value={draft.academicLevel}
+                onChange={updateDraft}
+                aria-label="Academic level"
+              >
+                <option>Year 1</option>
+                <option>Year 2</option>
+                <option>Year 3</option>
+                <option>Year 4</option>
+                <option>Graduate</option>
+              </select>
+            </label>
+          ) : null}
+        </div>
+
+        <div className="mt-6 flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            className="btn-secondary gap-2 px-4 py-2 text-sm"
+            onClick={onClose}
+            disabled={saving}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="btn-primary gap-2 px-4 py-2 text-sm"
+            onClick={onSave}
+            disabled={saving}
+          >
+            <Save className="h-4 w-4" aria-hidden />
+            {saving ? "Saving…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ConfirmModal({
   open,
   title,
@@ -349,10 +491,11 @@ function ConfirmModal({
 }
 
 function Profile() {
-  const { user, setUser, logout } = useAuth();
+  const { user, setUser, logout, refreshAuth } = useAuth();
   const fileInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState("overview");
-  const [editingIdentity, setEditingIdentity] = useState(false);
+  const [identityModalOpen, setIdentityModalOpen] = useState(false);
+  const [identitySaving, setIdentitySaving] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(true);
@@ -373,8 +516,16 @@ function Profile() {
       username,
       status: "Active Student",
       department: user?.department || "Computer Science",
-      studentId: user?.studentId || user?.id || "USH-2026-0147",
-      academicLevel: user?.academicLevel || "Year 3",
+      studentId:
+        user?.studentId != null && user.studentId !== ""
+          ? String(user.studentId)
+          : user?.id != null
+            ? String(user.id)
+            : "USH-2026-0147",
+      academicLevel:
+        schoolYearToAcademicLevel(user?.schoolYear) ||
+        user?.academicLevel ||
+        "Year 3",
       email: user?.email || "student@university.edu",
       phone: user?.phone || "+251 91 234 5678",
       location: user?.campus || "Main Campus",
@@ -481,7 +632,6 @@ function Profile() {
       department: nextProfile.department,
       photo: avatarPreview,
     }));
-    setEditingIdentity(false);
     setEditingContact(false);
     setEditingBio(false);
     setErrors({});
@@ -491,9 +641,78 @@ function Profile() {
   const cancelEdit = () => {
     setDraft(profile);
     setErrors({});
-    setEditingIdentity(false);
     setEditingContact(false);
     setEditingBio(false);
+  };
+
+  const openIdentityModal = () => {
+    setDraft((current) => ({
+      ...current,
+      fullName: profile.fullName,
+      username: profile.username,
+      department: profile.department,
+      academicLevel: profile.academicLevel,
+    }));
+    setIdentityModalOpen(true);
+  };
+
+  const closeIdentityModal = () => {
+    setDraft((current) => ({
+      ...current,
+      fullName: profile.fullName,
+      username: profile.username,
+      department: profile.department,
+      academicLevel: profile.academicLevel,
+    }));
+    setIdentityModalOpen(false);
+  };
+
+  const saveIdentity = async () => {
+    const displayName = draft.fullName.trim();
+    const uname = draft.username.trim();
+    const department = draft.department.trim();
+    const schoolYear = academicLevelToSchoolYear(draft.academicLevel);
+
+    if (!displayName || !uname) {
+      toast.error("Full name and username are required.");
+      return;
+    }
+    if (user?.accountType === "student") {
+      if (!department) {
+        toast.error("Department or major is required.");
+        return;
+      }
+      if (!Number.isFinite(schoolYear) || schoolYear < 1 || schoolYear > 7) {
+        toast.error("Choose a valid academic level.");
+        return;
+      }
+    }
+
+    setIdentitySaving(true);
+    try {
+      const body =
+        user?.accountType === "student"
+          ? { displayName, username: uname, department, schoolYear }
+          : { displayName, username: uname, department };
+
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok)
+        throw new Error(payload.message || "Could not save profile.");
+
+      await refreshAuth();
+      setIdentityModalOpen(false);
+      toast.success("Profile updated");
+    } catch (e) {
+      toast.error(e.message || "Could not save profile.");
+    } finally {
+      setIdentitySaving(false);
+    }
   };
 
   const uploadAvatar = (event) => {
@@ -575,99 +794,29 @@ function Profile() {
                 />
 
                 <div className="relative z-10 min-w-0 pt-2 lg:pt-0">
-                  {editingIdentity ? (
-                    <div className="grid gap-3 rounded-2xl border border-slate-200/90 bg-slate-50/90 p-4 sm:grid-cols-2 dark:border-slate-600/80 dark:bg-slate-800/80">
-                      <input
-                        className="input-field"
-                        name="fullName"
-                        value={draft.fullName}
-                        onChange={updateDraft}
-                        aria-label="Full name"
-                      />
-                      <input
-                        className="input-field"
-                        name="username"
-                        value={draft.username}
-                        onChange={updateDraft}
-                        aria-label="Username"
-                      />
-                      <input
-                        className="input-field"
-                        name="department"
-                        value={draft.department}
-                        onChange={updateDraft}
-                        aria-label="Department or major"
-                      />
-                      <select
-                        className="input-field"
-                        name="academicLevel"
-                        value={draft.academicLevel}
-                        onChange={updateDraft}
-                        aria-label="Academic level"
-                      >
-                        <option>Year 1</option>
-                        <option>Year 2</option>
-                        <option>Year 3</option>
-                        <option>Year 4</option>
-                        <option>Graduate</option>
-                      </select>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h1 className="relative z-10 max-w-full text-balance break-words font-display text-3xl font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
-                          {profile.fullName || profile.username || "Student"}
-                        </h1>
-                        <span className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/30">
-                          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
-                          {profile.status}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-400">
-                        @{profile.username} / {profile.department} /{" "}
-                        {profile.academicLevel}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                        Student ID:{" "}
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {profile.studentId}
-                        </span>
-                      </p>
-                    </>
-                  )}
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="relative z-10 max-w-full text-balance break-words font-display text-3xl font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                      {profile.fullName || profile.username || "Student"}
+                    </h1>
+                    <span className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/30">
+                      <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
+                      {profile.status}
+                    </span>
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-400">
+                    @{profile.username} / {profile.department} /{" "}
+                    {profile.academicLevel}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Student ID:{" "}
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">
+                      {profile.studentId}
+                    </span>
+                  </p>
                 </div>
               </div>
 
               <div className="relative z-10 flex flex-wrap gap-2">
-                {editingIdentity ? (
-                  <>
-                    <button
-                      type="button"
-                      className="btn-secondary gap-2 px-4 py-2 text-sm"
-                      onClick={cancelEdit}
-                    >
-                      <X className="h-4 w-4" aria-hidden />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-primary gap-2 px-4 py-2 text-sm"
-                      onClick={() => saveProfile("identity")}
-                    >
-                      <Save className="h-4 w-4" aria-hidden />
-                      Save
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    className="btn-primary gap-2 px-4 py-2 text-sm"
-                    onClick={() => setEditingIdentity(true)}
-                  >
-                    <Edit3 className="h-4 w-4" aria-hidden />
-                    Edit Profile
-                  </button>
-                )}
                 <Link
                   to="/settings"
                   className="btn-secondary gap-2 px-4 py-2 text-sm"
@@ -907,7 +1056,7 @@ function Profile() {
                   <button
                     type="button"
                     className="btn-secondary justify-start gap-2 px-4 py-2.5 text-sm"
-                    onClick={() => setEditingIdentity(true)}
+                    onClick={openIdentityModal}
                   >
                     <Edit3 className="h-4 w-4" aria-hidden />
                     Edit Profile
@@ -1327,6 +1476,17 @@ function Profile() {
           </section>
         ) : null}
       </section>
+
+      <IdentityEditModal
+        open={identityModalOpen}
+        title="Edit profile"
+        draft={draft}
+        updateDraft={updateDraft}
+        isStudent={user?.accountType !== "instructor"}
+        saving={identitySaving}
+        onClose={closeIdentityModal}
+        onSave={() => void saveIdentity()}
+      />
 
       <ConfirmModal
         open={Boolean(confirm)}
