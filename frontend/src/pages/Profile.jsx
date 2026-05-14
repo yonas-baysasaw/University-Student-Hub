@@ -1,11 +1,14 @@
 import {
   Activity,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
   Award,
   BadgeCheck,
   Bell,
   BookOpen,
   BriefcaseBusiness,
+  Calendar,
   CalendarDays,
   Camera,
   Check,
@@ -19,6 +22,7 @@ import {
   KeyRound,
   Laptop,
   LayoutDashboard,
+  Library,
   Lock,
   LogOut,
   Mail,
@@ -34,14 +38,24 @@ import {
   Target,
   Trophy,
   Upload,
+  UserPlus,
   UserRound,
+  Users,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import defaultProfile from "../assets/profile.png";
+import BookEventReportMenu from "../components/report/BookEventReportMenu.jsx";
 import { useAuth } from "../contexts/AuthContext";
+import { academicTrackLabel } from "../utils/bookUploadMeta";
+import {
+  formatLibraryDate,
+  humanizeFormat,
+  visibilityLabel,
+  visibilityTone,
+} from "../utils/formatLabels";
 
 const tabs = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
@@ -200,6 +214,167 @@ function academicLevelToSchoolYear(level) {
   }
   if (/^graduate$/i.test(s)) return 7;
   return NaN;
+}
+
+/** Maps GET /api/profile/public payload → Profile.jsx row shape (peer view). */
+function mapPeerApiToProfileRow(peer) {
+  if (!peer) return null;
+  const full =
+    (peer.displayName && String(peer.displayName).trim()) ||
+    (peer.name && String(peer.name).trim()) ||
+    peer.username ||
+    "Member";
+  const level = schoolYearToAcademicLevel(peer.schoolYear ?? null);
+  return {
+    fullName: full,
+    username: peer.username || "—",
+    status:
+      peer.accountType === "instructor" ? "Instructor" : "Student",
+    department: peer.department?.trim() ? peer.department.trim() : "—",
+    studentId: "",
+    academicLevel: level || "—",
+    email: "",
+    phone: "",
+    location: "",
+    emergencyContact: "",
+    bio: "",
+    interests: "",
+    careerGoals: "",
+    skills: "",
+  };
+}
+
+function formatPeerBookDate(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
+function PeerLibraryGrid({ sharedBooks }) {
+  return (
+    <div className="panel-card rounded-3xl p-6 shadow-xl shadow-slate-900/[0.06] md:p-8 dark:shadow-black/35">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-100 pb-6 dark:border-slate-700/80">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-500/15 to-indigo-500/10 text-cyan-700 ring-1 ring-cyan-500/20 dark:from-cyan-400/12 dark:to-indigo-400/8 dark:text-cyan-300 dark:ring-cyan-400/25">
+            <Library className="h-6 w-6" strokeWidth={1.75} aria-hidden />
+          </span>
+          <div>
+            <h2 className="font-display text-2xl font-bold text-slate-950 dark:text-white">
+              Library contributions
+            </h2>
+            <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+              Public and unlisted materials they’ve shared — open a card for
+              details, reactions, and Study Buddy.
+            </p>
+          </div>
+        </div>
+        <Link
+          to="/liqu-ai/study-buddy"
+          className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50/80 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-cyan-500/40"
+        >
+          <Sparkles className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+          Liqu AI
+        </Link>
+      </div>
+
+      <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {sharedBooks.length === 0 ? (
+          <div className="col-span-full rounded-3xl border border-dashed border-slate-300 bg-gradient-to-br from-slate-50 to-cyan-50/30 px-8 py-16 text-center dark:border-slate-600 dark:from-slate-900/50 dark:to-slate-900/30">
+            <BookOpen className="mx-auto h-14 w-14 text-cyan-500/75" />
+            <p className="mt-4 font-display text-xl font-semibold text-slate-950 dark:text-white">
+              Nothing on the shelf yet
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-600 dark:text-slate-400">
+              When this member publishes books to the library, they’ll show up
+              here for everyone who visits their profile.
+            </p>
+          </div>
+        ) : (
+          sharedBooks.map((book) => (
+            <article
+              key={book._id}
+              className="library-book-card group flex flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white dark:border-slate-600/85 dark:bg-slate-900/40"
+            >
+              <Link
+                to={`/library/${book._id}`}
+                className="relative block aspect-[4/3] overflow-hidden bg-slate-100 dark:bg-slate-800"
+              >
+                {book.thumbnailUrl ? (
+                  <img
+                    src={book.thumbnailUrl}
+                    alt=""
+                    className="library-cover-img h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 p-6">
+                    <BookOpen className="h-12 w-12 text-slate-400" />
+                    <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                      No cover
+                    </span>
+                  </div>
+                )}
+                <div className="library-cover-shine pointer-events-none absolute inset-0" />
+              </Link>
+              <div className="flex flex-1 flex-col p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <h3 className="line-clamp-2 font-display text-base font-semibold text-slate-950 dark:text-white">
+                    <Link
+                      to={`/library/${book._id}`}
+                      className="transition hover:text-cyan-700 dark:hover:text-cyan-400"
+                    >
+                      {book.title || "Untitled"}
+                    </Link>
+                  </h3>
+                  <span
+                    className={`shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ring-1 ${visibilityTone(book.visibility)}`}
+                  >
+                    {visibilityLabel(book.visibility)}
+                  </span>
+                </div>
+                {book.academicTrack ||
+                book.department ||
+                book.courseSubject ||
+                Number.isFinite(book.publishYear) ? (
+                  <p className="mt-2 line-clamp-2 text-xs font-medium text-slate-600 dark:text-slate-400">
+                    {[
+                      book.academicTrack
+                        ? academicTrackLabel(book.academicTrack)
+                        : null,
+                      book.department,
+                      book.courseSubject,
+                      Number.isFinite(book.publishYear) ? book.publishYear : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                ) : null}
+                <p className="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                  {humanizeFormat(book.format)} ·{" "}
+                  {formatLibraryDate(book.createdAt) ||
+                    formatPeerBookDate(book.createdAt)}
+                </p>
+                {book.description ? (
+                  <p className="mt-2 line-clamp-3 flex-1 text-sm leading-relaxed text-slate-600 dark:text-slate-400">
+                    {book.description}
+                  </p>
+                ) : (
+                  <div className="flex-1" />
+                )}
+                <Link
+                  to={`/library/${book._id}`}
+                  className="btn-secondary mt-4 inline-flex w-full items-center justify-center gap-2 py-2.5 text-sm font-bold"
+                >
+                  View details
+                  <ArrowRight className="h-4 w-4" aria-hidden />
+                </Link>
+              </div>
+            </article>
+          ))
+        )}
+      </div>
+    </div>
+  );
 }
 
 function StatCard({ icon: Icon, label, value, hint, progress, tone = "cyan" }) {
@@ -490,7 +665,11 @@ function ConfirmModal({
   );
 }
 
-function Profile() {
+function Profile({ viewMode = "owner" }) {
+  const isPeerView = viewMode === "peer";
+  const { userId: peerRouteUserId } = useParams();
+  const peerUserId = isPeerView ? peerRouteUserId : null;
+
   const { user, setUser, logout, refreshAuth } = useAuth();
   const fileInputRef = useRef(null);
   const [activeTab, setActiveTab] = useState("overview");
@@ -498,13 +677,89 @@ function Profile() {
   const [identitySaving, setIdentitySaving] = useState(false);
   const [editingContact, setEditingContact] = useState(false);
   const [editingBio, setEditingBio] = useState(false);
-  const [loadingActivity, setLoadingActivity] = useState(true);
+  const [loadingActivity, setLoadingActivity] = useState(!isPeerView);
   const [activities, setActivities] = useState(mockActivities);
   const [sessions, setSessions] = useState(mockSessions);
   const [confirm, setConfirm] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(
     user?.photo || defaultProfile,
   );
+
+  const [peerLoading, setPeerLoading] = useState(isPeerView);
+  const [peerError, setPeerError] = useState("");
+  const [peerApiProfile, setPeerApiProfile] = useState(null);
+  const [peerSharedBooks, setPeerSharedBooks] = useState([]);
+  const [peerSubscribersCount, setPeerSubscribersCount] = useState(0);
+  const [peerBooksSharedCount, setPeerBooksSharedCount] = useState(0);
+  const [peerSubscribed, setPeerSubscribed] = useState(false);
+  const [peerActionLoading, setPeerActionLoading] = useState(false);
+  const [peerActionMessage, setPeerActionMessage] = useState("");
+
+  const viewerIdStr = user ? String(user._id ?? user.id ?? "") : "";
+
+  useEffect(() => {
+    if (!isPeerView) return;
+    if (!peerUserId) {
+      setPeerError("Missing user id");
+      setPeerLoading(false);
+      return;
+    }
+    let active = true;
+
+    const loadPeer = async () => {
+      try {
+        setPeerLoading(true);
+        setPeerError("");
+        const res = await fetch(`/api/profile/public/${peerUserId}`, {
+          credentials: "include",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(data?.message || "Failed to load profile");
+        }
+        if (!active) return;
+        const loadedProfile = data?.profile || null;
+        setPeerApiProfile(loadedProfile);
+        const loadedBooks = Array.isArray(data?.sharedBooks)
+          ? data.sharedBooks
+          : [];
+        setPeerSharedBooks(loadedBooks);
+        setPeerSubscribed(Boolean(data?.viewerState?.subscribed));
+        setPeerSubscribersCount(
+          Number.isFinite(loadedProfile?.subscribersCount)
+            ? loadedProfile.subscribersCount
+            : 0,
+        );
+        setPeerBooksSharedCount(
+          Number.isFinite(data?.stats?.sharedBooks)
+            ? data.stats.sharedBooks
+            : loadedBooks.length,
+        );
+      } catch (err) {
+        if (!active) return;
+        setPeerError(err?.message || "Could not load this profile");
+        setPeerApiProfile(null);
+      } finally {
+        if (active) setPeerLoading(false);
+      }
+    };
+
+    loadPeer();
+    return () => {
+      active = false;
+    };
+  }, [isPeerView, peerUserId]);
+
+  const peerJoinedDate = useMemo(() => {
+    if (!isPeerView || !peerApiProfile?.joinedAt) return null;
+    const date = new Date(peerApiProfile.joinedAt);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  }, [isPeerView, peerApiProfile?.joinedAt]);
 
   const displayName =
     user?.displayName || user?.name || user?.username || "Amina Bekele";
@@ -551,12 +806,23 @@ function Profile() {
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    if (!isPeerView || !peerApiProfile) return;
+    const row = mapPeerApiToProfileRow(peerApiProfile);
+    if (!row) return;
+    setProfile(row);
+    setDraft(row);
+    setAvatarPreview(peerApiProfile.avatar || defaultProfile);
+  }, [isPeerView, peerApiProfile]);
+
+  useEffect(() => {
+    if (isPeerView) return;
     setProfile(initialProfile);
     setDraft(initialProfile);
     setAvatarPreview(user?.photo || defaultProfile);
-  }, [initialProfile, user?.photo]);
+  }, [initialProfile, user?.photo, isPeerView]);
 
   useEffect(() => {
+    if (isPeerView) return;
     let active = true;
 
     const loadActivity = async () => {
@@ -585,7 +851,7 @@ function Profile() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [isPeerView]);
 
   useEffect(() => {
     return () => {
@@ -744,24 +1010,136 @@ function Profile() {
     toast.success("Signed out");
   };
 
+  const handlePeerSubscribe = async () => {
+    if (!peerApiProfile?.id || peerActionLoading) return;
+    setPeerActionLoading(true);
+    setPeerActionMessage("");
+    try {
+      const res = await fetch(
+        `/api/profile/public/${peerApiProfile.id}/subscribe`,
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401) {
+          throw new Error("Please sign in to subscribe.");
+        }
+        throw new Error(data?.message || "Could not update subscription");
+      }
+      const subscribed = Boolean(data?.subscribed);
+      const nextCount = Number.isFinite(data?.profile?.subscribersCount)
+        ? data.profile.subscribersCount
+        : peerSubscribersCount;
+      setPeerSubscribed(subscribed);
+      setPeerSubscribersCount(nextCount);
+      setPeerApiProfile((prev) =>
+        prev ? { ...prev, subscribersCount: nextCount } : prev,
+      );
+      setPeerActionMessage(
+        subscribed ? "You’re following this member." : "Subscription removed.",
+      );
+      window.setTimeout(() => setPeerActionMessage(""), 3200);
+    } catch (err) {
+      setPeerActionMessage(err?.message || "Could not update subscription.");
+      window.setTimeout(() => setPeerActionMessage(""), 4000);
+    } finally {
+      setPeerActionLoading(false);
+    }
+  };
+
+  if (
+    isPeerView &&
+    viewerIdStr &&
+    peerUserId &&
+    viewerIdStr === String(peerUserId)
+  ) {
+    return <Navigate to="/profile" replace />;
+  }
+
+  const showPeerDashboard =
+    isPeerView && !peerLoading && !peerError && peerApiProfile;
+  const showOwnerDashboard = !isPeerView;
+
   return (
     <main className="dashboard-ambient min-h-screen pb-16">
       <section className="relative z-20 mx-auto w-full max-w-7xl scroll-mt-24 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        {isPeerView ? (
+          <Link
+            to="/library"
+            className="group mb-6 inline-flex items-center gap-2 rounded-full border border-slate-200/90 bg-white/85 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition hover:border-cyan-400/45 hover:bg-white hover:text-cyan-900 dark:border-slate-600 dark:bg-slate-900/85 dark:text-slate-200 dark:hover:border-cyan-500/40 dark:hover:bg-slate-900"
+          >
+            <ArrowLeft
+              className="h-4 w-4 transition group-hover:-translate-x-0.5"
+              aria-hidden
+            />
+            Campus library
+          </Link>
+        ) : null}
+
+        {isPeerView && peerLoading ? (
+          <div className="rounded-[2rem] border border-slate-200/90 bg-white p-10 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+            <div className="animate-pulse space-y-6">
+              <div className="h-40 rounded-2xl bg-slate-200 dark:bg-slate-700" />
+              <div className="h-52 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="h-32 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+                <div className="h-32 rounded-2xl bg-slate-100 dark:bg-slate-800" />
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {isPeerView && !peerLoading && peerError ? (
+          <div className="rounded-[2rem] border border-rose-200/90 bg-gradient-to-br from-rose-50 to-white p-10 text-center shadow-inner dark:border-rose-900/40 dark:from-rose-950/50 dark:to-slate-900">
+            <p className="font-display text-lg font-semibold text-rose-900 dark:text-rose-100">
+              {peerError}
+            </p>
+            <Link
+              to="/library"
+              className="btn-primary mt-6 inline-flex px-6 py-2.5 text-sm"
+            >
+              Browse library
+            </Link>
+          </div>
+        ) : null}
+
+        {isPeerView && !peerLoading && !peerError && !peerApiProfile ? (
+          <div className="rounded-[2rem] border border-slate-200 bg-white/90 p-10 text-center dark:border-slate-700 dark:bg-slate-900/70">
+            <p className="font-medium text-slate-600 dark:text-slate-400">
+              We couldn’t find this profile.
+            </p>
+            <Link
+              to="/library"
+              className="btn-primary mt-5 inline-flex px-6 py-2.5 text-sm"
+            >
+              Back to library
+            </Link>
+          </div>
+        ) : null}
+
+        {showOwnerDashboard || showPeerDashboard ? (
+          <>
         <div className="overflow-hidden rounded-[2rem] border border-slate-200/90 bg-white shadow-xl shadow-slate-200/60 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30">
           <div className="relative z-0 h-40 bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 sm:h-52">
             <div
               className="absolute inset-0 z-0 workspace-hero-mesh opacity-80"
               aria-hidden
             />
+            {!isPeerView ? (
             <div className="absolute bottom-5 right-5 z-[1] hidden items-center gap-2 rounded-full bg-white/14 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] text-white ring-1 ring-white/25 backdrop-blur sm:flex">
               <span className="h-2 w-2 rounded-full bg-emerald-300" />
               Student record synced
             </div>
+            ) : null}
           </div>
 
           <div className="relative z-10 min-h-[10rem] bg-white px-4 pb-6 pt-8 sm:min-h-[11rem] sm:px-6 sm:pb-7 sm:pt-10 lg:px-8 dark:bg-slate-900">
             <div className="-mt-8 flex flex-col gap-5 sm:-mt-10 lg:flex-row lg:items-end lg:justify-between">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-end lg:items-start">
+                {!isPeerView ? (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
@@ -785,6 +1163,22 @@ function Profile() {
                     Change
                   </span>
                 </button>
+                ) : (
+                <div className="relative z-10 h-28 w-28 shrink-0 overflow-hidden rounded-3xl bg-slate-100 ring-2 ring-white/80 profile-avatar-ring dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32">
+                  {avatarPreview ? (
+                    <img
+                      src={avatarPreview}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="flex h-full w-full items-center justify-center font-display text-3xl font-bold text-cyan-800 dark:text-cyan-200">
+                      {initials}
+                    </span>
+                  )}
+                </div>
+                )}
+                {!isPeerView ? (
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -792,6 +1186,7 @@ function Profile() {
                   className="sr-only"
                   onChange={uploadAvatar}
                 />
+                ) : null}
 
                 <div className="relative z-10 min-w-0 pt-2 lg:pt-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -807,16 +1202,62 @@ function Profile() {
                     @{profile.username} / {profile.department} /{" "}
                     {profile.academicLevel}
                   </p>
+                  {!isPeerView ? (
                   <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                     Student ID:{" "}
                     <span className="font-semibold text-slate-800 dark:text-slate-200">
                       {profile.studentId}
                     </span>
                   </p>
+                  ) : null}
+                  {isPeerView && peerJoinedDate ? (
+                    <p className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <Calendar className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
+                      <span>
+                        Member since{" "}
+                        <span className="font-semibold text-slate-800 dark:text-slate-200">
+                          {peerJoinedDate}
+                        </span>
+                      </span>
+                    </p>
+                  ) : null}
                 </div>
               </div>
 
               <div className="relative z-10 flex flex-wrap gap-2">
+                {isPeerView ? (
+                  <>
+                    {user &&
+                    peerApiProfile?.id &&
+                    viewerIdStr !== String(peerApiProfile.id) ? (
+                      <div className="flex w-full justify-end sm:w-auto sm:justify-start">
+                        <BookEventReportMenu
+                          targetType="user"
+                          targetId={String(peerApiProfile.id)}
+                          shareUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/users/${peerApiProfile.id}`}
+                          align="left"
+                        />
+                      </div>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void handlePeerSubscribe()}
+                      disabled={peerActionLoading}
+                      className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        peerSubscribed
+                          ? "border-2 border-emerald-400/50 bg-emerald-50 text-emerald-900 shadow-emerald-900/10 hover:bg-emerald-100 dark:border-emerald-500/35 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-950/80"
+                          : "btn-primary shadow-cyan-900/20"
+                      }`}
+                    >
+                      <UserPlus className="h-5 w-5" aria-hidden />
+                      {peerActionLoading
+                        ? "Please wait…"
+                        : peerSubscribed
+                          ? "Following"
+                          : "Follow"}
+                    </button>
+                  </>
+                ) : (
                 <Link
                   to="/settings"
                   className="btn-secondary gap-2 px-4 py-2 text-sm"
@@ -824,11 +1265,13 @@ function Profile() {
                   <Settings className="h-4 w-4" aria-hidden />
                   Settings
                 </Link>
+                )}
               </div>
             </div>
           </div>
         </div>
 
+        {!isPeerView ? (
         <nav
           className="sticky top-[4.75rem] z-20 mt-5 overflow-x-auto rounded-2xl border border-slate-200/90 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/90"
           aria-label="Profile sections"
@@ -852,10 +1295,13 @@ function Profile() {
             ))}
           </div>
         </nav>
+        ) : null}
 
         {activeTab === "overview" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-6">
+              {!isPeerView ? (
+              <>
               <section aria-labelledby="academic-title">
                 <div className="mb-4 flex items-center gap-2">
                   <GraduationCap
@@ -1039,9 +1485,16 @@ function Profile() {
                   ))}
                 </div>
               </section>
+              </>
+              ) : null}
+              {isPeerView ? (
+                <PeerLibraryGrid sharedBooks={peerSharedBooks} />
+              ) : null}
             </div>
 
             <aside className="space-y-6">
+              {!isPeerView ? (
+              <>
               <section
                 className="rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60"
                 aria-labelledby="quick-actions-title"
@@ -1151,11 +1604,43 @@ function Profile() {
                   </div>
                 </dl>
               </section>
+              </>
+              ) : (
+              <>
+              <section className="rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60">
+                <h2 className="font-display text-xl font-bold text-slate-950 dark:text-white">
+                  Presence on the hub
+                </h2>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Follow for updates when they publish new library materials.
+                </p>
+                {peerActionMessage ? (
+                  <p className="mt-3 rounded-xl bg-emerald-50 px-3 py-2 text-center text-xs font-semibold text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                    {peerActionMessage}
+                  </p>
+                ) : null}
+                <div className="mt-4 grid gap-3">
+                  <StatCard
+                    icon={Users}
+                    label="Followers"
+                    value={peerSubscribersCount}
+                    tone="indigo"
+                  />
+                  <StatCard
+                    icon={BookOpen}
+                    label="Books shared"
+                    value={peerBooksSharedCount}
+                    tone="cyan"
+                  />
+                </div>
+              </section>
+              </>
+              )}
             </aside>
           </div>
         ) : null}
 
-        {activeTab === "activity" ? (
+        {!isPeerView && activeTab === "activity" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
             <section aria-labelledby="student-activity-title">
               <div className="mb-4 flex items-center gap-2">
@@ -1301,7 +1786,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {activeTab === "security" ? (
+        {!isPeerView && activeTab === "security" ? (
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
             <StatCard
               icon={Mail}
@@ -1359,7 +1844,7 @@ function Profile() {
           </div>
         ) : null}
 
-        {activeTab === "about" ? (
+        {!isPeerView && activeTab === "about" ? (
           <section
             className="mt-6 rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60"
             aria-labelledby="about-title"
@@ -1475,8 +1960,11 @@ function Profile() {
             </div>
           </section>
         ) : null}
+          </>
+        ) : null}
       </section>
 
+      {!isPeerView ? (
       <IdentityEditModal
         open={identityModalOpen}
         title="Edit profile"
@@ -1487,6 +1975,7 @@ function Profile() {
         onClose={closeIdentityModal}
         onSave={() => void saveIdentity()}
       />
+      ) : null}
 
       <ConfirmModal
         open={Boolean(confirm)}
@@ -1497,6 +1986,7 @@ function Profile() {
         onConfirm={confirm?.onConfirm}
       />
 
+      {!isPeerView ? (
       <button
         type="button"
         className="fixed bottom-5 right-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-cyan-600 text-white shadow-xl shadow-cyan-600/25 transition hover:-translate-y-0.5 hover:bg-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
@@ -1506,6 +1996,7 @@ function Profile() {
       >
         <Camera className="h-5 w-5" aria-hidden />
       </button>
+      ) : null}
     </main>
   );
 }
