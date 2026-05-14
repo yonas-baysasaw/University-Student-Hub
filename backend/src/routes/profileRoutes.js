@@ -31,7 +31,9 @@ router.get(
     }
 
     const user = await User.findById(userId)
-      .select('username name avatar createdAt subscribers')
+      .select(
+        'username name displayName avatar createdAt subscribers department schoolYear accountType',
+      )
       .lean();
     if (!user) {
       return res
@@ -60,10 +62,18 @@ router.get(
       profile: {
         id: String(user._id),
         name: user.name || user.username || 'User',
+        displayName: user.displayName || '',
         username: user.username || '',
         avatar: user.avatar || '',
         joinedAt: user.createdAt || null,
         subscribersCount: subscribers.length,
+        department: user.department || '',
+        schoolYear:
+          typeof user.schoolYear === 'number' && Number.isFinite(user.schoolYear)
+            ? user.schoolYear
+            : null,
+        accountType:
+          user.accountType === 'instructor' ? 'instructor' : 'student',
       },
       stats: {
         sharedBooks: sharedBooks.length,

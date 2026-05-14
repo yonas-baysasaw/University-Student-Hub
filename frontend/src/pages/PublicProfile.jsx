@@ -3,7 +3,9 @@ import {
   ArrowRight,
   BookOpen,
   Calendar,
+  GraduationCap,
   Library,
+  MapPin,
   Sparkles,
   UserPlus,
   Users,
@@ -20,6 +22,7 @@ import {
   visibilityTone,
 } from '../utils/formatLabels';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
+import { schoolYearToAcademicLevel } from '../utils/academicLevel';
 
 function PublicProfile() {
   const { userId } = useParams();
@@ -100,6 +103,20 @@ function PublicProfile() {
     });
   }, [profile?.joinedAt]);
 
+  const displayHeadline = useMemo(() => {
+    const dn = profile?.displayName?.trim();
+    if (dn) return dn;
+    return profile?.name?.trim() || 'Member';
+  }, [profile?.displayName, profile?.name]);
+
+  const academicLabel = useMemo(
+    () => schoolYearToAcademicLevel(profile?.schoolYear ?? null),
+    [profile?.schoolYear],
+  );
+
+  const hasCampusDetails =
+    Boolean(profile?.department?.trim()) || Boolean(academicLabel);
+
   const formatDate = (value) => {
     if (!value) return '—';
     const date = new Date(value);
@@ -137,7 +154,7 @@ function PublicProfile() {
         prev ? { ...prev, subscribersCount: nextCount } : prev,
       );
       setActionMessage(
-        subscribed ? 'You’re following this creator.' : 'Subscription removed.',
+        subscribed ? 'You’re following this member.' : 'Subscription removed.',
       );
       window.setTimeout(() => setActionMessage(''), 3200);
     } catch (err) {
@@ -225,7 +242,9 @@ function PublicProfile() {
                   <div className="min-w-0 flex-1 space-y-4">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-cyan-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-cyan-800 dark:bg-cyan-500/20 dark:text-cyan-200">
-                        Creator profile
+                        {profile.accountType === 'instructor'
+                          ? 'Instructor'
+                          : 'Student profile'}
                       </span>
                       <span className="rounded-full bg-slate-900/5 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/90 dark:bg-white/5 dark:text-slate-300 dark:ring-slate-600">
                         Public view
@@ -233,7 +252,7 @@ function PublicProfile() {
                     </div>
                     <div>
                       <h1 className="font-display text-balance text-3xl font-bold tracking-tight text-slate-900 md:text-4xl xl:text-[2.5rem] dark:text-white">
-                        {profile.name || 'Member'}
+                        {displayHeadline}
                       </h1>
                       {profile.username ? (
                         <p className="mt-1 font-medium text-cyan-700 dark:text-cyan-400">
@@ -286,13 +305,53 @@ function PublicProfile() {
                       ? 'Please wait…'
                       : isSubscribed
                         ? 'Following'
-                        : 'Follow creator'}
+                        : 'Follow'}
                   </button>
                   <p className="text-center text-[11px] leading-snug text-slate-500 dark:text-slate-400 sm:text-left">
-                    Get updates when they share new materials to the library.
+                    Get updates when they share new materials in the library.
                   </p>
                 </div>
               </div>
+
+              {hasCampusDetails ? (
+                <div className="relative border-t border-slate-200/80 bg-white/55 px-6 py-5 dark:border-slate-700 dark:bg-slate-900/80 md:px-10">
+                  <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                    Campus
+                  </p>
+                  <dl className="mt-3 grid gap-3 sm:grid-cols-2 sm:gap-6">
+                    {profile.department?.trim() ? (
+                      <div className="flex gap-3 rounded-2xl bg-slate-50/95 p-3 ring-1 ring-slate-100 dark:bg-slate-800/60 dark:ring-slate-700/80">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-500/12 text-indigo-700 dark:text-indigo-200">
+                          <MapPin className="h-5 w-5" aria-hidden />
+                        </span>
+                        <div className="min-w-0">
+                          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Department
+                          </dt>
+                          <dd className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">
+                            {profile.department.trim()}
+                          </dd>
+                        </div>
+                      </div>
+                    ) : null}
+                    {academicLabel ? (
+                      <div className="flex gap-3 rounded-2xl bg-slate-50/95 p-3 ring-1 ring-slate-100 dark:bg-slate-800/60 dark:ring-slate-700/80">
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/12 text-emerald-800 dark:text-emerald-200">
+                          <GraduationCap className="h-5 w-5" aria-hidden />
+                        </span>
+                        <div className="min-w-0">
+                          <dt className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                            Level
+                          </dt>
+                          <dd className="mt-0.5 text-sm font-semibold text-slate-900 dark:text-white">
+                            {academicLabel}
+                          </dd>
+                        </div>
+                      </div>
+                    ) : null}
+                  </dl>
+                </div>
+              ) : null}
 
               <div className="relative grid gap-px border-t border-slate-200/80 bg-slate-200/80 dark:border-slate-700 dark:bg-slate-700 sm:grid-cols-2">
                 <div className="flex items-center gap-4 bg-white/95 px-6 py-5 dark:bg-slate-900/95">
@@ -339,11 +398,11 @@ function PublicProfile() {
                   </span>
                   <div>
                     <h2 className="font-display text-2xl font-bold text-slate-900 dark:text-white">
-                      Shared library
+                      Library contributions
                     </h2>
                     <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                      Public and unlisted titles from this creator — open any card
-                      for full detail, reactions, and Study Buddy.
+                      Public and unlisted materials they’ve shared — open a card for
+                      details, reactions, and Study Buddy.
                     </p>
                   </div>
                 </div>

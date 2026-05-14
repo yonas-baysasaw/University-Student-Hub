@@ -398,22 +398,31 @@ function LibraryBookListRow({
         </div>
 
         <div className="flex min-w-0 items-center gap-2">
-          <img
-            src={item.uploader.avatar || defaultProfile}
-            alt=""
-            className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-cyan-500/20"
-          />
           {item.uploader.id ? (
             <Link
               to={`/users/${item.uploader.id}`}
-              className="truncate text-xs font-semibold text-slate-700 hover:text-cyan-600 dark:text-slate-200 dark:hover:text-cyan-400"
+              className="group/up inline-flex min-w-0 flex-1 items-center gap-2 rounded-lg px-0.5 py-0.5 transition hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
             >
-              {item.uploader.name}
+              <img
+                src={item.uploader.avatar || defaultProfile}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-cyan-500/20"
+              />
+              <span className="truncate text-xs font-semibold text-slate-700 group-hover/up:text-cyan-600 dark:text-slate-200 dark:group-hover/up:text-cyan-400">
+                {item.uploader.name}
+              </span>
             </Link>
           ) : (
-            <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">
-              {item.uploader.name}
-            </span>
+            <>
+              <img
+                src={item.uploader.avatar || defaultProfile}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-cyan-500/20"
+              />
+              <span className="truncate text-xs font-semibold text-slate-600 dark:text-slate-300">
+                {item.uploader.name}
+              </span>
+            </>
           )}
         </div>
 

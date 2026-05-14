@@ -1738,10 +1738,6 @@ function ExamPaperEngagement({ exam, currentUserId, onUpdate }) {
           </button>
         ) : null}
       </div>
-      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
-        Reactions steer discovery; saves keep papers one tap away in your profile
-        rhythm.
-      </p>
     </div>
   );
 }

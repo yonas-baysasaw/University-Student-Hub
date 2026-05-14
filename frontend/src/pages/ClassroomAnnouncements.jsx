@@ -948,7 +948,17 @@ function ClassroomAnnouncementsContent({ chatId }) {
             dangerouslySetInnerHTML={{ __html: bodyHtml }}
           />
           <p className="mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">
-            Posted by {norm.author}
+            Posted by{' '}
+            {norm.authorId ? (
+              <Link
+                to={`/users/${norm.authorId}`}
+                className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+              >
+                {norm.author}
+              </Link>
+            ) : (
+              <span>{norm.author}</span>
+            )}
           </p>
         </div>
       </article>

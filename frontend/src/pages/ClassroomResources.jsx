@@ -1080,7 +1080,17 @@ function ClassroomResourcesContent({ chatId }) {
                           ) : null}
                         </div>
                         <p className="mt-3 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                          {item.author} ·{' '}
+                          {item.authorId ? (
+                            <Link
+                              to={`/users/${item.authorId}`}
+                              className="font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+                            >
+                              {item.author}
+                            </Link>
+                          ) : (
+                            <span>{item.author}</span>
+                          )}{' '}
+                          ·{' '}
                           {new Date(item.createdAt).toLocaleDateString(undefined, {
                             dateStyle: 'medium',
                           })}
