@@ -11,6 +11,22 @@ import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
 const router = express.Router();
 
+const PUBLIC_PROFILE_FIELDS =
+  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialTelegram socialLinkedIn socialInstagram socialFacebook socialUpwork';
+
+/** @param {unknown} body @param {string} key @param {number} maxLen */
+function readOptionalTrimmedString(body, key, maxLen) {
+  if (body[key] === undefined) return undefined;
+  if (typeof body[key] !== 'string') return null;
+  return body[key].trim().slice(0, maxLen);
+}
+
+function readOptionalBoolean(body, key) {
+  if (body[key] === undefined) return undefined;
+  if (typeof body[key] === 'boolean') return body[key];
+  return null;
+}
+
 /* ===== Middleware: Ensure Authenticated ===== */
 function ensureAuth(req, res, next) {
   if (req.isAuthenticated?.()) {
@@ -31,9 +47,7 @@ router.get(
     }
 
     const user = await User.findById(userId)
-      .select(
-        'username name displayName avatar createdAt subscribers department schoolYear accountType',
-      )
+      .select(PUBLIC_PROFILE_FIELDS)
       .lean();
     if (!user) {
       return res
@@ -74,6 +88,27 @@ router.get(
             : null,
         accountType:
           user.accountType === 'instructor' ? 'instructor' : 'student',
+        email:
+          user.showEmailPublic &&
+          typeof user.email === 'string' &&
+          user.email.trim()
+            ? user.email.trim()
+            : '',
+        bio: typeof user.bio === 'string' ? user.bio : '',
+        interests: typeof user.interests === 'string' ? user.interests : '',
+        careerGoals:
+          typeof user.careerGoals === 'string' ? user.careerGoals : '',
+        skills: typeof user.skills === 'string' ? user.skills : '',
+        socialTelegram:
+          typeof user.socialTelegram === 'string' ? user.socialTelegram : '',
+        socialLinkedIn:
+          typeof user.socialLinkedIn === 'string' ? user.socialLinkedIn : '',
+        socialInstagram:
+          typeof user.socialInstagram === 'string' ? user.socialInstagram : '',
+        socialFacebook:
+          typeof user.socialFacebook === 'string' ? user.socialFacebook : '',
+        socialUpwork:
+          typeof user.socialUpwork === 'string' ? user.socialUpwork : '',
       },
       stats: {
         sharedBooks: sharedBooks.length,
@@ -367,6 +402,53 @@ router.put(
   blockReadOnlyUser,
   asyncHandler(async (req, res) => {
     const { username, displayName, department, schoolYear } = req.body;
+
+    const showEmailPublic = readOptionalBoolean(req.body, 'showEmailPublic');
+    if (showEmailPublic === null) {
+      return res.status(400).json({ message: 'Invalid showEmailPublic' });
+    }
+    if (showEmailPublic !== undefined) {
+      req.user.showEmailPublic = showEmailPublic;
+    }
+
+    const bio = readOptionalTrimmedString(req.body, 'bio', 1600);
+    if (bio === null) {
+      return res.status(400).json({ message: 'Invalid bio' });
+    }
+    if (bio !== undefined) req.user.bio = bio;
+
+    const interests = readOptionalTrimmedString(req.body, 'interests', 600);
+    if (interests === null) {
+      return res.status(400).json({ message: 'Invalid interests' });
+    }
+    if (interests !== undefined) req.user.interests = interests;
+
+    const careerGoals = readOptionalTrimmedString(req.body, 'careerGoals', 600);
+    if (careerGoals === null) {
+      return res.status(400).json({ message: 'Invalid career goals' });
+    }
+    if (careerGoals !== undefined) req.user.careerGoals = careerGoals;
+
+    const skills = readOptionalTrimmedString(req.body, 'skills', 600);
+    if (skills === null) {
+      return res.status(400).json({ message: 'Invalid skills' });
+    }
+    if (skills !== undefined) req.user.skills = skills;
+
+    const socialKeys = [
+      ['socialTelegram', 'socialTelegram'],
+      ['socialLinkedIn', 'socialLinkedIn'],
+      ['socialInstagram', 'socialInstagram'],
+      ['socialFacebook', 'socialFacebook'],
+      ['socialUpwork', 'socialUpwork'],
+    ];
+    for (const [bodyKey, docKey] of socialKeys) {
+      const v = readOptionalTrimmedString(req.body, bodyKey, 400);
+      if (v === null) {
+        return res.status(400).json({ message: `Invalid ${bodyKey}` });
+      }
+      if (v !== undefined) req.user[docKey] = v;
+    }
 
     if (username !== undefined) req.user.username = username;
     if (displayName !== undefined) req.user.displayName = displayName;

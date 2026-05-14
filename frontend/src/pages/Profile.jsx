@@ -44,6 +44,12 @@ import {
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  FaFacebook,
+  FaInstagram,
+  FaLinkedinIn,
+  FaTelegram,
+} from "react-icons/fa";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import defaultProfile from "../assets/profile.png";
@@ -61,6 +67,11 @@ const tabs = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
   { id: "activity", label: "Activity", Icon: Activity },
   { id: "security", label: "Security", Icon: ShieldCheck },
+  { id: "about", label: "About", Icon: UserRound },
+];
+
+const peerTabs = [
+  { id: "overview", label: "Overview", Icon: LayoutDashboard },
   { id: "about", label: "About", Icon: UserRound },
 ];
 
@@ -216,6 +227,233 @@ function academicLevelToSchoolYear(level) {
   return NaN;
 }
 
+function trimSocialInput(raw) {
+  return String(raw ?? "").trim();
+}
+
+function hrefTelegram(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  const h = t.replace(/^@/, "");
+  if (!h) return null;
+  return `https://t.me/${encodeURIComponent(h)}`;
+}
+
+function hrefLinkedIn(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://www.linkedin.com/in/${encodeURIComponent(t.replace(/^\/+/, ""))}`;
+}
+
+function hrefInstagram(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  const h = t.replace(/^@/, "");
+  return `https://www.instagram.com/${encodeURIComponent(h)}/`;
+}
+
+function hrefFacebook(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://www.facebook.com/${encodeURIComponent(t)}`;
+}
+
+function hrefUpwork(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  return `https://www.upwork.com/freelancers/${encodeURIComponent(t)}`;
+}
+
+const SOCIAL_LINK_DEFS = [
+  {
+    key: "socialTelegram",
+    label: "Telegram",
+    hrefFn: hrefTelegram,
+    Icon: FaTelegram,
+    bg: "bg-sky-500/15 text-sky-700 ring-sky-500/25 dark:text-sky-200",
+  },
+  {
+    key: "socialLinkedIn",
+    label: "LinkedIn",
+    hrefFn: hrefLinkedIn,
+    Icon: FaLinkedinIn,
+    bg: "bg-blue-600/15 text-blue-800 ring-blue-600/25 dark:text-blue-200",
+  },
+  {
+    key: "socialInstagram",
+    label: "Instagram",
+    hrefFn: hrefInstagram,
+    Icon: FaInstagram,
+    bg: "bg-fuchsia-500/15 text-fuchsia-800 ring-fuchsia-500/25 dark:text-fuchsia-200",
+  },
+  {
+    key: "socialFacebook",
+    label: "Facebook",
+    hrefFn: hrefFacebook,
+    Icon: FaFacebook,
+    bg: "bg-blue-500/15 text-blue-900 ring-blue-500/20 dark:text-blue-100",
+  },
+  {
+    key: "socialUpwork",
+    label: "Upwork",
+    hrefFn: hrefUpwork,
+    Icon: BriefcaseBusiness,
+    bg: "bg-emerald-500/12 text-emerald-900 ring-emerald-500/25 dark:text-emerald-200",
+  },
+];
+
+function socialLinksFromRow(row) {
+  return SOCIAL_LINK_DEFS.map((def) => ({
+    ...def,
+    href: def.hrefFn(row[def.key]),
+    raw: trimSocialInput(row[def.key]),
+  })).filter((x) => x.href);
+}
+
+function SocialConnectStrip({ row, className = "" }) {
+  const links = socialLinksFromRow(row);
+  if (links.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap gap-2 ${className}`}>
+      {links.map(({ key, label, href, Icon, bg }) => (
+        <a
+          key={key}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={label}
+          aria-label={label}
+          className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ring-1 transition hover:opacity-90 ${bg}`}
+        >
+          <Icon className="h-5 w-5" aria-hidden />
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function SocialConnectPanel({
+  title = "Connect",
+  subtitle,
+  row,
+  emptyHint,
+  className = "",
+}) {
+  const links = socialLinksFromRow(row);
+  return (
+    <section
+      className={`rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60 ${className}`}
+      aria-labelledby="social-connect-title"
+    >
+      <h2
+        id="social-connect-title"
+        className="font-display text-xl font-bold text-slate-950 dark:text-white"
+      >
+        {title}
+      </h2>
+      {subtitle ? (
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+          {subtitle}
+        </p>
+      ) : null}
+      {links.length > 0 ? (
+        <div className="mt-4 flex flex-wrap gap-2.5">
+          {links.map(({ key, label, href, Icon, bg }) => (
+            <a
+              key={key}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`inline-flex items-center gap-2 rounded-2xl px-3.5 py-2.5 text-sm font-bold ring-1 transition hover:opacity-90 ${bg}`}
+            >
+              <Icon className="h-4 w-4 shrink-0" aria-hidden />
+              {label}
+            </a>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          {emptyHint}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function PeerAboutReadOnly({ profile: p }) {
+  const hasAny =
+    (p.bio && p.bio.trim()) ||
+    (p.interests && p.interests.trim()) ||
+    (p.careerGoals && p.careerGoals.trim()) ||
+    (p.skills && p.skills.trim());
+  return (
+    <div className="panel-card rounded-3xl p-6 shadow-xl shadow-slate-900/[0.06] md:p-8 dark:shadow-black/35">
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-5 dark:border-slate-700/80">
+        <BriefcaseBusiness
+          className="h-6 w-6 text-cyan-700 dark:text-cyan-300"
+          aria-hidden
+        />
+        <h2 className="font-display text-2xl font-bold text-slate-950 dark:text-white">
+          About
+        </h2>
+      </div>
+      {hasAny ? (
+        <div className="mt-6 grid gap-5 lg:grid-cols-2">
+          {p.bio?.trim() ? (
+            <div className="lg:col-span-2">
+              <span className="text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                Bio
+              </span>
+              <p className="mt-2 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50 to-cyan-50/40 p-4 text-sm leading-7 text-slate-700 dark:border-slate-700 dark:from-slate-900/50 dark:to-slate-900/30 dark:text-slate-300">
+                {p.bio.trim()}
+              </p>
+            </div>
+          ) : null}
+          <FieldRow
+            label="Interests"
+            name="interests"
+            value={p.interests}
+            editing={false}
+            icon={Sparkles}
+            readOnly
+          />
+          <FieldRow
+            label="Career goals"
+            name="careerGoals"
+            value={p.careerGoals}
+            editing={false}
+            icon={Target}
+            readOnly
+          />
+          <FieldRow
+            label="Skills"
+            name="skills"
+            value={p.skills}
+            editing={false}
+            icon={Check}
+            readOnly
+          />
+        </div>
+      ) : (
+        <div className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-14 text-center dark:border-slate-600 dark:bg-slate-900/40">
+          <BadgeCheck className="mx-auto h-12 w-12 text-slate-400" />
+          <p className="mt-4 font-semibold text-slate-900 dark:text-white">
+            No about details yet
+          </p>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-600 dark:text-slate-400">
+            This member hasn’t added a bio or goals to their public profile.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** Maps GET /api/profile/public payload → Profile.jsx row shape (peer view). */
 function mapPeerApiToProfileRow(peer) {
   if (!peer) return null;
@@ -225,6 +463,8 @@ function mapPeerApiToProfileRow(peer) {
     peer.username ||
     "Member";
   const level = schoolYearToAcademicLevel(peer.schoolYear ?? null);
+  const publicEmail =
+    typeof peer.email === "string" && peer.email.trim() ? peer.email.trim() : "";
   return {
     fullName: full,
     username: peer.username || "—",
@@ -233,14 +473,25 @@ function mapPeerApiToProfileRow(peer) {
     department: peer.department?.trim() ? peer.department.trim() : "—",
     studentId: "",
     academicLevel: level || "—",
-    email: "",
+    email: publicEmail,
     phone: "",
     location: "",
     emergencyContact: "",
-    bio: "",
-    interests: "",
-    careerGoals: "",
-    skills: "",
+    showEmailPublic: false,
+    bio: typeof peer.bio === "string" ? peer.bio : "",
+    interests: typeof peer.interests === "string" ? peer.interests : "",
+    careerGoals: typeof peer.careerGoals === "string" ? peer.careerGoals : "",
+    skills: typeof peer.skills === "string" ? peer.skills : "",
+    socialTelegram:
+      typeof peer.socialTelegram === "string" ? peer.socialTelegram : "",
+    socialLinkedIn:
+      typeof peer.socialLinkedIn === "string" ? peer.socialLinkedIn : "",
+    socialInstagram:
+      typeof peer.socialInstagram === "string" ? peer.socialInstagram : "",
+    socialFacebook:
+      typeof peer.socialFacebook === "string" ? peer.socialFacebook : "",
+    socialUpwork:
+      typeof peer.socialUpwork === "string" ? peer.socialUpwork : "",
   };
 }
 
@@ -750,6 +1001,12 @@ function Profile({ viewMode = "owner" }) {
     };
   }, [isPeerView, peerUserId]);
 
+  useEffect(() => {
+    if (!isPeerView) return;
+    const allowed = new Set(["overview", "about"]);
+    if (!allowed.has(activeTab)) setActiveTab("overview");
+  }, [isPeerView, activeTab]);
+
   const peerJoinedDate = useMemo(() => {
     if (!isPeerView || !peerApiProfile?.joinedAt) return null;
     const date = new Date(peerApiProfile.joinedAt);
@@ -769,7 +1026,8 @@ function Profile({ viewMode = "owner" }) {
     () => ({
       fullName: displayName,
       username,
-      status: "Active Student",
+      status:
+        user?.accountType === "instructor" ? "Instructor" : "Student",
       department: user?.department || "Computer Science",
       studentId:
         user?.studentId != null && user.studentId !== ""
@@ -786,17 +1044,22 @@ function Profile({ viewMode = "owner" }) {
       location: user?.campus || "Main Campus",
       emergencyContact:
         user?.emergencyContact || "Mekdes Bekele - +251 91 555 0182",
-      bio:
-        user?.bio ||
-        "Computer science student focused on applied AI, distributed systems, and building helpful campus tools.",
-      interests:
-        user?.interests || "AI tutoring, systems design, academic communities",
+      showEmailPublic: Boolean(user?.showEmailPublic),
+      bio: typeof user?.bio === "string" ? user.bio : "",
+      interests: typeof user?.interests === "string" ? user.interests : "",
       careerGoals:
-        user?.careerGoals ||
-        "Become a software engineer working on education technology.",
-      skills:
-        user?.skills ||
-        "React, Node.js, Python, data structures, research writing",
+        typeof user?.careerGoals === "string" ? user.careerGoals : "",
+      skills: typeof user?.skills === "string" ? user.skills : "",
+      socialTelegram:
+        typeof user?.socialTelegram === "string" ? user.socialTelegram : "",
+      socialLinkedIn:
+        typeof user?.socialLinkedIn === "string" ? user.socialLinkedIn : "",
+      socialInstagram:
+        typeof user?.socialInstagram === "string" ? user.socialInstagram : "",
+      socialFacebook:
+        typeof user?.socialFacebook === "string" ? user.socialFacebook : "",
+      socialUpwork:
+        typeof user?.socialUpwork === "string" ? user.socialUpwork : "",
     }),
     [displayName, user, username],
   );
@@ -862,7 +1125,7 @@ function Profile({ viewMode = "owner" }) {
 
   const lastLogin = formatDateTime(user?.lastSeen) || "Today, 9:24 AM";
   const initials = initialsFor(profile.fullName, profile.username);
-  const bioRemaining = 240 - draft.bio.length;
+  const bioRemaining = 1200 - draft.bio.length;
 
   const validateContact = () => {
     const nextErrors = {};
@@ -877,14 +1140,60 @@ function Profile({ viewMode = "owner" }) {
   };
 
   const updateDraft = (event) => {
-    const { name, value } = event.target;
+    const { name, type } = event.target;
+    if (!name) return;
+    const value =
+      type === "checkbox"
+        ? event.target.checked
+        : event.target.value;
     setDraft((current) => ({ ...current, [name]: value }));
   };
 
-  const saveProfile = (scope) => {
+  const saveProfile = async (scope) => {
     if (scope === "contact" && !validateContact()) {
       toast.error("Please fix the highlighted fields.");
       return;
+    }
+
+    if (!isPeerView) {
+      try {
+        const body = {};
+        if (scope === "bio") {
+          body.bio = draft.bio;
+          body.interests = draft.interests;
+          body.careerGoals = draft.careerGoals;
+          body.skills = draft.skills;
+        } else if (scope === "contact") {
+          body.showEmailPublic = Boolean(draft.showEmailPublic);
+          body.socialTelegram = draft.socialTelegram;
+          body.socialLinkedIn = draft.socialLinkedIn;
+          body.socialInstagram = draft.socialInstagram;
+          body.socialFacebook = draft.socialFacebook;
+          body.socialUpwork = draft.socialUpwork;
+        } else {
+          return;
+        }
+
+        const res = await fetch("/api/profile", {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.message || "Could not save profile.");
+        }
+        await refreshAuth();
+        toast.success("Profile updated");
+        setEditingContact(false);
+        setEditingBio(false);
+        setErrors({});
+        return;
+      } catch (e) {
+        toast.error(e.message || "Could not save profile.");
+        return;
+      }
     }
 
     const nextProfile = { ...profile, ...draft };
@@ -1198,7 +1507,22 @@ function Profile({ viewMode = "owner" }) {
                       {profile.status}
                     </span>
                   </div>
-                  <p className="mt-3 text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  {isPeerView && profile.email ? (
+                    <a
+                      href={`mailto:${profile.email}`}
+                      className="relative z-10 mt-2 inline-flex w-fit max-w-full items-center gap-2 rounded-full border border-cyan-200/90 bg-gradient-to-r from-white via-cyan-50/95 to-teal-50/80 px-3.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm shadow-cyan-900/10 ring-1 ring-cyan-400/25 dark:border-cyan-500/35 dark:from-slate-800 dark:via-cyan-950/50 dark:to-slate-900 dark:text-cyan-50 dark:ring-cyan-400/25"
+                      title={`Email ${profile.email}`}
+                    >
+                      <Mail
+                        className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-300"
+                        aria-hidden
+                      />
+                      <span className="truncate">{profile.email}</span>
+                    </a>
+                  ) : null}
+                  <p
+                    className={`text-sm font-semibold text-slate-600 dark:text-slate-400 ${isPeerView && profile.email ? "mt-2" : "mt-3"}`}
+                  >
                     @{profile.username} / {profile.department} /{" "}
                     {profile.academicLevel}
                   </p>
@@ -1271,13 +1595,15 @@ function Profile({ viewMode = "owner" }) {
           </div>
         </div>
 
-        {!isPeerView ? (
+        {(showOwnerDashboard || showPeerDashboard) ? (
         <nav
           className="sticky top-[4.75rem] z-20 mt-5 overflow-x-auto rounded-2xl border border-slate-200/90 bg-white/90 p-1 shadow-sm backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/90"
           aria-label="Profile sections"
         >
-          <div className="grid min-w-max grid-cols-4 gap-1 sm:min-w-0">
-            {tabs.map(({ id, label, Icon }) => (
+          <div
+            className={`grid min-w-max gap-1 sm:min-w-0 ${isPeerView ? "grid-cols-2" : "grid-cols-4"}`}
+          >
+            {(isPeerView ? peerTabs : tabs).map(({ id, label, Icon }) => (
               <button
                 key={id}
                 type="button"
@@ -1297,10 +1623,9 @@ function Profile({ viewMode = "owner" }) {
         </nav>
         ) : null}
 
-        {activeTab === "overview" ? (
+        {!isPeerView && activeTab === "overview" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-6">
-              {!isPeerView ? (
               <>
               <section aria-labelledby="academic-title">
                 <div className="mb-4 flex items-center gap-2">
@@ -1394,7 +1719,7 @@ function Profile({ viewMode = "owner" }) {
                         <button
                           type="button"
                           className="btn-primary gap-2 px-4 py-2 text-sm"
-                          onClick={() => saveProfile("contact")}
+                          onClick={() => void saveProfile("contact")}
                         >
                           <Save className="h-4 w-4" aria-hidden />
                           Save
@@ -1451,6 +1776,92 @@ function Profile({ viewMode = "owner" }) {
                     icon={Bell}
                   />
                 </div>
+                <label className="mt-5 flex cursor-pointer items-start gap-3 rounded-2xl border border-slate-200/90 bg-white/85 p-4 dark:border-slate-700/80 dark:bg-slate-900/45">
+                  <input
+                    type="checkbox"
+                    name="showEmailPublic"
+                    checked={Boolean(draft.showEmailPublic)}
+                    onChange={updateDraft}
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                  />
+                  <span className="min-w-0 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                    <span className="font-bold text-slate-900 dark:text-white">
+                      Show email on public profile
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
+                      Lets visitors see your university email under your name on
+                      your shared profile (/users/…/) as a tap-to-mail link.
+                    </span>
+                  </span>
+                </label>
+                <div className="mt-7 rounded-2xl border border-slate-200/80 bg-gradient-to-br from-slate-50/95 to-cyan-50/25 p-5 dark:border-slate-700/80 dark:from-slate-900/55 dark:to-slate-900/25">
+                  <div className="flex items-start gap-2">
+                    <Users className="h-5 w-5 shrink-0 text-cyan-700 dark:text-cyan-300" aria-hidden />
+                    <div className="min-w-0">
+                      <h3 className="font-display text-base font-bold text-slate-900 dark:text-white">
+                        Social & freelance profiles
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
+                        Paste a full URL or a handle — visitors get one-tap branded
+                        buttons on your public profile.
+                      </p>
+                    </div>
+                  </div>
+                  {editingContact ? (
+                    <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                      <FieldRow
+                        label="Telegram"
+                        name="socialTelegram"
+                        value={draft.socialTelegram}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={FaTelegram}
+                      />
+                      <FieldRow
+                        label="LinkedIn"
+                        name="socialLinkedIn"
+                        value={draft.socialLinkedIn}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={FaLinkedinIn}
+                      />
+                      <FieldRow
+                        label="Instagram"
+                        name="socialInstagram"
+                        value={draft.socialInstagram}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={FaInstagram}
+                      />
+                      <FieldRow
+                        label="Facebook"
+                        name="socialFacebook"
+                        value={draft.socialFacebook}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={FaFacebook}
+                      />
+                      <FieldRow
+                        label="Upwork"
+                        name="socialUpwork"
+                        value={draft.socialUpwork}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={BriefcaseBusiness}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <SocialConnectStrip row={profile} className="mt-4" />
+                      {socialLinksFromRow(profile).length === 0 ? (
+                        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+                          No public social links yet — choose Edit above to add
+                          yours.
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </div>
               </section>
 
               <section aria-labelledby="achievements-title">
@@ -1486,15 +1897,9 @@ function Profile({ viewMode = "owner" }) {
                 </div>
               </section>
               </>
-              ) : null}
-              {isPeerView ? (
-                <PeerLibraryGrid sharedBooks={peerSharedBooks} />
-              ) : null}
             </div>
 
             <aside className="space-y-6">
-              {!isPeerView ? (
-              <>
               <section
                 className="rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60"
                 aria-labelledby="quick-actions-title"
@@ -1604,9 +2009,22 @@ function Profile({ viewMode = "owner" }) {
                   </div>
                 </dl>
               </section>
-              </>
+            </aside>
+          </div>
+        ) : null}
+
+        {isPeerView &&
+        showPeerDashboard &&
+        (activeTab === "overview" || activeTab === "about") ? (
+          <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
+            <div className="space-y-6">
+              {activeTab === "overview" ? (
+                <PeerLibraryGrid sharedBooks={peerSharedBooks} />
               ) : (
-              <>
+                <PeerAboutReadOnly profile={profile} />
+              )}
+            </div>
+            <aside className="space-y-6">
               <section className="rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60">
                 <h2 className="font-display text-xl font-bold text-slate-950 dark:text-white">
                   Presence on the hub
@@ -1634,8 +2052,12 @@ function Profile({ viewMode = "owner" }) {
                   />
                 </div>
               </section>
-              </>
-              )}
+              <SocialConnectPanel
+                title="Connect"
+                subtitle="Reach them on the networks they’ve chosen to publish."
+                row={profile}
+                emptyHint="No public social links on this profile yet."
+              />
             </aside>
           </div>
         ) : null}
@@ -1875,7 +2297,7 @@ function Profile({ viewMode = "owner" }) {
                   <button
                     type="button"
                     className="btn-primary gap-2 px-4 py-2 text-sm"
-                    onClick={() => saveProfile("bio")}
+                    onClick={() => void saveProfile("bio")}
                   >
                     <Save className="h-4 w-4" aria-hidden />
                     Save
@@ -1904,7 +2326,7 @@ function Profile({ viewMode = "owner" }) {
                       className="mt-2 min-h-32 w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-950 outline-none transition focus:border-cyan-400 focus:bg-white focus:ring-4 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-800/70 dark:text-white dark:focus:bg-slate-900"
                       name="bio"
                       value={draft.bio}
-                      maxLength={240}
+                      maxLength={1200}
                       onChange={updateDraft}
                       aria-label="Short bio"
                     />
