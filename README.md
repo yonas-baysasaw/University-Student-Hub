@@ -76,7 +76,7 @@ University Student Hub is a collaborative platform that enables students to:
 
 Create `backend/.env`:
 
-`env
+```env
 PORT=5000
 NODE_ENV=development
 SESSION_SECRET=your_session_secret
