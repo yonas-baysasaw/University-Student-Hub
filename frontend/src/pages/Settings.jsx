@@ -77,7 +77,7 @@ const faqItems = [
   {
     question: 'Can I use my own AI key?',
     answer:
-      'Yes. The Liqu AI controls let you save a Gemini key and model preference for your account.',
+      'Custom AI keys are currently disabled. Liqu AI uses server-managed configuration.',
   },
 ];
 
@@ -604,66 +604,27 @@ function Settings() {
   }
 
   async function testKey() {
-    if (!apiKey.trim()) return;
+    void apiKey;
     setTestingKey(true);
-    try {
-      const res = await fetch(
-        `/api/ai/models?apiKey=${encodeURIComponent(apiKey.trim())}`,
-        { credentials: 'include' },
-      );
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.message || 'Failed to list models.');
-      setModels(payload.models || []);
-      toast.success('Gemini key is valid.');
-    } catch (error) {
-      setModels([]);
-      toast.error(error.message || 'Could not validate key.');
-    } finally {
-      setTestingKey(false);
-    }
+    toast.info('Custom AI key testing is currently disabled.');
+    setTimeout(() => setTestingKey(false), 300);
   }
 
   async function saveByok() {
+    void apiKey;
+    void modelId;
     setSavingKey(true);
-    try {
-      const res = await fetch('/api/profile/api-key', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          geminiApiKey: apiKey.trim(),
-          geminiModelId: modelId,
-        }),
-      });
-      const payload = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(payload.message || 'Failed to save key.');
-      toast.success('Liqu AI settings saved.');
-      await refreshAuth();
-    } catch (error) {
-      toast.error(error.message || 'Failed to save key.');
-    } finally {
-      setSavingKey(false);
-    }
+    toast.info('Custom AI key saving is currently disabled.');
+    setTimeout(() => setSavingKey(false), 300);
   }
 
   async function clearByok() {
     setSavingKey(true);
-    try {
-      const res = await fetch('/api/profile/api-key', {
-        method: 'DELETE',
-        credentials: 'include',
-      });
-      if (!res.ok) throw new Error('Failed to clear key.');
-      setApiKey('');
-      setModelId('');
-      setModels([]);
-      toast.success('Liqu AI key cleared.');
-      await refreshAuth();
-    } catch (error) {
-      toast.error(error.message || 'Failed to clear key.');
-    } finally {
-      setSavingKey(false);
-    }
+    setApiKey('');
+    setModelId('');
+    setModels([]);
+    toast.info('Custom AI key controls are disabled.');
+    setTimeout(() => setSavingKey(false), 300);
   }
 
   async function confirmModalAction() {
@@ -1387,13 +1348,12 @@ function Settings() {
                         byokActive ? 'success' : 'info',
                       )}`}
                     >
-                      {byokActive ? 'BYOK active' : 'Optional key'}
+                      {byokActive ? 'Legacy key detected' : 'Server-managed'}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Save a Gemini key and model preference for study assistance.
-                    The server stores the key and never returns it to the
-                    client.
+                    Liqu AI key/model customization is currently disabled in this
+                    build. The assistant uses server-managed settings.
                   </p>
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
                     <div className="relative">

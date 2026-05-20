@@ -59,7 +59,7 @@ function useIsMinWidth(px) {
 }
 
 const BASE_WELCOME =
-  "Hi! I'm Liqu AI, powered by Google Gemini. I can help you study, explain concepts, answer questions, or discuss topics from your coursework. How can I help you today?";
+  "Hi! I'm Liqu AI. I can help you study, explain concepts, answer questions, and pull relevant excerpts from your books. How can I help you today?";
 
 function makeWelcome(bookTitle, contextBlurb = '') {
   let content = bookTitle
@@ -447,7 +447,7 @@ function LiquAiChatPanel({
     if (p === 'downloading') return 'Downloading file…';
     if (p === 'extracting') return 'Extracting text from the document…';
     if (p === 'chunking') return 'Splitting into passages for search…';
-    if (p === 'embedding') {
+    if (p === 'embedding' || p === 'writing') {
       const t = Number(ragStatus.ragIndexTotalChunks) || 0;
       const d = Number(ragStatus.ragIndexDoneChunks) || 0;
       if (t > 0) return `Embedding passages (${d} / ${t})…`;
@@ -469,7 +469,7 @@ function LiquAiChatPanel({
     if (p === 'downloading') return 'Step 1/4';
     if (p === 'extracting') return 'Step 2/4';
     if (p === 'chunking') return 'Step 3/4';
-    if (p === 'embedding') return 'Step 4/4';
+    if (p === 'embedding' || p === 'writing') return 'Step 4/4';
     return '';
   })();
 
@@ -581,11 +581,8 @@ function LiquAiChatPanel({
     const bookPayload = bookId ? { bookId: String(bookId) } : {};
 
     try {
-      if (socket?.connected) {
-        await sendViaSocket(history, bookPayload);
-      } else {
-        await sendViaRest(history, bookPayload);
-      }
+      // Use REST chat path directly; backend socket AI streaming is disabled.
+      await sendViaRest(history, bookPayload);
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -965,7 +962,7 @@ function LiquAiChatPanel({
                       : 'truncate text-xs font-medium text-slate-600 dark:text-slate-300'
                   }
                 >
-                  Gemini · {name}
+                  Liqu AI · {name}
                 </p>
               </div>
               {!useRailSidebar ? (

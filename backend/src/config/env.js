@@ -59,30 +59,11 @@ export const ENV = {
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || "gemini-2.0-flash",
-  /** RAG `embedContent` model id (path segment after `models/`). */
-  GEMINI_EMBEDDING_MODEL:
-    process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001",
-  /**
-   * Milliseconds for TCP/TLS connect to `generativelanguage.googleapis.com`.
-   * Node’s default `fetch` (Undici) uses 10s — too low on slow networks.
-   */
-  GEMINI_HTTP_CONNECT_TIMEOUT_MS: (() => {
-    const n = parseInt(
-      String(process.env.GEMINI_HTTP_CONNECT_TIMEOUT_MS || "90000"),
-      10,
-    );
-    return Number.isFinite(n) && n >= 5_000 ? n : 90_000;
-  })(),
-  /**
-   * Comma-separated emails promoted to `role: admin` on server start (no auto-demotion).
-   * Legacy: if empty, `STAFF_EMAILS` is used once with a deprecation warning.
-   */
+  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || "gemini-2.5-flash",
+  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "",
+  RAG_EMBED_MODEL: process.env.RAG_EMBED_MODEL || "nomic-embed-text",
   ADMIN_EMAILS: ADMIN_EMAILS_RESOLVED,
-  /**
-   * When set, every admin self-registration must send this key (body.adminInviteKey).
-   * When unset, only first-admin bootstrap is allowed (zero existing administrators).
-   */
+
   ADMIN_REGISTRATION_SECRET: String(
     process.env.ADMIN_REGISTRATION_SECRET ?? "",
   ).trim(),

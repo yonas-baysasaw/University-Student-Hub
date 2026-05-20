@@ -1,4 +1,5 @@
 import Book from '../models/Books.js';
+import { scheduleRagIndexForBook } from '../services/bookRagService.js';
 import { createPdfThumbnailBuffer } from '../services/pdfThumbnailService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 import { validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
@@ -105,6 +106,26 @@ async function uploadController(req, res, next) {
       thumbnailUrl,
       format: uploadedFile.mimetype,
     });
+
+    // Start indexing so uploaded files populate BookChunk for RAG.
+    const ragStart = await scheduleRagIndexForBook(
+      String(book._id),
+      req.user._id,
+      req.user,
+    );
+    if (ragStart?.error) {
+      await Book.findByIdAndUpdate(book._id, {
+        $set: {
+          ragIndexStatus: 'failed',
+          ragIndexPhase: '',
+          ragIndexError: ragStart.error,
+          ragIndexProgressPercent: 0,
+        },
+      });
+      console.warn(
+        `[upload] RAG indexing not started for book ${String(book._id)}: ${ragStart.error}`,
+      );
+    }
 
     return res.status(201).json({
       id: book._id,

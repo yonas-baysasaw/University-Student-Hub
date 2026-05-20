@@ -11,6 +11,7 @@ import {
 } from '../utils/bookAccess.js';
 import { parsePublishYear, validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { scheduleRagIndexForBook } from '../services/bookRagService.js';
 
 const ensureValidBookId = (bookId) => mongoose.Types.ObjectId.isValid(bookId);
 
@@ -193,9 +194,98 @@ export const createBook = asyncHandler(async (req, res) => {
     visibility: typeof visibility === 'string' ? visibility : 'public',
   });
 
+  // Fire-and-forget indexing so uploaded PDFs become searchable automatically.
+  void scheduleRagIndexForBook(String(book._id), req.user._id, req.user);
+
   res.status(201).json({
     success: true,
     data: book,
+  });
+});
+
+export const reindexMyBooks = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const userId = req.user._id;
+
+  const books = await Book.find({ userId })
+    .select('_id ragIndexStatus title')
+    .lean();
+
+  if (books.length === 0) {
+    return res.status(200).json({
+      success: true,
+      total: 0,
+      queued: 0,
+      skipped: 0,
+      details: [],
+    });
+  }
+
+  const ids = books.map((b) => b._id);
+  const counts = await BookChunk.aggregate([
+    { $match: { book: { $in: ids } } },
+    { $group: { _id: '$book', count: { $sum: 1 } } },
+  ]);
+  const chunkCountByBookId = new Map(
+    counts.map((c) => [String(c._id), Number(c.count) || 0]),
+  );
+
+  let queued = 0;
+  let skipped = 0;
+  const details = [];
+
+  for (const book of books) {
+    const bid = String(book._id);
+    const chunkCount = chunkCountByBookId.get(bid) || 0;
+    const status = String(book.ragIndexStatus || 'idle');
+
+    if (status === 'indexing') {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: 'already_indexing',
+      });
+      continue;
+    }
+
+    if (status === 'ready' && chunkCount > 0) {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: 'already_indexed',
+      });
+      continue;
+    }
+
+    const out = await scheduleRagIndexForBook(bid, userId, req.user);
+    if (out?.started) {
+      queued += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'queued',
+      });
+    } else {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: out?.error || 'could_not_queue',
+      });
+    }
+  }
+
+  return res.status(202).json({
+    success: true,
+    total: books.length,
+    queued,
+    skipped,
+    details,
   });
 });
 
