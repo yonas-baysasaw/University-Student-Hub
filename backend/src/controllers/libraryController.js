@@ -473,7 +473,7 @@ export const incrementBookDownload = asyncHandler(async (req, res) => {
   }
 
   const book = await Book.findOneAndUpdate({ _id: bookId }, update, {
-    new: true,
+    returnDocument: 'after',
   }).lean();
 
   res.status(200).json({

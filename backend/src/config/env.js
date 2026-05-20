@@ -32,11 +32,8 @@ export const ENV = {
   GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL,
   EMAIL_USER: process.env.EMAIL_USER,
   EMAIL_PASS: process.env.EMAIL_PASS,
-  /** Optional display/from address (must be allowed by Gmail). */
   EMAIL_FROM: process.env.EMAIL_FROM,
-  /** Base URL for links in transactional email (verify, reset). Omit trailing slash. */
   FRONTEND_URL: process.env.FRONTEND_URL,
-  /** Rate limits (per-window max requests). */
   RATE_LIMIT_WINDOW_MS: (() => {
     const n = parseInt(
       String(process.env.RATE_LIMIT_WINDOW_MS || "900000"),

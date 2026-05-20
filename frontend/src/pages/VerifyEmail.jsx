@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import AuthShell from "../components/AuthShell";
-import { useAuth } from "../contexts/AuthContext";
 import { safeInternalPath } from "../utils/safeRedirect";
 
 function VerifyEmail() {
@@ -9,10 +8,9 @@ function VerifyEmail() {
   const token = searchParams.get("token");
   const nextParam = searchParams.get("next");
   const navigate = useNavigate();
-  const { refreshAuth, setUser } = useAuth();
   const [status, setStatus] = useState("loading");
   const [message, setMessage] = useState("");
-  const [adminRedirect, setAdminRedirect] = useState(false);
+  const wantsAdminLogin = safeInternalPath(nextParam)?.startsWith("/admin");
 
   useEffect(() => {
     if (!token || !token.trim()) {
@@ -41,23 +39,18 @@ function VerifyEmail() {
           );
           return;
         }
+
         setStatus("ok");
-        setMessage(data.message || "Your email is verified.");
-        if (data.user && typeof data.user === "object") {
-          setUser(data.user);
-        }
-        try {
-          await refreshAuth();
-        } catch {
-          // Session cookie should still work; landing page will reload auth.
-        }
-        const nextSafe = safeInternalPath(nextParam);
-        const fallback =
-          data.user?.isAdmin === true ? "/admin" : "/";
-        const target = nextSafe ?? fallback;
-        setAdminRedirect(target === "/admin" || target.startsWith("/admin/"));
+        setMessage(
+          data.message ||
+            "Your email has been verified successfully. You can now use your account.",
+        );
+        const target = wantsAdminLogin ? "/admin/login" : "/login";
+
         if (!cancelled) {
-          navigate(target, { replace: true });
+          setTimeout(() => {
+            navigate(target, { replace: true });
+          }, 1200);
         }
       } catch {
         if (!cancelled) {
@@ -70,7 +63,7 @@ function VerifyEmail() {
     return () => {
       cancelled = true;
     };
-  }, [token, nextParam, refreshAuth, navigate]);
+  }, [token, navigate, wantsAdminLogin]);
 
   return (
     <AuthShell
@@ -80,7 +73,7 @@ function VerifyEmail() {
       <div aria-live="polite">
         {status === "loading" ? (
           <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-            Verifying your email…
+            Verifying your email...
           </p>
         ) : (
           <div
@@ -97,9 +90,9 @@ function VerifyEmail() {
 
       {status === "ok" ? (
         <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
-          {adminRedirect
-            ? "Taking you to the admin dashboard…"
-            : "Taking you to your workspace…"}
+          {wantsAdminLogin
+            ? "Verification complete. Redirecting to admin sign in..."
+            : "Verification complete. Redirecting to sign in..."}
         </p>
       ) : (
         <div className="mt-4 space-y-2 text-center text-sm">

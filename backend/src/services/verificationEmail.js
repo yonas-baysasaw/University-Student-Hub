@@ -25,7 +25,7 @@ export async function sendVerificationEmail({ to, token, verifyNext }) {
     throw err;
   }
 
-  const base = (ENV.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+  const base = (ENV.FRONTEND_URL).replace(/\/$/, "");
   const safeNext = safeInternalPath(verifyNext);
   const qs = new URLSearchParams({ token });
   if (safeNext) qs.set("next", safeNext);

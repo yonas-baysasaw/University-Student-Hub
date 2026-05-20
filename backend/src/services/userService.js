@@ -174,7 +174,7 @@ export const updateUserAvatar = async (userId, avatarUrl) => {
   const user = await User.findByIdAndUpdate(
     userId,
     { avatar: avatarUrl },
-    { new: true, runValidators: true },
+    { returnDocument: 'after', runValidators: true },
   );
 
   if (!user) {

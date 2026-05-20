@@ -39,6 +39,17 @@ router.post("/login", ensureIdentifier, (req, res, next) => {
         message: info?.message || "Invalid credentials",
       });
     }
+
+    // Enforce email verification for non-admin local accounts before session login.
+    const hasLocalPassword = Boolean(user.password);
+    const isAdmin = user.role === "admin";
+    if (hasLocalPassword && !isAdmin && user.email_verified !== true) {
+      return res.status(401).json({
+        message:
+          "VERIFY_EMAIL: Please verify your email before signing in. You can resend the confirmation email from the sign-in page.",
+      });
+    }
+
     return req.login(user, (loginErr) => {
       if (loginErr) return next(loginErr);
       return loginSuccess(req, res);
@@ -66,10 +77,22 @@ router.post(
       );
 
       if (user?.password && user.email_verified === false) {
-        const token = crypto.randomBytes(20).toString("hex");
-        user.emailVerificationToken = token;
-        user.emailVerificationExpires = Date.now() + 48 * 3600000;
-        await user.save();
+        const hasUsableToken =
+          typeof user.emailVerificationToken === "string" &&
+          user.emailVerificationToken.trim().length > 0 &&
+          user.emailVerificationExpires &&
+          new Date(user.emailVerificationExpires).getTime() > Date.now();
+
+        const token = hasUsableToken
+          ? user.emailVerificationToken
+          : crypto.randomBytes(20).toString("hex");
+
+        if (!hasUsableToken) {
+          user.emailVerificationToken = token;
+          user.emailVerificationExpires = Date.now() + 48 * 3600000;
+          await user.save();
+        }
+
         const verifyNext =
           user.role === "admin" ? "/admin" : undefined;
         await sendVerificationEmail({

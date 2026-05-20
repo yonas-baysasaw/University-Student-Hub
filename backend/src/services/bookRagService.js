@@ -567,7 +567,7 @@ export async function scheduleRagIndexForBook(bookId, userId, userLike) {
         ragIndexProgressPercent: 0,
       },
     },
-    { new: true, select: 'title' },
+    { returnDocument: 'after', select: 'title' },
   );
 
   if (!claimed) {

@@ -615,7 +615,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   const doc = await Settings.findOneAndUpdate(
     { key: 'system' },
     { $set: { value, updatedBy: req.user._id } },
-    { new: true, upsert: true },
+    { returnDocument: 'after', upsert: true },
   );
   await writeSystemLog(req, 'admin.settings.update', {
     entity: 'Settings',
