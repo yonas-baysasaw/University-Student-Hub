@@ -18,6 +18,8 @@ import {
   incrementBookDownload,
   reactToBook,
   reindexMyBooks,
+  searchBooksByChunkContent,
+  searchBookChunks,
   toggleSaveBook,
   updateBook,
 } from '../controllers/libraryController.js';
@@ -26,6 +28,8 @@ import { isAuthenticated } from '../middlewares/authMiddleware.js';
 const router = Router();
 
 router.get('/', getAllBooks);
+router.get('/search/chunks', searchBookChunks);
+router.post('/search/books', searchBooksByChunkContent);
 router.post('/rag/reindex-mine', isAuthenticated, reindexMyBooks);
 router.get('/:bookId/rag/status', isAuthenticated, getBookRagStatus);
 router.post('/:bookId/rag/index', isAuthenticated, postIndexBookRag);

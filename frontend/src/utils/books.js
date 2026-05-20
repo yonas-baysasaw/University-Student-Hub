@@ -79,3 +79,25 @@ export async function fetchLibraryBooks(signal, queryParams) {
       : [];
   return books.map((book, index) => mapBookToResource(book, index));
 }
+
+export async function searchLibraryBooksByContent(signal, query, limit = 50) {
+  const res = await fetch('/api/books/search/books', {
+    method: 'POST',
+    credentials: 'include',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, limit }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to search books.');
+  }
+
+  const data = await res.json();
+  const books = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
+  return books.map((book, index) => mapBookToResource(book, index));
+}

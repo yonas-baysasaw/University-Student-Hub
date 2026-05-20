@@ -43,5 +43,6 @@ const bookChunkSchema = new mongoose.Schema(
 );
 
 bookChunkSchema.index({ book: 1, chunkIndex: 1 }, { unique: true });
+bookChunkSchema.index({ text: 'text' });
 
 export default mongoose.model('BookChunk', bookChunkSchema);

@@ -172,6 +172,148 @@ export const getBookById = asyncHandler(async (req, res) => {
   });
 });
 
+export const searchBookChunks = asyncHandler(async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const limitRaw = Number.parseInt(String(req.query.limit || '10'), 10);
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(Math.max(limitRaw, 1), 50)
+    : 10;
+
+  if (!q) {
+    return res.status(400).json({
+      success: false,
+      message: 'Query parameter "q" is required',
+    });
+  }
+
+  const chunks = await BookChunk.find(
+    { $text: { $search: q } },
+    { score: { $meta: 'textScore' } },
+  )
+    .select('book chunkIndex text chapter section pageStart pageEnd createdAt updatedAt')
+    .sort({ score: { $meta: 'textScore' } })
+    .limit(limit)
+    .lean();
+
+  return res.status(200).json({
+    success: true,
+    query: q,
+    count: chunks.length,
+    limit,
+    data: chunks.map((chunk) => ({
+      id: String(chunk._id),
+      book: String(chunk.book),
+      chunkIndex: chunk.chunkIndex,
+      text: chunk.text,
+      chapter: chunk.chapter || '',
+      section: chunk.section || '',
+      pageStart: chunk.pageStart ?? null,
+      pageEnd: chunk.pageEnd ?? null,
+      score: chunk.score ?? null,
+      createdAt: chunk.createdAt,
+      updatedAt: chunk.updatedAt,
+    })),
+  });
+});
+
+export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
+  const query = String(req.body?.query || req.body?.content || '').trim();
+  const limitRaw = Number.parseInt(String(req.body?.limit || '10'), 10);
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(Math.max(limitRaw, 1), 50)
+    : 10;
+
+  if (!query) {
+    return res.status(400).json({
+      success: false,
+      message: 'Request body field "query" is required',
+    });
+  }
+
+  const matchedBooks = await BookChunk.aggregate([
+    {
+      $match: {
+        $text: { $search: query },
+      },
+    },
+    {
+      $addFields: {
+        score: { $meta: 'textScore' },
+      },
+    },
+    {
+      $group: {
+        _id: '$book',
+        bestScore: { $max: '$score' },
+        matchedChunks: { $sum: 1 },
+      },
+    },
+    {
+      $sort: {
+        bestScore: -1,
+        matchedChunks: -1,
+      },
+    },
+    {
+      $limit: limit,
+    },
+  ]);
+
+  const rankedIds = matchedBooks.map((x) => x._id).filter(Boolean);
+  if (rankedIds.length === 0) {
+    return res.status(200).json({
+      success: true,
+      query,
+      count: 0,
+      limit,
+      data: [],
+    });
+  }
+
+  const visibilityFilter = browseListFilter(req);
+  const books = await Book.find({
+    _id: { $in: rankedIds },
+    ...visibilityFilter,
+  })
+    .populate('userId', 'username name avatar subscribers')
+    .lean();
+
+  const byId = new Map(books.map((b) => [String(b._id), b]));
+  const scoreById = new Map(
+    matchedBooks.map((m) => [
+      String(m._id),
+      {
+        bestScore: m.bestScore ?? null,
+        matchedChunks: m.matchedChunks ?? 0,
+      },
+    ]),
+  );
+
+  const data = rankedIds
+    .map((id) => {
+      const book = byId.get(String(id));
+      if (!book) return null;
+      const stats = scoreById.get(String(id)) || {
+        bestScore: null,
+        matchedChunks: 0,
+      };
+      return {
+        ...toBookResponse(book, req),
+        relevanceScore: stats.bestScore,
+        matchedChunks: stats.matchedChunks,
+      };
+    })
+    .filter(Boolean);
+
+  return res.status(200).json({
+    success: true,
+    query,
+    count: data.length,
+    limit,
+    data,
+  });
+});
+
 export const createBook = asyncHandler(async (req, res) => {
   assertCanWrite(req.user);
   const { title, description, bookUrl, thumbnailUrl, format, visibility } =

@@ -10,7 +10,12 @@ import "dotenv/config";
 import connectDB from "./config/db.js";
 import { ENV } from "./config/env.js";
 import configurePassport from "./config/passport.js";
-import { getAllBooks, getBookById } from "./controllers/libraryController.js";
+import {
+  getAllBooks,
+  getBookById,
+  searchBooksByChunkContent,
+  searchBookChunks,
+} from "./controllers/libraryController.js";
 import { errorHandler, notFound } from "./middlewares/errorHandler.js";
 import adminRoutes from "./routes/adminRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
@@ -109,6 +114,8 @@ app.use("/api/vault", vaultRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/reading-lists", readingListRoutes);
 app.get("/api/books", getAllBooks);
+app.get("/api/books/search/chunks", searchBookChunks);
+app.post("/api/books/search/books", searchBooksByChunkContent);
 app.get("/api/books/:bookId", getBookById);
 app.use("/api/books", booksRoutes);
 

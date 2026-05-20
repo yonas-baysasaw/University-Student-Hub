@@ -27,7 +27,7 @@ import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import UploadBookModal from '../components/UploadBookModal.jsx';
 import { useAuth } from '../contexts/AuthContext';
 import { useBookUploadModal } from '../hooks/useBookUploadModal.js';
-import { fetchLibraryBooks } from '../utils/books';
+import { fetchLibraryBooks, searchLibraryBooksByContent } from '../utils/books';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
 import {
   formatLibraryDate,
@@ -161,6 +161,45 @@ function readGuestSavedIds() {
   }
 }
 
+function filterResourcesByApiQuery(resources, apiQuery) {
+  return resources.filter((item) => {
+    if (apiQuery.department) {
+      const department = String(item.department || '').trim();
+      if (department !== String(apiQuery.department).trim()) return false;
+    }
+
+    if (apiQuery.year) {
+      const y = Number(item.publishYear);
+      if (!Number.isFinite(y) || y !== Number(apiQuery.year)) return false;
+    }
+
+    if (apiQuery.yearFrom) {
+      const y = Number(item.publishYear);
+      if (!Number.isFinite(y) || y < Number(apiQuery.yearFrom)) return false;
+    }
+
+    if (apiQuery.yearTo) {
+      const y = Number(item.publishYear);
+      if (!Number.isFinite(y) || y > Number(apiQuery.yearTo)) return false;
+    }
+
+    if (apiQuery.from || apiQuery.to) {
+      const created = new Date(item.createdAt || 0).getTime();
+      if (!Number.isFinite(created)) return false;
+      if (apiQuery.from) {
+        const from = new Date(apiQuery.from).getTime();
+        if (Number.isFinite(from) && created < from) return false;
+      }
+      if (apiQuery.to) {
+        const to = new Date(apiQuery.to).getTime();
+        if (Number.isFinite(to) && created > to) return false;
+      }
+    }
+
+    return true;
+  });
+}
+
 const useResources = (listFetchKey, listBookIdsSerialized, reloadNonce = 0) => {
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -181,14 +220,17 @@ const useResources = (listFetchKey, listBookIdsSerialized, reloadNonce = 0) => {
         setLoading(true);
         setError('');
 
-        const books = await fetchLibraryBooks(undefined, apiQuery);
+        const query = String(apiQuery.q || '').trim();
+        const books = query
+          ? await searchLibraryBooksByContent(undefined, query, 50)
+          : await fetchLibraryBooks(undefined, apiQuery);
         if (!active) return;
-        let next = books;
+        let next = query ? filterResourcesByApiQuery(books, apiQuery) : books;
         if (Array.isArray(listBookIds)) {
           if (listBookIds.length === 0) next = [];
           else {
             const allow = new Set(listBookIds.map(String));
-            next = books.filter((b) =>
+            next = next.filter((b) =>
               allow.has(String(b.bookId || b.id)),
             );
           }
@@ -981,13 +1023,20 @@ function Library() {
     setQueryInput(qFromUrl);
   }, [qFromUrl]);
 
-  // const onQueryInputChange = (val) => {
-  //   setQueryInput(val);
-  //   if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
-  //   queryDebounceRef.current = window.setTimeout(() => {
-  //     patchParams({ q: val.trim() || null });
-  //   }, 320);
-  // };
+  const onQueryInputChange = (val) => {
+    setQueryInput(val);
+    if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
+    queryDebounceRef.current = window.setTimeout(() => {
+      patchParams({ q: val.trim() || null });
+    }, 320);
+  };
+
+  useEffect(
+    () => () => {
+      if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
+    },
+    [],
+  );
 
   const [guestSavedIds, setGuestSavedIds] = useState(
     () => new Set(readGuestSavedIds()),
@@ -1453,7 +1502,7 @@ function Library() {
                 className="input-field h-11 w-full border-slate-200/90 bg-white/90 pl-10 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
                 placeholder="Search title, department, course…"
                 value={queryInput}
-                // onChange={(e) => onQueryInputChange(e.target.value)}
+                onChange={(e) => onQueryInputChange(e.target.value)}
                 aria-label="Search library"
                 title="Search title, department, course"
               />
