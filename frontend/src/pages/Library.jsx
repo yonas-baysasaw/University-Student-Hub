@@ -981,13 +981,13 @@ function Library() {
     setQueryInput(qFromUrl);
   }, [qFromUrl]);
 
-  const onQueryInputChange = (val) => {
-    setQueryInput(val);
-    if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
-    queryDebounceRef.current = window.setTimeout(() => {
-      patchParams({ q: val.trim() || null });
-    }, 320);
-  };
+  // const onQueryInputChange = (val) => {
+  //   setQueryInput(val);
+  //   if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
+  //   queryDebounceRef.current = window.setTimeout(() => {
+  //     patchParams({ q: val.trim() || null });
+  //   }, 320);
+  // };
 
   const [guestSavedIds, setGuestSavedIds] = useState(
     () => new Set(readGuestSavedIds()),
@@ -1453,7 +1453,7 @@ function Library() {
                 className="input-field h-11 w-full border-slate-200/90 bg-white/90 pl-10 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
                 placeholder="Search title, department, course…"
                 value={queryInput}
-                onChange={(e) => onQueryInputChange(e.target.value)}
+                // onChange={(e) => onQueryInputChange(e.target.value)}
                 aria-label="Search library"
                 title="Search title, department, course"
               />
