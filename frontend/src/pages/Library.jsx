@@ -1025,10 +1025,12 @@ function Library() {
 
   const onQueryInputChange = (val) => {
     setQueryInput(val);
-    if (queryDebounceRef.current) window.clearTimeout(queryDebounceRef.current);
-    queryDebounceRef.current = window.setTimeout(() => {
-      patchParams({ q: val.trim() || null });
-    }, 320);
+  };
+
+  const onQueryInputKeyDown = (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    patchParams({ q: queryInput.trim() || null });
   };
 
   useEffect(
@@ -1503,6 +1505,7 @@ function Library() {
                 placeholder="Search title, department, course…"
                 value={queryInput}
                 onChange={(e) => onQueryInputChange(e.target.value)}
+                onKeyDown={onQueryInputKeyDown}
                 aria-label="Search library"
                 title="Search title, department, course"
               />

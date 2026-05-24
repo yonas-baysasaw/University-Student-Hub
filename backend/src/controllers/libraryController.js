@@ -230,6 +230,10 @@ export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
     });
   }
 
+  const visibilityFilter = browseListFilter(req);
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const queryRegex = new RegExp(escaped, 'i');
+
   const matchedBooks = await BookChunk.aggregate([
     {
       $match: {
@@ -259,7 +263,47 @@ export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
     },
   ]);
 
-  const rankedIds = matchedBooks.map((x) => x._id).filter(Boolean);
+  const titleDescriptionBooks = await Book.find({
+    ...visibilityFilter,
+    $or: [{ title: queryRegex }, { description: queryRegex }],
+  })
+    .select('_id')
+    .limit(limit * 3)
+    .lean();
+
+  const scoreById = new Map();
+  for (const m of matchedBooks) {
+    const id = String(m._id);
+    scoreById.set(id, {
+      bestScore: m.bestScore ?? null,
+      matchedChunks: m.matchedChunks ?? 0,
+      titleDescriptionMatch: false,
+      relevanceScore: (Number(m.bestScore) || 0) + Math.min(Number(m.matchedChunks) || 0, 5) * 0.15,
+    });
+  }
+
+  for (const b of titleDescriptionBooks) {
+    const id = String(b._id);
+    const existing = scoreById.get(id);
+    if (existing) {
+      existing.titleDescriptionMatch = true;
+      existing.relevanceScore += 1;
+      scoreById.set(id, existing);
+    } else {
+      scoreById.set(id, {
+        bestScore: null,
+        matchedChunks: 0,
+        titleDescriptionMatch: true,
+        relevanceScore: 1,
+      });
+    }
+  }
+
+  const rankedIds = [...scoreById.entries()]
+    .sort((a, b) => (b[1].relevanceScore || 0) - (a[1].relevanceScore || 0))
+    .slice(0, limit)
+    .map(([id]) => id);
+
   if (rankedIds.length === 0) {
     return res.status(200).json({
       success: true,
@@ -270,7 +314,6 @@ export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
     });
   }
 
-  const visibilityFilter = browseListFilter(req);
   const books = await Book.find({
     _id: { $in: rankedIds },
     ...visibilityFilter,
@@ -279,15 +322,6 @@ export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
     .lean();
 
   const byId = new Map(books.map((b) => [String(b._id), b]));
-  const scoreById = new Map(
-    matchedBooks.map((m) => [
-      String(m._id),
-      {
-        bestScore: m.bestScore ?? null,
-        matchedChunks: m.matchedChunks ?? 0,
-      },
-    ]),
-  );
 
   const data = rankedIds
     .map((id) => {
@@ -296,11 +330,15 @@ export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
       const stats = scoreById.get(String(id)) || {
         bestScore: null,
         matchedChunks: 0,
+        titleDescriptionMatch: false,
+        relevanceScore: 0,
       };
       return {
         ...toBookResponse(book, req),
         relevanceScore: stats.bestScore,
         matchedChunks: stats.matchedChunks,
+        titleDescriptionMatch: stats.titleDescriptionMatch,
+        combinedRelevanceScore: stats.relevanceScore,
       };
     })
     .filter(Boolean);
