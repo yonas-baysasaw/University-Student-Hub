@@ -2,6 +2,7 @@ import Assignment from '../models/Assignment.js';
 import Chat from '../models/Chat.js';
 import ClassroomAnnouncement from '../models/ClassroomAnnouncement.js';
 import Event from '../models/Event.js';
+import { getPersonalEventsForFeed } from './personalCalendarService.js';
 
 const HH_MM = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
@@ -277,6 +278,9 @@ export async function getCalendarFeed(userId, from, to) {
       },
     });
   }
+
+  const personalItems = await getPersonalEventsForFeed(userId, from, to);
+  items.push(...personalItems);
 
   items.sort(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime(),

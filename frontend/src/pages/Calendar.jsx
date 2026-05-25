@@ -1,7 +1,10 @@
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
+import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
+import timeGridPlugin from '@fullcalendar/timegrid';
 import {
+  AlertTriangle,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -9,6 +12,7 @@ import {
   Plus,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
 } from 'lucide-react';
 import {
   useCallback,
@@ -19,18 +23,32 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import CalendarEventModal, {
+  dateToDatetimeLocalValue,
+  isoToDatetimeLocalValue,
+} from '../components/calendar/CalendarEventModal.jsx';
 import MiniMonthPicker from '../components/calendar/MiniMonthPicker.jsx';
 import { CALENDAR_INVALIDATE_EVENT } from '../constants/dashboardEvents.js';
 import { useSocket } from '../contexts/SocketContext';
 import { readJsonOrThrow } from '../utils/http';
 
 const LS_LAYERS = 'ush.calendar.layers';
+const LS_VIEW = 'ush.calendar.view';
+const LS_REMINDED = 'ush.calendar.reminded';
 
 const LAYER_DEFS = [
   { key: 'class', label: 'Classes', color: '#0891b2' },
   { key: 'assignment', label: 'Assignments', color: '#d97706' },
   { key: 'announcement', label: 'Exams & deadlines', color: '#dc2626' },
   { key: 'event', label: 'Events', color: '#15803d' },
+  { key: 'personal', label: 'Personal', color: '#7c3aed' },
+];
+
+const VIEW_OPTIONS = [
+  { id: 'dayGridMonth', label: 'Month' },
+  { id: 'timeGridWeek', label: 'Week' },
+  { id: 'timeGridDay', label: 'Day' },
+  { id: 'listWeek', label: 'Schedule' },
 ];
 
 const DEFAULT_LAYERS = Object.fromEntries(
@@ -61,24 +79,80 @@ function loadLayerPrefs() {
   }
 }
 
+function loadViewPref() {
+  if (typeof window === 'undefined') return 'dayGridMonth';
+  try {
+    const v = window.localStorage.getItem(LS_VIEW);
+    if (VIEW_OPTIONS.some((o) => o.id === v)) return v;
+  } catch {
+    /* ignore */
+  }
+  return 'dayGridMonth';
+}
+
+function loadRemindedSet() {
+  try {
+    const raw = sessionStorage.getItem(LS_REMINDED);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function persistRemindedSet(set) {
+  try {
+    sessionStorage.setItem(LS_REMINDED, JSON.stringify([...set]));
+  } catch {
+    /* ignore */
+  }
+}
+
+function defaultCreateRange(date = new Date()) {
+  const start = new Date(date);
+  start.setMinutes(0, 0, 0);
+  if (start.getHours() < 23) {
+    start.setHours(start.getHours() + 1);
+  }
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return {
+    startsAtLocal: dateToDatetimeLocalValue(start),
+    endsAtLocal: dateToDatetimeLocalValue(end),
+  };
+}
+
 function CalendarPage() {
   const navigate = useNavigate();
   const socket = useSocket();
   const calendarRef = useRef(null);
   const fetchGen = useRef(0);
+  const remindedRef = useRef(loadRemindedSet());
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [layers, setLayers] = useState(loadLayerPrefs);
+  const [currentView, setCurrentView] = useState(loadViewPref);
   const [feedItems, setFeedItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [titleLabel, setTitleLabel] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [miniMonth, setMiniMonth] = useState(() => {
     const n = new Date();
     return { y: n.getFullYear(), m: n.getMonth() };
   });
   const [selectedDay, setSelectedDay] = useState(() => new Date());
   const [visibleRange, setVisibleRange] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState('create');
+  const [modalPersonalId, setModalPersonalId] = useState(null);
+  const [modalInitial, setModalInitial] = useState({});
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
 
   const persistLayers = useCallback((next) => {
     setLayers(next);
@@ -96,39 +170,46 @@ function CalendarPage() {
     [layers, persistLayers],
   );
 
-  const loadFeed = useCallback(async (from, to, { silent = false } = {}) => {
-    if (!from || !to) return;
-    const gen = ++fetchGen.current;
-    if (!silent) setLoading(true);
-    setError('');
-    try {
-      const qs = new URLSearchParams({ from, to });
-      const res = await fetch(`/api/calendar/feed?${qs}`, {
-        credentials: 'include',
-      });
-      const data = await readJsonOrThrow(res, 'Could not load calendar');
-      if (gen !== fetchGen.current) return;
-      setFeedItems(Array.isArray(data.items) ? data.items : []);
-    } catch (e) {
-      if (gen !== fetchGen.current) return;
-      setError(e?.message || 'Could not load calendar');
-    } finally {
-      if (gen === fetchGen.current && !silent) setLoading(false);
-    }
-  }, []);
+  const loadFeed = useCallback(
+    async (from, to, { silent = false, q = '' } = {}) => {
+      if (!from || !to) return;
+      const gen = ++fetchGen.current;
+      if (!silent) setLoading(true);
+      setError('');
+      try {
+        const qs = new URLSearchParams({ from, to });
+        if (q) qs.set('q', q);
+        const res = await fetch(`/api/calendar/feed?${qs}`, {
+          credentials: 'include',
+        });
+        const data = await readJsonOrThrow(res, 'Could not load calendar');
+        if (gen !== fetchGen.current) return;
+        setFeedItems(Array.isArray(data.items) ? data.items : []);
+      } catch (e) {
+        if (gen !== fetchGen.current) return;
+        setError(e?.message || 'Could not load calendar');
+      } finally {
+        if (gen === fetchGen.current && !silent) setLoading(false);
+      }
+    },
+    [],
+  );
 
   const refetchVisible = useCallback(
     (opts) => {
       if (!visibleRange) return;
-      void loadFeed(visibleRange.from, visibleRange.to, opts);
+      void loadFeed(visibleRange.from, visibleRange.to, {
+        ...opts,
+        q: debouncedSearch,
+      });
     },
-    [visibleRange, loadFeed],
+    [visibleRange, loadFeed, debouncedSearch],
   );
 
   useEffect(() => {
     if (!visibleRange) return;
-    void loadFeed(visibleRange.from, visibleRange.to);
-  }, [visibleRange, loadFeed]);
+    void loadFeed(visibleRange.from, visibleRange.to, { q: debouncedSearch });
+  }, [visibleRange, loadFeed, debouncedSearch]);
 
   useEffect(() => {
     const debounced = () => refetchVisible({ silent: true });
@@ -172,10 +253,62 @@ function CalendarPage() {
     };
   }, [refetchVisible]);
 
+  useEffect(() => {
+    const tick = () => {
+      const now = Date.now();
+      for (const item of feedItems) {
+        if (item.source !== 'personal') continue;
+        const mins = item.meta?.reminderMinutesBefore;
+        if (mins == null || !Number.isFinite(Number(mins))) continue;
+        const start = new Date(item.start).getTime();
+        if (Number.isNaN(start)) continue;
+        const remindAt = start - Number(mins) * 60_000;
+        const key = `${item.id}:${item.start}`;
+        if (now >= remindAt && now < start && !remindedRef.current.has(key)) {
+          remindedRef.current.add(key);
+          persistRemindedSet(remindedRef.current);
+          toast.info(`Upcoming: ${item.title}`, {
+            description: `Starts ${new Date(item.start).toLocaleString()}`,
+          });
+        }
+      }
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => clearInterval(id);
+  }, [feedItems]);
+
   const filteredItems = useMemo(
     () => feedItems.filter((item) => layers[item.source] !== false),
     [feedItems, layers],
   );
+
+  const conflicts = useMemo(() => {
+    const timed = filteredItems
+      .filter((i) => !i.allDay)
+      .map((i) => ({
+        title: i.title,
+        startMs: new Date(i.start).getTime(),
+        endMs: new Date(i.end).getTime(),
+      }))
+      .filter((i) => !Number.isNaN(i.startMs) && !Number.isNaN(i.endMs))
+      .sort((a, b) => a.startMs - b.startMs);
+
+    const pairs = [];
+    for (let i = 0; i < timed.length; i += 1) {
+      for (let j = i + 1; j < timed.length; j += 1) {
+        if (timed[j].startMs >= timed[i].endMs) break;
+        if (
+          timed[j].startMs < timed[i].endMs &&
+          timed[j].endMs > timed[i].startMs
+        ) {
+          pairs.push([timed[i], timed[j]]);
+          if (pairs.length >= 3) return pairs;
+        }
+      }
+    }
+    return pairs;
+  }, [filteredItems]);
 
   const fcEvents = useMemo(
     () =>
@@ -191,6 +324,7 @@ function CalendarPage() {
           url: item.url,
           source: item.source,
           meta: item.meta,
+          editable: Boolean(item.editable),
         },
       })),
     [filteredItems],
@@ -203,27 +337,33 @@ function CalendarPage() {
     const from = formatLocalDate(info.start);
     const to = formatLocalDate(lastVisible);
     setVisibleRange({ from, to });
-    setTitleLabel(
-      info.view.title ||
-        info.start.toLocaleString(undefined, { month: 'long', year: 'numeric' }),
-    );
+    setTitleLabel(info.view.title || '');
     setMiniMonth({
       y: info.view.currentStart.getFullYear(),
       m: info.view.currentStart.getMonth(),
     });
+    setCurrentView(info.view.type);
   }, []);
 
   const getApi = () => calendarRef.current?.getApi?.();
 
   const goToday = () => {
-    const api = getApi();
-    api?.today();
-    const n = new Date();
-    setSelectedDay(n);
+    getApi()?.today();
+    setSelectedDay(new Date());
   };
 
   const goPrev = () => getApi()?.prev();
   const goNext = () => getApi()?.next();
+
+  const changeView = (viewId) => {
+    getApi()?.changeView(viewId);
+    setCurrentView(viewId);
+    try {
+      localStorage.setItem(LS_VIEW, viewId);
+    } catch {
+      /* ignore */
+    }
+  };
 
   const handleMiniSelect = (d) => {
     setSelectedDay(d);
@@ -235,32 +375,102 @@ function CalendarPage() {
     getApi()?.gotoDate(new Date(y, m, 1));
   };
 
+  const openCreateModal = useCallback((date = new Date()) => {
+    setModalMode('create');
+    setModalPersonalId(null);
+    setModalInitial({
+      title: '',
+      ...defaultCreateRange(date),
+      allDay: false,
+      description: '',
+      location: '',
+      meetingUrl: '',
+      recurrence: 'none',
+      recurrenceUntilLocal: '',
+      reminderMinutesBefore: '',
+    });
+    setModalOpen(true);
+  }, []);
+
+  const openEditPersonalModal = useCallback(async (personalId) => {
+    try {
+      const res = await fetch(
+        `/api/calendar/personal/${encodeURIComponent(personalId)}`,
+        { credentials: 'include' },
+      );
+      const data = await readJsonOrThrow(res, 'Could not load event');
+      const ev = data.event;
+      setModalMode('edit');
+      setModalPersonalId(personalId);
+      setModalInitial({
+        title: ev.title || '',
+        startsAtLocal: isoToDatetimeLocalValue(ev.startsAt),
+        endsAtLocal: isoToDatetimeLocalValue(ev.endsAt),
+        allDay: Boolean(ev.allDay),
+        description: ev.description || '',
+        location: ev.location || '',
+        meetingUrl: ev.meetingUrl || '',
+        recurrence: ev.recurrence || 'none',
+        recurrenceUntilLocal: ev.recurrenceUntil
+          ? ev.recurrenceUntil.slice(0, 10)
+          : '',
+        reminderMinutesBefore:
+          ev.reminderMinutesBefore != null
+            ? String(ev.reminderMinutesBefore)
+            : '',
+      });
+      setModalOpen(true);
+    } catch (e) {
+      toast.error(e?.message || 'Could not load event');
+    }
+  }, []);
+
   const handleEventClick = (info) => {
     info.jsEvent.preventDefault();
-    const url = info.event.extendedProps?.url;
+    const { source, url, meta } = info.event.extendedProps || {};
+    if (source === 'personal' && meta?.personalId) {
+      void openEditPersonalModal(meta.personalId);
+      return;
+    }
     if (url) navigate(url);
   };
 
+  const handleDateClick = (info) => {
+    openCreateModal(info.date);
+  };
+
+  const renderCreateButton = (className) => (
+    <button
+      type="button"
+      className={className}
+      onClick={() => openCreateModal(new Date())}
+    >
+      <Plus className="h-4 w-4" aria-hidden />
+      Create
+    </button>
+  );
+
   return (
     <div className="flex h-[calc(100dvh-4.25rem)] min-h-[480px] flex-col overflow-hidden bg-white dark:bg-slate-950">
+      <CalendarEventModal
+        open={modalOpen}
+        mode={modalMode}
+        personalId={modalPersonalId}
+        initial={modalInitial}
+        onClose={() => setModalOpen(false)}
+        onSaved={() => refetchVisible({ silent: true })}
+      />
+
       <div className="flex min-h-0 flex-1">
-        {/* Sidebar */}
         <aside
           className={`${
             sidebarOpen ? 'w-[260px]' : 'w-0'
           } hidden shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50/95 transition-[width] duration-200 dark:border-slate-700 dark:bg-slate-900/80 md:block`}
         >
           <div className="flex h-full w-[260px] flex-col gap-4 overflow-y-auto p-4">
-            <button
-              type="button"
-              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-900/15 transition hover:from-cyan-500 hover:to-cyan-600"
-              onClick={() =>
-                toast.info('Personal events are coming in a future update.')
-              }
-            >
-              <Plus className="h-4 w-4" aria-hidden />
-              Create
-            </button>
+            {renderCreateButton(
+              'inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-cyan-700 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-cyan-900/15 transition hover:from-cyan-500 hover:to-cyan-600',
+            )}
 
             <MiniMonthPicker
               year={miniMonth.y}
@@ -298,7 +508,6 @@ function CalendarPage() {
           </div>
         </aside>
 
-        {/* Main */}
         <div className="flex min-w-0 flex-1 flex-col">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2 dark:border-slate-700 sm:px-4">
             <button
@@ -331,7 +540,7 @@ function CalendarPage() {
             <div className="flex items-center gap-0.5">
               <button
                 type="button"
-                aria-label="Previous month"
+                aria-label="Previous"
                 onClick={goPrev}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               >
@@ -339,7 +548,7 @@ function CalendarPage() {
               </button>
               <button
                 type="button"
-                aria-label="Next month"
+                aria-label="Next"
                 onClick={goNext}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
               >
@@ -349,16 +558,38 @@ function CalendarPage() {
             <h1 className="font-display text-lg font-semibold text-slate-900 dark:text-slate-50 sm:text-xl">
               {titleLabel}
             </h1>
-            <div className="ml-auto flex items-center gap-2">
+            <div className="relative ml-auto flex min-w-[140px] flex-1 items-center gap-2 sm:max-w-xs sm:flex-none">
+              <Search
+                className="pointer-events-none absolute left-2.5 h-4 w-4 text-slate-400"
+                aria-hidden
+              />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search events"
+                className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-2 text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100"
+              />
+            </div>
+            <div className="flex items-center gap-2">
               {loading ? (
                 <Loader2
                   className="h-4 w-4 animate-spin text-cyan-600"
                   aria-hidden
                 />
               ) : null}
-              <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                Month
-              </span>
+              <select
+                value={currentView}
+                onChange={(e) => changeView(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                aria-label="Calendar view"
+              >
+                {VIEW_OPTIONS.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -368,19 +599,27 @@ function CalendarPage() {
             </div>
           ) : null}
 
-          {/* Mobile sidebar drawer */}
+          {conflicts.length > 0 ? (
+            <div className="flex items-start gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              <div>
+                <p className="font-semibold">Schedule overlap detected</p>
+                <ul className="mt-1 list-inside list-disc text-xs opacity-90">
+                  {conflicts.map(([a, b], idx) => (
+                    <li key={idx}>
+                      {a.title} overlaps with {b.title}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : null}
+
           {sidebarOpen ? (
             <div className="border-b border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/80 md:hidden">
-              <button
-                type="button"
-                className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-cyan-700 px-4 py-2 text-sm font-semibold text-white"
-                onClick={() =>
-                  toast.info('Personal events are coming in a future update.')
-                }
-              >
-                <Plus className="h-4 w-4" aria-hidden />
-                Create
-              </button>
+              {renderCreateButton(
+                'mb-3 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-cyan-600 to-cyan-700 px-4 py-2 text-sm font-semibold text-white',
+              )}
               <MiniMonthPicker
                 year={miniMonth.y}
                 month={miniMonth.m}
@@ -413,16 +652,27 @@ function CalendarPage() {
           <div className="ush-calendar-grid min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
             <FullCalendar
               ref={calendarRef}
-              plugins={[dayGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
+              plugins={[
+                dayGridPlugin,
+                timeGridPlugin,
+                listPlugin,
+                interactionPlugin,
+              ]}
+              initialView={currentView}
               headerToolbar={false}
               height="100%"
               events={fcEvents}
               eventClick={handleEventClick}
+              dateClick={handleDateClick}
               datesSet={handleDatesSet}
-              dayMaxEvents={3}
+              dayMaxEvents={currentView === 'dayGridMonth' ? 3 : false}
               nowIndicator
               fixedWeekCount={false}
+              slotMinTime="06:00:00"
+              slotMaxTime="22:00:00"
+              allDaySlot
+              listDayFormat={{ weekday: 'short', month: 'short', day: 'numeric' }}
+              listDaySideFormat={false}
             />
           </div>
         </div>
@@ -433,6 +683,8 @@ function CalendarPage() {
           --fc-border-color: #e2e8f0;
           --fc-today-bg-color: rgba(6, 182, 212, 0.08);
           --fc-neutral-bg-color: #f8fafc;
+          --fc-event-bg-color: #0891b2;
+          --fc-event-border-color: #0891b2;
           height: 100%;
           font-family: inherit;
         }
@@ -442,13 +694,17 @@ function CalendarPage() {
           --fc-neutral-bg-color: #0f172a;
         }
         .ush-calendar-grid .fc .fc-col-header-cell-cushion,
-        .ush-calendar-grid .fc .fc-daygrid-day-number {
+        .ush-calendar-grid .fc .fc-daygrid-day-number,
+        .ush-calendar-grid .fc .fc-list-day-text,
+        .ush-calendar-grid .fc .fc-list-day-side-text {
           color: #475569;
           font-size: 0.75rem;
           font-weight: 600;
         }
         .dark .ush-calendar-grid .fc .fc-col-header-cell-cushion,
-        .dark .ush-calendar-grid .fc .fc-daygrid-day-number {
+        .dark .ush-calendar-grid .fc .fc-daygrid-day-number,
+        .dark .ush-calendar-grid .fc .fc-list-day-text,
+        .dark .ush-calendar-grid .fc .fc-list-day-side-text {
           color: #94a3b8;
         }
         .ush-calendar-grid .fc .fc-event {
@@ -460,6 +716,9 @@ function CalendarPage() {
         }
         .ush-calendar-grid .fc .fc-daygrid-day-frame {
           min-height: 5.5rem;
+        }
+        .ush-calendar-grid .fc .fc-timegrid-slot-label-cushion {
+          font-size: 0.65rem;
         }
       `}</style>
     </div>

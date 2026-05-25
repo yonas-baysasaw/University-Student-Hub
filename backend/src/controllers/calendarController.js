@@ -33,7 +33,17 @@ export const getCalendarFeedHandler = asyncHandler(async (req, res) => {
   const endInclusive = new Date(to);
   endInclusive.setHours(23, 59, 59, 999);
 
-  const items = await getCalendarFeed(req.user._id, from, endInclusive);
+  let items = await getCalendarFeed(req.user._id, from, endInclusive);
+
+  const qRaw = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+  if (qRaw) {
+    const q = qRaw.toLowerCase();
+    items = items.filter((item) =>
+      String(item.title ?? '')
+        .toLowerCase()
+        .includes(q),
+    );
+  }
 
   res.json({
     from: from.toISOString().slice(0, 10),
