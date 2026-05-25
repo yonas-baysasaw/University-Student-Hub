@@ -541,6 +541,7 @@ function ClassRoom() {
         <ClassroomScheduleEditor
           key={scheduleForId}
           chatId={scheduleForId}
+          classroomName={scheduleClassroom.name}
           initialSlots={scheduleClassroom.metadata?.classSchedule?.slots}
           onSaved={() => {
             fetchChats();
