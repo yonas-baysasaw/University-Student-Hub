@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import ClassroomCardMenu from '../components/ClassroomCardMenu.jsx';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
 import { CLASSROOM_LIST_CHANGED_EVENT } from '../constants/dashboardEvents.js';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { useAuth } from '../contexts/AuthContext';
 import {
   canManageClassroom,
@@ -23,6 +24,7 @@ import { readJsonOrThrow } from '../utils/http';
 
 function notifyClassroomsChanged() {
   window.dispatchEvent(new CustomEvent(CLASSROOM_LIST_CHANGED_EVENT));
+  notifyCalendarInvalidate();
 }
 
 async function copyInvitationCode(code) {

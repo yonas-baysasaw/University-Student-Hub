@@ -8,6 +8,11 @@ import User from '../models/User.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 import { validateEventCatalogMeta } from '../utils/bookCatalogMeta.js';
+import {
+  notifyAllConnectedCalendarInvalidate,
+  notifyUserCalendarInvalidate,
+  notifyUsersCalendarInvalidate,
+} from '../utils/calendarNotify.js';
 
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -299,6 +304,7 @@ export const createEvent = asyncHandler(async (req, res) => {
     courseSubject: '',
   });
   await event.populate('userId', 'username name avatar');
+  notifyAllConnectedCalendarInvalidate();
   res.status(201).json({
     success: true,
     data: toEventResponse(event.toObject(), req),
@@ -319,11 +325,16 @@ export const deleteEvent = asyncHandler(async (req, res) => {
     return res.status(403).json({ message: 'You can only delete your own events.' });
   }
   const bid = ev._id;
+  const notifyIds = [
+    String(ev.userId),
+    ...(ev.reservedBy || []).map((id) => String(id)),
+  ];
   await Promise.all([
     EventReview.deleteMany({ eventId: bid }),
     EventComment.deleteMany({ eventId: bid }),
   ]);
   await ev.deleteOne();
+  notifyUsersCalendarInvalidate(notifyIds);
   res.status(200).json({ success: true, message: 'Event deleted' });
 });
 
@@ -411,6 +422,13 @@ export const reserveEventSeat = asyncHandler(async (req, res) => {
   const orgAfter = organizerIdFromEvent(event);
   if (orgAfter && orgAfter === String(req.user._id)) {
     await event.populate('reservedBy', 'username name avatar');
+  }
+
+  const orgId = organizerIdFromEvent(event);
+  if (orgId) {
+    notifyUsersCalendarInvalidate([uid, orgId]);
+  } else {
+    notifyUserCalendarInvalidate(uid);
   }
 
   res.status(200).json({

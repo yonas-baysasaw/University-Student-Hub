@@ -35,6 +35,7 @@ import {
   isClassroomCreator,
 } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 
 const RESOURCE_CATEGORY_OPTIONS = [
   { id: 'syllabus', label: 'Syllabus', hint: 'Policies & calendar' },
@@ -732,6 +733,7 @@ function ClassroomResourcesContent({ chatId }) {
       setNewAssignmentPublish(true);
       setNewAssignmentFile(null);
       await loadAssignmentsList();
+      notifyCalendarInvalidate();
     } catch (err) {
       setLoadError(err?.message || 'Assignment failed');
     } finally {
@@ -752,6 +754,7 @@ function ClassroomResourcesContent({ chatId }) {
         p?.assignmentId === assignmentId ? null : p,
       );
       await loadAssignmentsList();
+      notifyCalendarInvalidate();
     } catch (err) {
       setLoadError(err?.message || 'Delete failed');
     }

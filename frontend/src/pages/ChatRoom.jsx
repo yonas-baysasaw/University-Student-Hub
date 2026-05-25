@@ -32,6 +32,7 @@ import ClassroomHero from '../components/ClassroomHero';
 import ClassroomParticipantsDrawer from '../components/ClassroomParticipantsDrawer';
 import ClassroomTabs from '../components/ClassroomTabs';
 import { CLASSROOM_LIST_CHANGED_EVENT } from '../constants/dashboardEvents.js';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { useSocket } from '../contexts/SocketContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -47,6 +48,7 @@ import defaultProfile from '../assets/profile.png';
 
 function notifyClassroomsChanged() {
   window.dispatchEvent(new CustomEvent(CLASSROOM_LIST_CHANGED_EVENT));
+  notifyCalendarInvalidate();
 }
 
 const NEAR_BOTTOM_PX = 96;

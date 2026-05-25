@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { toast } from 'sonner';
 import { SCHEDULE_SAVED_EVENT } from '../constants/dashboardEvents.js';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { readJsonOrThrow } from '../utils/http';
 import {
   earliestNextOccurrenceMs,
@@ -587,6 +588,7 @@ function ClassroomScheduleEditor({
       );
       await readJsonOrThrow(res, 'Could not save schedule');
       window.dispatchEvent(new CustomEvent(SCHEDULE_SAVED_EVENT));
+      notifyCalendarInvalidate();
       toast.success('Schedule saved. Dashboard updated.');
       onSaved?.();
       updateModalOpen(false);

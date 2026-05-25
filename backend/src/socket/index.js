@@ -53,6 +53,9 @@ export const initSocketServer = async (server, sessionMiddleware) => {
   io.on('connection', (socket) => {
     const { user } = socket;
 
+    const userRoomId = String(user._id ?? user.id);
+    socket.join(`user:${userRoomId}`);
+
     (async () => {
       try {
         await markOnline(user.id);

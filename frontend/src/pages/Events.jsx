@@ -28,6 +28,7 @@ import defaultProfile from '../assets/profile.png';
 import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import { useAuth } from '../contexts/AuthContext';
 import { readJsonOrThrow } from '../utils/http';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import {
   ACADEMIC_TRACKS,
   academicTrackLabel,
@@ -756,6 +757,7 @@ export default function Events() {
       const withMedia = mediaPayload.data ?? created;
       setEvents((prev) => [withMedia, ...prev]);
       toast.success('Event posted');
+      notifyCalendarInvalidate();
       setCreateOpen(false);
       resetCreateForm();
     } catch (err) {
@@ -782,6 +784,7 @@ export default function Events() {
       await readJsonOrThrow(res, 'Could not delete event');
       setEvents((prev) => prev.filter((x) => String(x._id) !== String(ev._id)));
       toast.success('Event removed');
+      notifyCalendarInvalidate();
     } catch (err) {
       toast.error(err.message);
     } finally {

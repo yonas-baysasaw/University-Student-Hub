@@ -34,6 +34,7 @@ import {
   isClassroomCreator,
 } from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 
 const TITLE_MAX = 500;
 const BODY_MAX = 20000;
@@ -651,6 +652,7 @@ function ClassroomAnnouncementsContent({ chatId }) {
       resetComposerDraft();
       setComposerOpen(false);
       toast.success('Announcement published');
+      notifyCalendarInvalidate();
     } catch (e) {
       setLoadError(e?.message || 'Could not publish announcement');
     } finally {
@@ -776,6 +778,7 @@ function ClassroomAnnouncementsContent({ chatId }) {
       }
       setEditModal(null);
       toast.success('Announcement updated');
+      notifyCalendarInvalidate();
     } catch (e) {
       setLoadError(e?.message || 'Update failed');
     } finally {
@@ -794,6 +797,7 @@ function ClassroomAnnouncementsContent({ chatId }) {
       await readJsonOrThrow(res, 'Failed to delete');
       setAnnouncements((prev) => prev.filter((a) => a.id !== id));
       toast.success('Removed');
+      notifyCalendarInvalidate();
     } catch (e) {
       setLoadError(e?.message || 'Delete failed');
     }

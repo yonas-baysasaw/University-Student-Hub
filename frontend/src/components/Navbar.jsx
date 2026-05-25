@@ -17,6 +17,7 @@ const menuWidth = 272;
 
 const baseNavLinks = [
   { to: '/', label: 'Dashboard', end: true },
+  { to: '/calendar', label: 'Calendar', end: false },
   { to: '/classroom', label: 'Classroom', end: false },
   { to: '/events', label: 'Events', end: false },
   { to: '/library', label: 'Library', end: false },

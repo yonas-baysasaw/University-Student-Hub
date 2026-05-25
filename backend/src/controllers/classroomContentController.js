@@ -13,6 +13,7 @@ import {
   loadChatForClassroomRequest,
 } from '../utils/classroomContentAuth.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { notifyChatMembersCalendarInvalidate } from '../utils/calendarNotify.js';
 
 function authorLabel(user) {
   return (
@@ -199,6 +200,8 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
     console.error('[createAnnouncement] announcement email notify failed', err);
   });
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   return res.status(201).json({
     announcement: announcementToDto(created),
   });
@@ -251,6 +254,8 @@ export const patchAnnouncement = asyncHandler(async (req, res) => {
 
   await doc.save();
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   return res.json({
     announcement: announcementToDto(doc),
   });
@@ -277,6 +282,7 @@ export const deleteAnnouncement = asyncHandler(async (req, res) => {
   }
 
   await ann.deleteOne();
+  notifyChatMembersCalendarInvalidate(chat);
   return res.json({ message: 'Deleted' });
 });
 

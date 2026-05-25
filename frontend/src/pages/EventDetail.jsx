@@ -22,6 +22,7 @@ import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { academicTrackLabel } from '../utils/bookUploadMeta';
 import { readJsonOrThrow } from '../utils/http';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { visibilityLabel, visibilityTone } from '../utils/formatLabels';
 
 const MAX_EVENT_MEDIA = 12;
@@ -335,6 +336,7 @@ export default function EventDetail() {
           ? 'You are on the list'
           : 'You left this event',
       );
+      notifyCalendarInvalidate();
     } catch (err) {
       toast.error(err.message);
     } finally {

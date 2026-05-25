@@ -28,6 +28,7 @@ import AdminSignup from './pages/admin/AdminSignup.jsx';
 import AdminStudents from './pages/admin/AdminStudents.jsx';
 import AdminWelcome from './pages/admin/AdminWelcome.jsx';
 import BookDetail from './pages/BookDetail';
+import Calendar from './pages/Calendar';
 import ChatRoom from './pages/ChatRoom';
 import ClassRoom from './pages/ClassRoom';
 import ClassroomAnnouncements from './pages/ClassroomAnnouncements';
@@ -87,6 +88,7 @@ function AppRoutes() {
         <div key={location.pathname} className="route-fade">
           <Routes>
             <Route path="/" element={<Home />} />
+            <Route path="/calendar" element={<Calendar />} />
             <Route path="/classroom" element={<ClassRoom />} />
             <Route path="/classroom/:chatId" element={<ChatRoom />} />
             <Route
@@ -189,6 +191,7 @@ function AppRoutes() {
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password/:token" element={<Reset />} />
           <Route path="/classroom" element={<RedirectToLogin />} />
+          <Route path="/calendar" element={<RedirectToLogin />} />
           <Route path="/classroom/:chatId" element={<RedirectToLogin />} />
           <Route
             path="/classroom/:chatId/announcements"

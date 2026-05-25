@@ -14,6 +14,7 @@ import {
   loadChatForClassroomRequest,
 } from '../utils/classroomContentAuth.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { notifyChatMembersCalendarInvalidate } from '../utils/calendarNotify.js';
 
 function getUploadedFile(req) {
   if (req.file) return req.file;
@@ -285,6 +286,8 @@ export const createAssignment = asyncHandler(async (req, res) => {
     authorName: authorLabel(req.user),
   });
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   const now = new Date();
   return res.status(201).json({
     assignment: mapAssignmentRow(created, {
@@ -348,6 +351,8 @@ export const patchAssignment = asyncHandler(async (req, res) => {
 
   await doc.save();
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   const now = new Date();
   return res.json({
     assignment: mapAssignmentRow(doc, {
@@ -390,6 +395,8 @@ export const deleteAssignment = asyncHandler(async (req, res) => {
 
   if (doc.fileKey) await deleteS3Key(doc.fileKey);
   await doc.deleteOne();
+
+  notifyChatMembersCalendarInvalidate(chat);
 
   return res.json({ message: 'Deleted' });
 });
