@@ -227,6 +227,40 @@ function academicLevelToSchoolYear(level) {
   return NaN;
 }
 
+const EMPTY_IDENTITY = "—";
+
+function buildStudentIdentityFields({ username, department, schoolYear }) {
+  const uname =
+    typeof username === "string" && username.trim()
+      ? username.trim()
+      : EMPTY_IDENTITY;
+  const dept =
+    typeof department === "string" && department.trim()
+      ? department.trim()
+      : EMPTY_IDENTITY;
+  const academicLevel =
+    schoolYearToAcademicLevel(schoolYear ?? null) || EMPTY_IDENTITY;
+  return { username: uname, department: dept, academicLevel };
+}
+
+function isStudentIdentityIncomplete(user) {
+  if (!user || user.accountType === "instructor") return false;
+  const hasUsername =
+    typeof user.username === "string" && user.username.trim();
+  const hasDepartment =
+    typeof user.department === "string" && user.department.trim();
+  const hasSchoolYear =
+    typeof user.schoolYear === "number" &&
+    Number.isFinite(user.schoolYear) &&
+    user.schoolYear >= 1 &&
+    user.schoolYear <= 7;
+  return !hasUsername || !hasDepartment || !hasSchoolYear;
+}
+
+function identityFieldForEdit(value) {
+  return value === EMPTY_IDENTITY ? "" : value;
+}
+
 function trimSocialInput(raw) {
   return String(raw ?? "").trim();
 }
@@ -462,17 +496,21 @@ function mapPeerApiToProfileRow(peer) {
     (peer.name && String(peer.name).trim()) ||
     peer.username ||
     "Member";
-  const level = schoolYearToAcademicLevel(peer.schoolYear ?? null);
+  const identity = buildStudentIdentityFields({
+    username: peer.username,
+    department: peer.department,
+    schoolYear: peer.schoolYear,
+  });
   const publicEmail =
     typeof peer.email === "string" && peer.email.trim() ? peer.email.trim() : "";
   return {
     fullName: full,
-    username: peer.username || "—",
+    username: identity.username,
     status:
       peer.accountType === "instructor" ? "Instructor" : "Student",
-    department: peer.department?.trim() ? peer.department.trim() : "—",
+    department: identity.department,
     studentId: "",
-    academicLevel: level || "—",
+    academicLevel: identity.academicLevel,
     email: publicEmail,
     phone: "",
     location: "",
@@ -1019,26 +1057,35 @@ function Profile({ viewMode = "owner" }) {
   }, [isPeerView, peerApiProfile?.joinedAt]);
 
   const displayName =
-    user?.displayName || user?.name || user?.username || "Amina Bekele";
-  const username = user?.username || "amina.bekele";
+    user?.displayName?.trim() ||
+    user?.name?.trim() ||
+    user?.username?.trim() ||
+    "Student";
+
+  const ownerIdentity = useMemo(
+    () =>
+      buildStudentIdentityFields({
+        username: user?.username,
+        department: user?.department,
+        schoolYear: user?.schoolYear,
+      }),
+    [user?.username, user?.department, user?.schoolYear],
+  );
 
   const initialProfile = useMemo(
     () => ({
       fullName: displayName,
-      username,
+      username: ownerIdentity.username,
       status:
         user?.accountType === "instructor" ? "Instructor" : "Student",
-      department: user?.department || "Computer Science",
+      department: ownerIdentity.department,
       studentId:
         user?.studentId != null && user.studentId !== ""
           ? String(user.studentId)
           : user?.id != null
             ? String(user.id)
             : "USH-2026-0147",
-      academicLevel:
-        schoolYearToAcademicLevel(user?.schoolYear) ||
-        user?.academicLevel ||
-        "Year 3",
+      academicLevel: ownerIdentity.academicLevel,
       email: user?.email || "student@university.edu",
       phone: user?.phone || "+251 91 234 5678",
       location: user?.campus || "Main Campus",
@@ -1061,7 +1108,7 @@ function Profile({ viewMode = "owner" }) {
       socialUpwork:
         typeof user?.socialUpwork === "string" ? user.socialUpwork : "",
     }),
-    [displayName, user, username],
+    [displayName, ownerIdentity, user],
   );
 
   const [profile, setProfile] = useState(initialProfile);
@@ -1224,9 +1271,9 @@ function Profile({ viewMode = "owner" }) {
     setDraft((current) => ({
       ...current,
       fullName: profile.fullName,
-      username: profile.username,
-      department: profile.department,
-      academicLevel: profile.academicLevel,
+      username: identityFieldForEdit(profile.username),
+      department: identityFieldForEdit(profile.department),
+      academicLevel: identityFieldForEdit(profile.academicLevel),
     }));
     setIdentityModalOpen(true);
   };
@@ -1235,9 +1282,9 @@ function Profile({ viewMode = "owner" }) {
     setDraft((current) => ({
       ...current,
       fullName: profile.fullName,
-      username: profile.username,
-      department: profile.department,
-      academicLevel: profile.academicLevel,
+      username: identityFieldForEdit(profile.username),
+      department: identityFieldForEdit(profile.department),
+      academicLevel: identityFieldForEdit(profile.academicLevel),
     }));
     setIdentityModalOpen(false);
   };
@@ -1426,6 +1473,29 @@ function Profile({ viewMode = "owner" }) {
             >
               Back to library
             </Link>
+          </div>
+        ) : null}
+
+        {showOwnerDashboard && isStudentIdentityIncomplete(user) ? (
+          <div className="mb-6 rounded-2xl border border-amber-200/90 bg-gradient-to-r from-amber-50 to-white px-5 py-4 dark:border-amber-900/40 dark:from-amber-950/40 dark:to-slate-900">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <AlertTriangle
+                  className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400"
+                  aria-hidden
+                />
+                <p className="text-sm text-slate-700 dark:text-slate-300">
+                  Complete your student profile so others can see your username,
+                  major, and year on your public profile.
+                </p>
+              </div>
+              <Link
+                to="/settings"
+                className="btn-primary shrink-0 px-4 py-2 text-sm"
+              >
+                Complete profile
+              </Link>
+            </div>
           </div>
         ) : null}
 
