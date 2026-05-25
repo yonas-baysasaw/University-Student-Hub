@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import remarkGfm from 'remark-gfm';
 import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
@@ -60,6 +60,36 @@ function useIsMinWidth(px) {
 
 const BASE_WELCOME =
   "Hi! I'm Liqu AI. I can help you study, explain concepts, answer questions, and pull relevant excerpts from your books. How can I help you today?";
+
+function normalizeReferences(references) {
+  if (!Array.isArray(references)) return [];
+  const seen = new Set();
+  const out = [];
+  for (const ref of references) {
+    const bookId = String(ref?.bookId || '').trim();
+    const bookTitle = String(ref?.bookTitle || 'Untitled').trim() || 'Untitled';
+    const excerptNumber = Number(ref?.excerptNumber || 0);
+    if (!bookId || excerptNumber <= 0) continue;
+    const key = `${bookId}::${excerptNumber}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      bookId,
+      bookTitle,
+      excerptNumber,
+      chapter: String(ref?.chapter || '').trim(),
+      pageStart:
+        ref?.pageStart === null || ref?.pageStart === undefined
+          ? null
+          : Number(ref.pageStart),
+      pageEnd:
+        ref?.pageEnd === null || ref?.pageEnd === undefined
+          ? null
+          : Number(ref.pageEnd),
+    });
+  }
+  return out;
+}
 
 function makeWelcome(bookTitle, contextBlurb = '') {
   let content = bookTitle
@@ -103,6 +133,10 @@ function LiquAiChatPanel({
   contextBlurb = '',
   /** When set (e.g. Study buddy), server augments Liqu AI with RAG from this book if indexed. */
   bookId = '',
+  /** Extra context injected into each AI request (not shown in the visible user bubble). */
+  requestContext = '',
+  /** Optional scope hint for backend grounding behavior (e.g. "classroom"). */
+  contextScope = '',
   starterPrompts,
   onQuickPrompt,
   showQuickPromptsEmptyState = true,
@@ -300,6 +334,7 @@ function LiquAiChatPanel({
           id: `${data._id}-${i}`,
           role: m.role,
           content: m.content,
+          references: [],
         }));
         setMessages(msgs.length ? msgs : [makeWelcome(bookTitle, contextBlurb)]);
         if (variant === 'gemini') setFollowStream(true);
@@ -577,12 +612,30 @@ function LiquAiChatPanel({
       ...messages.filter((m) => m.id !== 'welcome'),
       userMsg,
     ].map(({ role, content }) => ({ role, content }));
+    const contextPrefix = String(requestContext || '').trim();
+    const historyForLlm =
+      contextPrefix && history.length
+        ? history.map((msg, idx) =>
+            idx === history.length - 1 && msg.role === 'user'
+              ? {
+                  ...msg,
+                  content: `${contextPrefix}\n\n---\n\nUser question:\n${msg.content}`,
+                }
+              : msg,
+          )
+        : history;
 
-    const bookPayload = bookId ? { bookId: String(bookId) } : {};
+    const requestPayload = {
+      ...(bookId ? { bookId: String(bookId) } : {}),
+      ...(contextScope ? { contextScope: String(contextScope) } : {}),
+    };
 
     try {
-      // Use REST chat path directly; backend socket AI streaming is disabled.
-      await sendViaRest(history, bookPayload);
+      if (socket) {
+        await sendViaSocket(historyForLlm, requestPayload);
+      } else {
+        await sendViaRest(historyForLlm, requestPayload);
+      }
     } catch (err) {
       setError(err.message || 'Something went wrong. Please try again.');
     } finally {
@@ -593,12 +646,12 @@ function LiquAiChatPanel({
     }
   }
 
-  function sendViaSocket(history, bookPayload) {
+  function sendViaSocket(history, requestPayload) {
     return new Promise((resolve, reject) => {
       socket.emit('ai:chat', {
         messages: history,
         sessionId: activeSessionId,
-        ...bookPayload,
+        ...requestPayload,
       });
 
       const onSessionId = ({ sessionId }) => {
@@ -610,12 +663,13 @@ function LiquAiChatPanel({
         setStreamingContent(streamingRef.current);
       };
 
-      const onDone = ({ fullResponse, sessionId }) => {
+      const onDone = ({ fullResponse, sessionId, references }) => {
         cleanup();
         const aiMsg = {
           id: `ai-${Date.now()}`,
           role: 'assistant',
           content: fullResponse,
+          references: normalizeReferences(references),
         };
         setMessages((prev) => [...prev, aiMsg]);
         setStreamingContent('');
@@ -647,7 +701,7 @@ function LiquAiChatPanel({
     });
   }
 
-  async function sendViaRest(history, bookPayload) {
+  async function sendViaRest(history, requestPayload) {
     const res = await fetch('/api/ai/chat', {
       method: 'POST',
       credentials: 'include',
@@ -655,7 +709,7 @@ function LiquAiChatPanel({
       body: JSON.stringify({
         messages: history,
         sessionId: activeSessionId,
-        ...bookPayload,
+        ...requestPayload,
       }),
     });
 
@@ -664,6 +718,7 @@ function LiquAiChatPanel({
       id: `ai-${Date.now()}`,
       role: 'assistant',
       content: data.response,
+      references: normalizeReferences(data.references),
     };
     setMessages((prev) => [...prev, aiMsg]);
     if (data.sessionId) {
@@ -1867,6 +1922,10 @@ function MessageBubble({
             isUser={false}
             variant={variant}
           />
+          <MessageSources
+            references={message.references}
+            variant={variant}
+          />
           {showActions ? (
             <AssistantMessageActions content={message.content} />
           ) : null}
@@ -1898,6 +1957,52 @@ function MessageBubble({
       >
         <MessageContent content={message.content} isUser={isUser} />
       </div>
+    </div>
+  );
+}
+
+function MessageSources({ references, variant = 'default' }) {
+  const sources = normalizeReferences(references);
+  if (!sources.length) return null;
+  const isGemini = variant === 'gemini';
+  return (
+    <div
+      className={
+        isGemini
+          ? 'mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 p-2 dark:border-slate-700 dark:bg-slate-900/45'
+          : 'mt-2 rounded-lg border border-slate-200/80 bg-slate-50/80 p-2 dark:border-slate-700 dark:bg-slate-900/50'
+      }
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+        Sources
+      </p>
+      <ul className="mt-1.5 space-y-1">
+        {sources.map((source) => {
+          const pageLabel =
+            Number.isFinite(source.pageStart) && Number.isFinite(source.pageEnd)
+              ? source.pageStart === source.pageEnd
+                ? `Page ${source.pageStart}`
+                : `Pages ${source.pageStart}-${source.pageEnd}`
+              : '';
+          const chapterLabel = source.chapter ? `Chapter: ${source.chapter}` : '';
+          const meta = [chapterLabel, pageLabel].filter(Boolean).join(' · ');
+          return (
+            <li key={`${source.bookId}-${source.excerptNumber}`}>
+              <Link
+                to={`/library/${source.bookId}`}
+                className="text-xs text-blue-700 hover:underline dark:text-blue-400"
+              >
+                {source.bookTitle} · Excerpt #{source.excerptNumber}
+              </Link>
+              {meta ? (
+                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                  {meta}
+                </p>
+              ) : null}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

@@ -24,28 +24,33 @@ export function cosineSimilarity(a, b) {
 }
 
 export async function embedText(text) {
-  const url = String(ENV.OLLAMA_BASE_URL || '').trim();
-  const model = String(ENV.RAG_EMBED_MODEL || 'nomic-embed-text').trim();
-  if (!url) return null;
   const input = normalizeForEmbedding(text);
   if (!input) return null;
 
-  const res = await fetch(`${url.replace(/\/+$/, '')}/api/embeddings`, {
+  const apiKey = String(ENV.GEMINI_API_KEY || '').trim();
+  const modelId = String(ENV.GEMINI_EMBED_MODEL_ID || 'text-embedding-004').trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing on the server.');
+  }
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:embedContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model,
-      prompt: input,
+      model: `models/${modelId}`,
+      content: {
+        parts: [{ text: input }],
+      },
     }),
   });
   if (!res.ok) {
     const msg = await res.text().catch(() => '');
-    throw new Error(`Embedding request failed (${res.status}): ${msg.slice(0, 180)}`);
+    throw new Error(`Gemini embedding failed (${res.status}): ${msg.slice(0, 180)}`);
   }
   const data = await res.json().catch(() => ({}));
-  const emb = data?.embedding;
+  const emb = data?.embedding?.values;
   if (!Array.isArray(emb) || emb.length === 0) {
-    throw new Error('Embedding API returned empty vector.');
+    throw new Error('Gemini embedding API returned empty vector.');
   }
   return emb.map((x) => Number(x || 0));
 }

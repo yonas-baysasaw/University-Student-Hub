@@ -3,7 +3,7 @@ import User from "../models/User.js";
 
 /** Promote listed ADMIN_EMAILS to administrators on startup (no demotion). */
 export async function syncAdminEmailsFromEnv() {
-  const emails = ENV.ADMIN_EMAILS;
+  const emails = Array.isArray(ENV.ADMIN_EMAILS) ? ENV.ADMIN_EMAILS : [];
   if (!emails.length) return;
 
   const result = await User.updateMany(

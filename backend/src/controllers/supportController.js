@@ -1,5 +1,22 @@
 import ChatSession from '../models/ChatSession.js';
+import {
+  geminiService,
+  runSupportWithTools,
+} from '../services/geminiService.js';
+import {
+  executeSupportTool,
+  getSupportFunctionDeclarations,
+} from '../services/supportToolService.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+
+const SUPPORT_SYSTEM = `You are the University Student Hub support assistant. Answer using ONLY facts returned by the tools. If a tool returns an error or empty list, say so and suggest what the user can do (e.g. check the classroom name or open a specific page). Do not invent announcements, resource links, file names, messages, or exam details. Be concise, friendly, and use bullet points when listing items.
+
+Formatting (required):
+- Use the **when** field for dates—never paste raw ISO timestamps.
+- If **linkText** and **url** are present, use Markdown: [linkText](url) so the link is clickable with a short, readable label. Never put bare URLs, "URL:", or S3 links as plain text.
+- Never show database ids, **chatId**, **id**, or hex object ids in your answer. Reference classes by **classroom** or **name** from tools only. The field **chatId** from list_my_classrooms is only for your next tool call arguments—do not show it to the user.
+
+When the user asks about classrooms, resources, or announcements without naming one, call list_my_classrooms first, then use list_recent_resources or list_recent_announcements as needed. For one named class, use list_resources_for_chat or list_announcements_for_chat with the matching **chatId** from list_my_classrooms. For date filters on resources, use createdAfter/createdBefore (ISO) in the tool; still answer the user with **when**-style phrasing, not raw ISO.`;
 
 async function supportChatController(req, res, next) {
   try {
@@ -25,8 +42,15 @@ async function supportChatController(req, res, next) {
       }
     }
 
-    const responseText =
-      'Support AI is currently disabled on this server.';
+    const functionDeclarations = getSupportFunctionDeclarations();
+    const ctx = { userId };
+    const executeTool = (name, args) => executeSupportTool(name, ctx, args);
+
+    const responseText = await runSupportWithTools(req.user, messages, {
+      functionDeclarations,
+      systemInstruction: SUPPORT_SYSTEM,
+      executeTool,
+    });
 
     let session = sessionId
       ? await ChatSession.findOne({
@@ -60,6 +84,12 @@ async function supportChatController(req, res, next) {
       sessionId: session._id.toString(),
     });
   } catch (error) {
+    if (geminiService.constructor.isFatalError?.(error)) {
+      return res.status(429).json({
+        message:
+          'AI service quota or rate limit reached. Please try again later.',
+      });
+    }
     return next(error);
   }
 }

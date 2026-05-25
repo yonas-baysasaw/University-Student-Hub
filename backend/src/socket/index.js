@@ -1,5 +1,6 @@
 import { Server } from 'socket.io';
 import { ENV } from '../config/env.js';
+import { generateLiquAiReply } from '../controllers/aiController.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
@@ -191,14 +192,23 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     });
 
     // ── AI streaming chat ────────────────────────────────────────────────────
-    socket.on('ai:chat', async ({ messages, sessionId, bookId }) => {
+    socket.on('ai:chat', async ({ messages, sessionId, bookId, mode, contextScope }) => {
       try {
-        void messages;
-        void sessionId;
-        void bookId;
         assertCanWrite(user);
-        socket.emit('ai:error', {
-          message: 'Liqu AI is disabled on this server.',
+        const result = await generateLiquAiReply({
+          messages,
+          sessionId,
+          bookId,
+          mode,
+          contextScope,
+          userId: user._id,
+        });
+        socket.emit('ai:sessionId', { sessionId: result.sessionId });
+        socket.emit('ai:chunk', { chunk: result.response });
+        socket.emit('ai:done', {
+          fullResponse: result.response,
+          sessionId: result.sessionId,
+          references: result.references,
         });
       } catch (err) {
         console.error('ai:chat socket error:', err);

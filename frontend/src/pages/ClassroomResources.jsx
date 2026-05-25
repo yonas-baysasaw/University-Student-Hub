@@ -72,6 +72,8 @@ function formatDueSummary(iso) {
 }
 
 const SUMMIT_MAX_BYTES = 22 * 1024 * 1024;
+const LIQU_CONTEXT_MAX_CHARS = 18000;
+const LIQU_DISCUSSION_MSG_LIMIT = 50;
 
 function formatFileSize(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return '';
@@ -209,6 +211,9 @@ function ClassroomResourcesContent({ chatId }) {
   const [liquDrawerOpen, setLiquDrawerOpen] = useState(false);
   const [liquFocusMaterialId, setLiquFocusMaterialId] = useState(null);
   const [assignmentPaste, setAssignmentPaste] = useState('');
+  const [liquDiscussionMessages, setLiquDiscussionMessages] = useState([]);
+  const [liquAnnouncements, setLiquAnnouncements] = useState([]);
+  const [liquAssignmentsLoading, setLiquAssignmentsLoading] = useState(false);
 
   const liquContextBlurb = useMemo(() => {
     const parts = [];
@@ -252,6 +257,107 @@ function ClassroomResourcesContent({ chatId }) {
     if (!names.length) return '';
     return `Materials in this classroom include: ${names.join(', ')}.`;
   }, [resources]);
+
+  const liquRequestContext = useMemo(() => {
+    const parts = [
+      `Classroom: ${chatName}`,
+      'Use the classroom data below as the primary source of truth.',
+    ];
+
+    if (resources.length) {
+      const resourceRows = resources
+        .slice(0, 80)
+        .map((r, i) => {
+          const name = r.title || r.fileName || r.name || 'Untitled';
+          const category = categoryLabel(r.category || 'other');
+          const link = r.link ? ` | Link: ${r.link}` : '';
+          const desc = r.description ? ` | Notes: ${String(r.description).slice(0, 200)}` : '';
+          return `${i + 1}. ${name} | Category: ${category}${link}${desc}`;
+        })
+        .join('\n');
+      parts.push(`Classroom resources:\n${resourceRows}`);
+    } else {
+      parts.push('Classroom resources: none listed.');
+    }
+
+    if (liquAssignmentsLoading) {
+      parts.push('Classroom assignments: loading.');
+    } else if (assignments.length) {
+      const assignmentRows = assignments
+        .slice(0, 40)
+        .map((a, i) => {
+          const title = String(a?.title || 'Untitled assignment').trim();
+          const due = a?.dueAt
+            ? new Date(a.dueAt).toLocaleString()
+            : 'No due date';
+          const status = a?.published ? 'Published' : 'Draft';
+          const starter = a?.starterFileName
+            ? ` | Starter: ${a.starterFileName}`
+            : '';
+          return `${i + 1}. ${title} | Due: ${due} | ${status}${starter}`;
+        })
+        .join('\n');
+      parts.push(`Classroom assignments:\n${assignmentRows}`);
+    } else {
+      parts.push('Classroom assignments: none listed.');
+    }
+
+    if (liquDiscussionMessages.length) {
+      const discussionRows = liquDiscussionMessages
+        .map((m, i) => {
+          const who =
+            m?.sender?.displayName ||
+            m?.sender?.username ||
+            m?.sender?.name ||
+            'Unknown';
+          const text = String(m?.content || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 260);
+          return `${i + 1}. ${who}: ${text}`;
+        })
+        .join('\n');
+      parts.push(`Recent classroom discussion messages:\n${discussionRows}`);
+    } else {
+      parts.push('Recent classroom discussion messages: none available.');
+    }
+
+    if (liquAnnouncements.length) {
+      const announcementRows = liquAnnouncements
+        .slice(0, 30)
+        .map((a, i) => {
+          const title = String(a?.title || 'Untitled').trim();
+          const body = String(a?.body || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 260);
+          return `${i + 1}. ${title}${body ? ` | ${body}` : ''}`;
+        })
+        .join('\n');
+      parts.push(`Classroom announcements:\n${announcementRows}`);
+    } else {
+      parts.push('Classroom announcements: none available.');
+    }
+
+    if (assignmentPaste.trim()) {
+      parts.push(
+        `Instructor notes / assignment context:\n${assignmentPaste.trim().slice(0, 4000)}`,
+      );
+    }
+
+    const joined = parts.join('\n\n');
+    return joined.length > LIQU_CONTEXT_MAX_CHARS
+      ? joined.slice(0, LIQU_CONTEXT_MAX_CHARS)
+      : joined;
+  }, [
+    chatName,
+    resources,
+    assignments,
+    liquAssignmentsLoading,
+    liquDiscussionMessages,
+    liquAnnouncements,
+    assignmentPaste,
+  ]);
 
   const liquQuickPrompts = useMemo(
     () => [
@@ -310,6 +416,68 @@ function ClassroomResourcesContent({ chatId }) {
       setLiquFocusMaterialId(null);
     }
   }, [resources, liquFocusMaterialId]);
+
+  useEffect(() => {
+    if (!chatId || !viewerCanManageClassroom) {
+      setLiquDiscussionMessages([]);
+      return;
+    }
+    let cancelled = false;
+    const loadDiscussionMessages = async () => {
+      try {
+        const res = await fetch(
+          `/api/chats/${encodeURIComponent(chatId)}/messages?limit=${LIQU_DISCUSSION_MSG_LIMIT}`,
+          { credentials: 'include' },
+        );
+        const data = await readJsonOrThrow(
+          res,
+          'Failed to load classroom discussion context',
+        );
+        if (!cancelled) {
+          setLiquDiscussionMessages(
+            Array.isArray(data?.messages) ? data.messages : [],
+          );
+        }
+      } catch (_) {
+        if (!cancelled) setLiquDiscussionMessages([]);
+      }
+    };
+    loadDiscussionMessages();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, viewerCanManageClassroom]);
+
+  useEffect(() => {
+    if (!chatId || !viewerCanManageClassroom || !liquDrawerOpen) {
+      setLiquAnnouncements([]);
+      return;
+    }
+    let cancelled = false;
+    const loadAnnouncements = async () => {
+      try {
+        const res = await fetch(
+          `/api/chats/${encodeURIComponent(chatId)}/announcements`,
+          { credentials: 'include' },
+        );
+        const data = await readJsonOrThrow(
+          res,
+          'Failed to load classroom announcements context',
+        );
+        if (!cancelled) {
+          setLiquAnnouncements(
+            Array.isArray(data?.announcements) ? data.announcements : [],
+          );
+        }
+      } catch (_) {
+        if (!cancelled) setLiquAnnouncements([]);
+      }
+    };
+    loadAnnouncements();
+    return () => {
+      cancelled = true;
+    };
+  }, [chatId, viewerCanManageClassroom, liquDrawerOpen]);
 
   const closeSummitModal = useCallback(() => {
     setSubmitModal(null);
@@ -408,6 +576,18 @@ function ClassroomResourcesContent({ chatId }) {
   useEffect(() => {
     if (workspaceTab === 'assignments') loadAssignmentsList();
   }, [workspaceTab, loadAssignmentsList]);
+
+  useEffect(() => {
+    if (!liquDrawerOpen || !viewerCanManageClassroom) return;
+    if (assignments.length > 0) return;
+    setLiquAssignmentsLoading(true);
+    loadAssignmentsList().finally(() => setLiquAssignmentsLoading(false));
+  }, [
+    liquDrawerOpen,
+    viewerCanManageClassroom,
+    assignments.length,
+    loadAssignmentsList,
+  ]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -731,7 +911,14 @@ function ClassroomResourcesContent({ chatId }) {
             actions={headerActions}
           />
 
-          <ClassroomTabs trailing={tabsTrailingParticipants} />
+          <ClassroomTabs
+            trailing={tabsTrailingParticipants}
+            liquAction={
+              viewerCanManageClassroom
+                ? { label: 'Liqu AI', onClick: () => setLiquDrawerOpen(true) }
+                : null
+            }
+          />
 
           {loadError ? (
             <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-100" role="alert">
@@ -766,17 +953,6 @@ function ClassroomResourcesContent({ chatId }) {
               <ClipboardList className="h-4 w-4 shrink-0" aria-hidden />
               <span className="hidden md:inline">Assignments</span>
             </button>
-            {viewerCanManageClassroom ? (
-              <button
-                type="button"
-                aria-label="Liqu AI"
-                className={`${tabBtn} ml-auto gap-2 border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 text-white shadow-lg shadow-cyan-900/20 hover:brightness-110 dark:from-cyan-700 dark:to-indigo-950`}
-                onClick={() => setLiquDrawerOpen(true)}
-              >
-                <Sparkles className="h-4 w-4 shrink-0" aria-hidden />
-                <span className="hidden md:inline">Liqu AI</span>
-              </button>
-            ) : null}
           </div>
 
           {workspaceTab === 'materials' ? (
@@ -1906,6 +2082,8 @@ function ClassroomResourcesContent({ chatId }) {
                 className="h-[calc(100vh-8rem)] min-h-[420px]"
                 bookTitle={`Classroom: ${chatName}`}
                 contextBlurb={liquContextBlurb}
+                requestContext={liquRequestContext}
+                contextScope="classroom"
                 starterPrompts={liquQuickPrompts}
                 onQuickPrompt={onLiquQuickPrompt}
               />

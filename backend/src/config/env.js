@@ -59,11 +59,12 @@ export const ENV = {
   AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
   AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID || "gemini-2.5-flash",
-  OLLAMA_BASE_URL: process.env.OLLAMA_BASE_URL || "",
-  RAG_EMBED_MODEL: process.env.RAG_EMBED_MODEL || "nomic-embed-text",
+  GEMINI_MODEL_ID: process.env.GEMINI_MODEL_ID,
+  GEMINI_EMBED_MODEL_ID:
+    process.env.GEMINI_EMBED_MODEL_ID || "text-embedding-004",
+  RAG_VECTOR_INDEX_NAME:
+    process.env.RAG_VECTOR_INDEX_NAME || "book_chunks_vector_index",
   ADMIN_EMAILS: ADMIN_EMAILS_RESOLVED,
-
   ADMIN_REGISTRATION_SECRET: String(
     process.env.ADMIN_REGISTRATION_SECRET ?? "",
   ).trim(),

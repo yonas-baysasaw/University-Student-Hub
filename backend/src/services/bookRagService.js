@@ -189,6 +189,71 @@ function semanticOrKeywordScore(queryEmbedding, queryText, rowText, rowEmbedding
   return keywordScore(queryText, rowText);
 }
 
+function normalizeScoredChunkRow(row) {
+  return {
+    text: row.text,
+    score:
+      typeof row.score === 'number'
+        ? row.score
+        : Number(row.vectorScore || row.searchScore || 0),
+    chunkIndex: row.chunkIndex,
+    chapter: row.chapter || '',
+    section: row.section || '',
+    pageStart: row.pageStart ?? null,
+    pageEnd: row.pageEnd ?? null,
+    book: row.book ? String(row.book) : undefined,
+  };
+}
+
+async function searchChunksByVector({
+  filter = {},
+  queryEmbedding,
+  limit = TOP_K,
+}) {
+  if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) return null;
+  const indexName = String(ENV.RAG_VECTOR_INDEX_NAME || '').trim();
+  if (!indexName) return null;
+  try {
+    const rows = await BookChunk.aggregate([
+      {
+        $vectorSearch: {
+          index: indexName,
+          path: 'embedding',
+          queryVector: queryEmbedding,
+          numCandidates: Math.max(50, limit * 10),
+          limit,
+          filter,
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          book: 1,
+          chunkIndex: 1,
+          text: 1,
+          chapter: 1,
+          section: 1,
+          pageStart: 1,
+          pageEnd: 1,
+          vectorScore: { $meta: 'vectorSearchScore' },
+        },
+      },
+    ]);
+    return Array.isArray(rows) ? rows.map(normalizeScoredChunkRow) : [];
+  } catch (err) {
+    const msg = String(err?.message || '');
+    if (
+      msg.includes('$vectorSearch') ||
+      msg.toLowerCase().includes('atlas') ||
+      msg.toLowerCase().includes('index')
+    ) {
+      console.warn('[bookRag] vector search unavailable; falling back:', msg);
+      return null;
+    }
+    throw err;
+  }
+}
+
 function previewText(text, max = 180) {
   const oneLine = String(text || '').replace(/\s+/g, ' ').trim();
   if (oneLine.length <= max) return oneLine;
@@ -701,6 +766,12 @@ export async function buildRagContextForQuery(bookId, userId, query) {
     };
   }
 
+  const vectorRows = await searchChunksByVector({
+    filter: { book: new mongoose.Types.ObjectId(String(bookId)) },
+    queryEmbedding,
+    limit: TOP_K,
+  });
+
   const rows = await BookChunk.find({ book: bookId })
     .select('text chunkIndex chapter section pageStart pageEnd embedding')
     .lean();
@@ -713,18 +784,25 @@ export async function buildRagContextForQuery(bookId, userId, query) {
     };
   }
 
-  const scoredBase = rows
-    .map((r) => ({
-      text: r.text,
-      score: semanticOrKeywordScore(queryEmbedding, rewrittenQuery, r.text, r.embedding),
-      chunkIndex: r.chunkIndex,
-      chapter: r.chapter || '',
-      section: r.section || '',
-      pageStart: r.pageStart ?? null,
-      pageEnd: r.pageEnd ?? null,
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_K);
+  const scoredBase = Array.isArray(vectorRows)
+    ? vectorRows
+    : rows
+        .map((r) => ({
+          text: r.text,
+          score: semanticOrKeywordScore(
+            queryEmbedding,
+            rewrittenQuery,
+            r.text,
+            r.embedding,
+          ),
+          chunkIndex: r.chunkIndex,
+          chapter: r.chapter || '',
+          section: r.section || '',
+          pageStart: r.pageStart ?? null,
+          pageEnd: r.pageEnd ?? null,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, TOP_K);
 
   const picked = new Set(scoredBase.map((s) => s.chunkIndex));
   const scored = [...scoredBase];
@@ -793,6 +871,7 @@ export async function buildRagContextForQuery(bookId, userId, query) {
   const references = scored.map((s) => ({
     bookId: String(bookId),
     bookTitle: book.title || 'Untitled',
+    bookUrl: String(book.bookUrl || ''),
     chunkIndex: s.chunkIndex ?? 0,
     excerptNumber: (s.chunkIndex ?? 0) + 1,
     score: s.score,
@@ -823,7 +902,7 @@ export async function buildGeneralRagContextForQuery(userId, query) {
   }
 
   const books = await Book.find(canReadBookFilter(userId))
-    .select('_id title')
+    .select('_id title bookUrl')
     .lean();
   if (books.length === 0) {
     return { context: null, reason: 'no_books', references: [] };
@@ -831,6 +910,13 @@ export async function buildGeneralRagContextForQuery(userId, query) {
 
   const bookIds = books.map((b) => b._id);
   const titleById = new Map(books.map((b) => [String(b._id), b.title || 'Untitled']));
+  const urlById = new Map(books.map((b) => [String(b._id), String(b.bookUrl || '')]));
+
+  const vectorRows = await searchChunksByVector({
+    filter: { book: { $in: bookIds } },
+    queryEmbedding,
+    limit: TOP_K,
+  });
 
   const rows = await BookChunk.find({ book: { $in: bookIds } })
     .select('text chunkIndex book chapter section pageStart pageEnd embedding')
@@ -839,19 +925,26 @@ export async function buildGeneralRagContextForQuery(userId, query) {
     return { context: null, reason: 'not_indexed', references: [] };
   }
 
-  const scoredBase = rows
-    .map((r) => ({
-      book: String(r.book),
-      text: r.text,
-      score: semanticOrKeywordScore(queryEmbedding, rewrittenQuery, r.text, r.embedding),
-      chunkIndex: r.chunkIndex,
-      chapter: r.chapter || '',
-      section: r.section || '',
-      pageStart: r.pageStart ?? null,
-      pageEnd: r.pageEnd ?? null,
-    }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, TOP_K);
+  const scoredBase = Array.isArray(vectorRows)
+    ? vectorRows
+    : rows
+        .map((r) => ({
+          book: String(r.book),
+          text: r.text,
+          score: semanticOrKeywordScore(
+            queryEmbedding,
+            rewrittenQuery,
+            r.text,
+            r.embedding,
+          ),
+          chunkIndex: r.chunkIndex,
+          chapter: r.chapter || '',
+          section: r.section || '',
+          pageStart: r.pageStart ?? null,
+          pageEnd: r.pageEnd ?? null,
+        }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, TOP_K);
 
   const scored = [...scoredBase];
 
@@ -892,6 +985,7 @@ export async function buildGeneralRagContextForQuery(userId, query) {
   const references = scored.map((s) => ({
     bookId: s.book,
     bookTitle: titleById.get(s.book) || 'Untitled',
+    bookUrl: urlById.get(s.book) || '',
     chunkIndex: s.chunkIndex ?? 0,
     excerptNumber: (s.chunkIndex ?? 0) + 1,
     score: s.score,

@@ -17,7 +17,6 @@ Rules:
 - If answer is not found, say exactly:
 "The information was not found in the available books."`;
 
-const NOT_FOUND_TEXT = 'The information was not found in the available books.';
 const MODE_RULES = {
   chat: 'Provide a direct helpful answer in 3-6 sentences.',
   study_notes:
@@ -31,36 +30,6 @@ const MODE_RULES = {
 
 function toGeminiRole(role) {
   return role === 'assistant' ? 'model' : 'user';
-}
-
-function formatReferencesForDisplay(references) {
-  if (!Array.isArray(references) || references.length === 0) return '';
-  const seen = new Set();
-  const lines = [];
-  for (const ref of references) {
-    const title = String(ref?.bookTitle || 'Untitled');
-    const excerptNumber = Number(ref?.excerptNumber || 0);
-    const key = `${title}::${excerptNumber}`;
-    if (seen.has(key) || excerptNumber <= 0) continue;
-    seen.add(key);
-    const chapter = String(ref?.chapter || '').trim();
-    const pages =
-      ref?.pageStart && ref?.pageEnd
-        ? ref.pageStart === ref.pageEnd
-          ? `Page ${ref.pageStart}`
-          : `Pages ${ref.pageStart}-${ref.pageEnd}`
-        : '';
-    const meta = [chapter ? `Chapter: ${chapter}` : '', pages]
-      .filter(Boolean)
-      .join(' | ');
-    lines.push(
-      meta
-        ? `- ${title} (Excerpt #${excerptNumber}) | ${meta}`
-        : `- ${title} (Excerpt #${excerptNumber})`,
-    );
-  }
-  if (lines.length === 0) return '';
-  return `\n\nSources:\n${lines.join('\n')}`;
 }
 
 async function askGemini(messages) {
@@ -99,6 +68,119 @@ async function askGemini(messages) {
   return text;
 }
 
+function validateChatMessages(messages) {
+  if (!Array.isArray(messages) || messages.length === 0) {
+    throw new Error('messages must be a non-empty array');
+  }
+
+  for (const msg of messages) {
+    if (!msg.role || !msg.content || typeof msg.content !== 'string') {
+      throw new Error('Each message must have a role and content string');
+    }
+    if (!['user', 'assistant'].includes(msg.role)) {
+      throw new Error('Message role must be "user" or "assistant"');
+    }
+  }
+}
+
+async function generateLiquAiReply({
+  messages,
+  sessionId,
+  bookId,
+  mode,
+  contextScope,
+  userId,
+}) {
+  validateChatMessages(messages);
+
+  let messagesForLlm = messages;
+  let ragReferences = [];
+  let hasRagContext = false;
+  const lastUserMsg = messages.at(-1);
+  const classroomContextHint =
+    lastUserMsg?.role === 'user' &&
+    typeof lastUserMsg.content === 'string' &&
+    /use the classroom data below as the primary source of truth/i.test(
+      lastUserMsg.content,
+    );
+  const isClassroomScope =
+    String(contextScope || '').toLowerCase() === 'classroom' ||
+    classroomContextHint;
+
+  if (bookId && String(bookId).trim()) {
+    const aug = await augmentMessagesWithBookRag(
+      messages,
+      String(bookId).trim(),
+      userId,
+      mode,
+    );
+    messagesForLlm = aug.messages;
+    ragReferences = Array.isArray(aug.references) ? aug.references : [];
+    hasRagContext = Boolean(aug.ragUsed);
+  }
+
+  if ((!bookId || !String(bookId).trim()) && !isClassroomScope) {
+    if (lastUserMsg?.role === 'user' && typeof lastUserMsg.content === 'string') {
+      const modeRule = MODE_RULES[String(mode || 'chat').toLowerCase()] || MODE_RULES.chat;
+      const rag = await buildGeneralRagContextForQuery(
+        userId,
+        lastUserMsg.content,
+      );
+      if (rag.context) {
+        const prefix =
+          `${CONTEXT_ONLY_RULES}\n- Output mode: ${String(mode || 'chat')}\n- Mode behavior: ${modeRule}\n\nProvided context:\n\n` +
+          rag.context +
+          '\n\n---\n\nStudent question:\n';
+        const out = messages.slice(0, -1).map((m) => ({ ...m }));
+        out.push({ role: 'user', content: `${prefix}${lastUserMsg.content}` });
+        messagesForLlm = out;
+        hasRagContext = true;
+      }
+      ragReferences = Array.isArray(rag.references) ? rag.references : [];
+    }
+  }
+
+  let responseText = await askGemini(messagesForLlm);
+  if (isClassroomScope) {
+    responseText = responseText
+      .replace(/The information was not found in the available books\./gi, '')
+      .replace(/\n{0,2}Sources:\s*[\s\S]*$/i, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  // Persist to session (Liqu AI only, not support widget sessions)
+  let session = sessionId
+    ? await ChatSession.findOne({
+        _id: sessionId,
+        userId,
+        $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
+      })
+    : null;
+
+  if (!session) {
+    const firstUserMsg = messages.find((m) => m.role === 'user');
+    session = await ChatSession.create({
+      userId,
+      title: firstUserMsg ? firstUserMsg.content.slice(0, 60) : 'New chat',
+      messages: [],
+    });
+  }
+
+  const userMsg = messages[messages.length - 1];
+  session.messages.push(
+    { role: userMsg.role, content: userMsg.content },
+    { role: 'assistant', content: responseText },
+  );
+  await session.save();
+
+  return {
+    response: responseText,
+    sessionId: session._id.toString(),
+    references: ragReferences,
+  };
+}
+
 // ── Chat (REST, non-streaming) ─────────────────────────────────────────────────
 
 async function chatController(req, res, next) {
@@ -106,103 +188,25 @@ async function chatController(req, res, next) {
     assertCanWrite(req.user);
     const { messages, sessionId, bookId, mode } = req.body;
     const userId = req.user._id;
-
-    if (!Array.isArray(messages) || messages.length === 0) {
-      return res
-        .status(400)
-        .json({ message: 'messages must be a non-empty array' });
-    }
-
-    for (const msg of messages) {
-      if (!msg.role || !msg.content || typeof msg.content !== 'string') {
-        return res.status(400).json({
-          message: 'Each message must have a role and content string',
-        });
-      }
-      if (!['user', 'assistant'].includes(msg.role)) {
-        return res
-          .status(400)
-          .json({ message: 'Message role must be "user" or "assistant"' });
-      }
-    }
-
-    let messagesForLlm = messages;
-    let ragReferences = [];
-    let hasRagContext = false;
-    if (bookId && String(bookId).trim()) {
-      const aug = await augmentMessagesWithBookRag(
-        messages,
-        String(bookId).trim(),
-        userId,
-        mode,
-      );
-      messagesForLlm = aug.messages;
-      ragReferences = Array.isArray(aug.references) ? aug.references : [];
-      hasRagContext = Boolean(aug.ragUsed);
-    }
-
-    if (!bookId || !String(bookId).trim()) {
-      const lastUserMsg = messages.at(-1);
-      if (lastUserMsg?.role === 'user' && typeof lastUserMsg.content === 'string') {
-        const modeRule = MODE_RULES[String(mode || 'chat').toLowerCase()] || MODE_RULES.chat;
-        const rag = await buildGeneralRagContextForQuery(
-          userId,
-          lastUserMsg.content,
-        );
-        if (rag.context) {
-          const prefix =
-            `${CONTEXT_ONLY_RULES}\n- Output mode: ${String(mode || 'chat')}\n- Mode behavior: ${modeRule}\n\nProvided context:\n\n` +
-            rag.context +
-            '\n\n---\n\nStudent question:\n';
-          const out = messages.slice(0, -1).map((m) => ({ ...m }));
-          out.push({ role: 'user', content: `${prefix}${lastUserMsg.content}` });
-          messagesForLlm = out;
-          hasRagContext = true;
-        }
-        ragReferences = Array.isArray(rag.references) ? rag.references : [];
-      }
-    }
-
-    let responseText = NOT_FOUND_TEXT;
-    if (hasRagContext) {
-      responseText = await askGemini(messagesForLlm);
-    }
-    const sourcesText = formatReferencesForDisplay(ragReferences);
-    if (sourcesText) {
-      responseText = `${responseText}${sourcesText}`;
-    }
-
-    // Persist to session (Liqu AI only, not support widget sessions)
-    let session = sessionId
-      ? await ChatSession.findOne({
-          _id: sessionId,
-          userId,
-          $or: [{ kind: { $exists: false } }, { kind: 'liqu' }],
-        })
-      : null;
-
-    if (!session) {
-      const firstUserMsg = messages.find((m) => m.role === 'user');
-      session = await ChatSession.create({
-        userId,
-        title: firstUserMsg ? firstUserMsg.content.slice(0, 60) : 'New chat',
-        messages: [],
-      });
-    }
-
-    const userMsg = messages[messages.length - 1];
-    session.messages.push(
-      { role: userMsg.role, content: userMsg.content },
-      { role: 'assistant', content: responseText },
-    );
-    await session.save();
-
-    return res.json({
-      response: responseText,
-      sessionId: session._id.toString(),
-      references: ragReferences,
+    const result = await generateLiquAiReply({
+      messages,
+      sessionId,
+      bookId,
+      mode,
+      contextScope: req.body?.contextScope,
+      userId,
     });
+    return res.json(result);
   } catch (error) {
+    if (error.message?.includes('messages must be')) {
+      return res.status(400).json({ message: error.message });
+    }
+    if (
+      error.message?.includes('Each message must') ||
+      error.message?.includes('Message role must')
+    ) {
+      return res.status(400).json({ message: error.message });
+    }
     return next(error);
   }
 }
@@ -269,6 +273,7 @@ async function listModelsController(req, res, next) {
 export {
   chatController,
   deleteSessionController,
+  generateLiquAiReply,
   getSessionController,
   listModelsController,
   listSessionsController,
