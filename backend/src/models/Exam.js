@@ -157,13 +157,13 @@ examSchema.pre('validate', function () {
     return;
   }
   if (!this.fileUrl?.trim()) {
-    this.invalidate('fileUrl', 'PDF exams require a file URL');
+    this.invalidate('fileUrl', 'Uploaded exams require a file URL');
   }
   if (!this.fileKey?.trim()) {
-    this.invalidate('fileKey', 'PDF exams require a file key');
+    this.invalidate('fileKey', 'Uploaded exams require a file key');
   }
   if (this.fileSize == null || this.fileSize <= 0) {
-    this.invalidate('fileSize', 'PDF exams require a positive file size');
+    this.invalidate('fileSize', 'Uploaded exams require a positive file size');
   }
 });
 

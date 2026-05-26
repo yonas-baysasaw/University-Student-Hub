@@ -552,7 +552,13 @@ function ExamPractice() {
     function onProcessingFailed({ examId: eid }) {
       if (eid !== examId) return;
       setExam((prev) =>
-        prev ? { ...prev, processingStatus: 'failed' } : prev,
+        prev
+          ? {
+              ...prev,
+              processingStatus: 'failed',
+              processingError: error || prev.processingError,
+            }
+          : prev,
       );
       clearInterval(pollRef.current);
     }
@@ -636,6 +642,11 @@ function ExamPractice() {
         >
           {STATUS_LABELS[exam.processingStatus]}
         </p>
+        {isFailed && exam.processingError ? (
+          <p className="mt-2 text-sm leading-relaxed text-rose-500/90">
+            {exam.processingError}
+          </p>
+        ) : null}
         {isProcessing && (
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500">
             <span className="loading loading-spinner loading-sm" />

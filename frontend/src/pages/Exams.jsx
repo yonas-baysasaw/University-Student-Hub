@@ -48,6 +48,10 @@ import {
   examPaperTypeLabel,
 } from '../utils/examPaperLabels';
 import { readJsonOrThrow } from '../utils/http';
+import {
+  EXAM_IMPORT_ACCEPT,
+  validateExamImportFile,
+} from '../utils/examImportFormats';
 
 const TABS = [
   {
@@ -64,7 +68,7 @@ const TABS = [
   },
   {
     key: 'import',
-    label: 'Import PDF',
+    label: 'Import document',
     sub: 'AI extraction',
     icon: Upload,
   },
@@ -622,7 +626,7 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
               onClick={onOpenImport}
             >
               <Upload className="h-4 w-4 shrink-0" aria-hidden />
-              Import PDF
+              Import document
             </button>
           ) : null}
         </div>
@@ -640,9 +644,9 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
               {papersVisibility === 'private'
-                ? 'No private extracts yet — try All or import a PDF (stays private until you switch to Community).'
+                ? 'No private extracts yet — try All or import a document (stays private until you switch to Community).'
                 : papersVisibility === 'public'
-                  ? 'Nothing listed on the bank from you yet — publish from drafts below or expose a PDF.'
+                  ? 'Nothing listed on the bank from you yet — publish from drafts below or share an imported paper.'
                   : 'Import a syllabus or compose questions and publish — your shelf stays organized here.'}
             </p>
             {typeof onOpenImport === 'function' ? (
@@ -651,7 +655,7 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
                 className="btn-primary mt-4 px-5 py-2 text-sm"
                 onClick={onOpenImport}
               >
-                Go to Import PDF
+                Go to Import document
               </button>
             ) : null}
           </div>
@@ -1489,7 +1493,7 @@ function BankTab() {
             No papers yet.
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Import a PDF or publish from your vault.
+            Import a document or publish from your vault.
           </p>
         </div>
       )}
@@ -1873,7 +1877,7 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                   </span>
                 ) : (
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    PDF paper
+                    Uploaded paper
                   </span>
                 )}
                 {exam.visibility === 'private' && isOwner ? (
@@ -2006,7 +2010,14 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                   Extracting questions…
                 </>
               ) : exam.processingStatus === 'failed' ? (
-                <span className="text-rose-600">Processing failed</span>
+                <span className="text-rose-600">
+                  Processing failed
+                  {exam.processingError ? (
+                    <span className="mt-1 block font-normal text-rose-500/90">
+                      {exam.processingError}
+                    </span>
+                  ) : null}
+                </span>
               ) : (
                 <span>Not yet available</span>
               )}
@@ -2276,12 +2287,9 @@ function PdfImportTab({ onUploaded }) {
 
   function pickFile(picked) {
     if (!picked) return;
-    if (picked.type !== 'application/pdf') {
-      setError('Only PDF files are allowed.');
-      return;
-    }
-    if (picked.size > 10 * 1024 * 1024) {
-      setError('File must be smaller than 10 MB.');
+    const err = validateExamImportFile(picked);
+    if (err) {
+      setError(err);
       return;
     }
     setError('');
@@ -2319,7 +2327,7 @@ function PdfImportTab({ onUploaded }) {
 
     try {
       const form = new FormData();
-      form.append('pdf', file);
+      form.append('file', file);
       form.append('visibility', privacyPrivate ? 'private' : 'public');
       form.append('academicTrack', String(importTrack).trim().toLowerCase());
       form.append('department', resolvedDept);
@@ -2344,7 +2352,7 @@ function PdfImportTab({ onUploaded }) {
       const data = await readJsonOrThrow(res, 'Upload failed');
       setSuccess(data);
       setFile(null);
-      toast.success('PDF uploaded', {
+      toast.success('Document uploaded', {
         description: 'AI is extracting questions in the background.',
       });
     } catch (err) {
@@ -2422,7 +2430,7 @@ function PdfImportTab({ onUploaded }) {
                   </span>
                   <span className="min-w-0">
                     <span className="block font-display text-sm font-bold text-white">
-                      Import another PDF
+                      Import another document
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
                       Run the upload flow again for a fresh paper while this one finishes.
@@ -2473,14 +2481,15 @@ function PdfImportTab({ onUploaded }) {
         <div className="min-w-0">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-gradient-to-r from-cyan-50 to-teal-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-900 shadow-sm dark:border-cyan-300/50 dark:from-cyan-100/80 dark:to-sky-100/70 dark:text-cyan-950">
             <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            PDF → MCQs in one lane
+            Document → MCQs in one lane
           </span>
           <h2 className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900 dark:text-slate-900 md:text-2xl">
-            Bring a syllabus PDF or past paper
+            Bring a past paper or syllabus
           </h2>
           <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-600">
-            We upload to your vault privately, OCR & chunk the PDF, then auto-build practice
-            questions — max <strong className="text-cyan-700 dark:text-cyan-700">10 MB</strong>.
+            PDF, Word (.docx), PowerPoint (.pptx), or plain text — we upload privately,
+            extract content, then auto-build practice questions — max{' '}
+            <strong className="text-cyan-700 dark:text-cyan-700">10 MB</strong>.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-slate-200/95 bg-white px-3 py-2 text-xs shadow-sm backdrop-blur-sm dark:border-slate-300/90 dark:bg-white/90">
@@ -2526,12 +2535,12 @@ function PdfImportTab({ onUploaded }) {
           type="button"
           className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white to-slate-50/30 p-10 transition hover:from-cyan-50 hover:to-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:from-white dark:to-slate-50/50 dark:hover:from-sky-50"
           onClick={() => inputRef.current?.click()}
-          aria-label="Click or drag to upload PDF"
+          aria-label="Click or drag to upload exam document"
         >
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf"
+            accept={EXAM_IMPORT_ACCEPT}
             className="hidden"
             onChange={(e) => pickFile(e.target.files[0])}
           />
@@ -2548,10 +2557,10 @@ function PdfImportTab({ onUploaded }) {
           ) : (
             <>
               <p className="mt-3 font-semibold text-slate-700 dark:text-slate-800">
-                Drop your PDF here or tap to browse
+                Drop your file here or tap to browse
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Locked to vault behavior by default—you stay in control.
+                PDF, DOCX, PPTX, or TXT · max 10 MB
               </p>
             </>
           )}
@@ -2581,7 +2590,7 @@ function PdfImportTab({ onUploaded }) {
             <input
               value={displayTitle}
               onChange={(e) => setDisplayTitle(e.target.value)}
-              placeholder="Defaults to PDF filename without .pdf"
+              placeholder="Defaults to filename without extension"
               className="mt-1 input-field w-full text-sm"
             />
           </label>
@@ -2715,7 +2724,7 @@ function PdfImportTab({ onUploaded }) {
           title={
             file
               ? 'Upload requires catalog fields above'
-              : 'Pick a PDF first'
+              : 'Pick a file first'
           }
         >
           {uploading ? 'Working…' : (

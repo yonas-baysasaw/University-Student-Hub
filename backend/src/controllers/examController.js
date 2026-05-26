@@ -5,18 +5,19 @@ import Attempt from '../models/Attempt.js';
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
 import { processExamInBatches } from '../services/batchService.js';
-import {
-  analyzePDF,
-  extractImagesFromPDF,
-  extractTextFromPDF,
-  hashContent,
-} from '../services/pdfService.js';
+import { extractExamDocumentContent } from '../services/examDocumentService.js';
+import { extractImagesFromPDF, hashContent } from '../services/pdfService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 import {
   EXAM_PAPER_TYPES,
   validateExamPdfCatalogMeta,
 } from '../utils/examCatalogMeta.js';
 import { formatExamForClient } from '../utils/examJson.js';
+import { stripExamImportExtension } from '../utils/examImportFormats.js';
+import {
+  loadUserGeminiCredentials,
+  userLikeFromCredentials,
+} from '../utils/geminiUserCredentials.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 /**
@@ -39,6 +40,41 @@ function controllerError(res, next, error, label = 'examController') {
   return undefined;
 }
 
+function getUploadedExamFile(req) {
+  return req.file ?? (Array.isArray(req.files) ? req.files[0] : null);
+}
+
+function originalNameFromFileKey(fileKey) {
+  const base = String(fileKey || '').split('/').pop() || '';
+  const dash = base.indexOf('-');
+  return dash >= 0 ? base.slice(dash + 1) : base;
+}
+
+async function runExamBackgroundProcessing(examId, buffer, meta, userId) {
+  const credentials = await loadUserGeminiCredentials(userId);
+  const userLike = userLikeFromCredentials(credentials);
+
+  try {
+    const { textContent, isImageBased } = await extractExamDocumentContent(
+      buffer,
+      meta,
+    );
+    let content;
+    if (isImageBased) {
+      content = await extractImagesFromPDF(buffer);
+    } else {
+      content = textContent;
+    }
+    await processExamInBatches(examId, content, userLike);
+  } catch (err) {
+    console.error(`Background processing failed for exam ${examId}:`, err);
+    await Exam.findByIdAndUpdate(examId, {
+      processingStatus: 'failed',
+      processingError: err.message,
+    }).catch(() => {});
+  }
+}
+
 // ── Upload & Process ──────────────────────────────────────────────────────────
 
 async function uploadExamController(req, res, next) {
@@ -47,25 +83,26 @@ async function uploadExamController(req, res, next) {
     const userId = req.user?._id;
     if (!userId) return res.status(401).json({ message: 'Unauthorized' });
 
-    const file = req.file ?? (Array.isArray(req.files) ? req.files[0] : null);
+    const file = getUploadedExamFile(req);
     if (!file)
-      return res.status(400).json({ message: 'No PDF file uploaded.' });
+      return res.status(400).json({ message: 'No file uploaded.' });
 
-    // Upload raw PDF to S3
+    // Upload raw file to S3
     const s3Result = await uploadFileToS3(file, `${userId}/exams`);
 
-    // Extract text to build content hash for deduplication
     let textContent = '';
-    let isImageBased = false;
     try {
-      const analysis = await analyzePDF(file.buffer);
-      isImageBased = analysis.isImageBased;
-      if (!isImageBased) {
-        textContent = await extractTextFromPDF(file.buffer);
-      }
+      const extracted = await extractExamDocumentContent(file.buffer, {
+        mimetype: file.mimetype,
+        originalname: file.originalname,
+      });
+      textContent = extracted.textContent;
     } catch (pdfErr) {
+      if (pdfErr.status === 400) {
+        return res.status(400).json({ message: pdfErr.message });
+      }
       console.warn(
-        'PDF analysis failed — will process without text:',
+        'Document analysis failed — will process without text:',
         pdfErr.message,
       );
     }
@@ -90,7 +127,7 @@ async function uploadExamController(req, res, next) {
     const displayTitle = String(req.body?.displayTitle || '').trim();
     const titleForRecord =
       displayTitle ||
-      String(file.originalname || 'exam.pdf').replace(/\.pdf$/i, '').trim() ||
+      stripExamImportExtension(file.originalname) ||
       file.originalname ||
       'Untitled exam';
 
@@ -144,27 +181,17 @@ async function uploadExamController(req, res, next) {
       ...catalogFields,
     });
 
-    const pdfBuffer = file.buffer;
-    (async () => {
-      try {
-        let content;
-        if (isImageBased) {
-          content = await extractImagesFromPDF(pdfBuffer);
-        } else {
-          content = textContent;
-        }
-        await processExamInBatches(exam._id.toString(), content, userId);
-      } catch (err) {
-        console.error(
-          `Background processing failed for exam ${exam._id}:`,
-          err,
-        );
-        await Exam.findByIdAndUpdate(exam._id, {
-          processingStatus: 'failed',
-          processingError: err.message,
-        }).catch(() => {});
-      }
-    })();
+    const fileBuffer = file.buffer;
+    const fileMeta = {
+      mimetype: file.mimetype,
+      originalname: file.originalname,
+    };
+    void runExamBackgroundProcessing(
+      exam._id.toString(),
+      fileBuffer,
+      fileMeta,
+      userId,
+    );
 
     const populatedNew = await Exam.findById(exam._id).populate(
       'uploadedBy',
@@ -489,7 +516,7 @@ async function reprocessFailedExamController(req, res, next) {
       });
     }
     if (!exam.fileKey?.trim()) {
-      return res.status(400).json({ message: 'No PDF on file for this exam.' });
+      return res.status(400).json({ message: 'No file on record for this exam.' });
     }
 
     let s3Response;
@@ -504,34 +531,37 @@ async function reprocessFailedExamController(req, res, next) {
       console.error('[reprocessFailedExam] S3 get failed:', s3Err);
       return res.status(502).json({
         message:
-          'Could not load the PDF from storage. Try uploading the file again.',
+          'Could not load the file from storage. Try uploading it again.',
       });
     }
 
     const bytes = await s3Response.Body.transformToByteArray();
-    const pdfBuffer = Buffer.from(bytes);
+    const fileBuffer = Buffer.from(bytes);
+    const storedName = originalNameFromFileKey(exam.fileKey);
+
+    let textContent = '';
+    try {
+      const extracted = await extractExamDocumentContent(fileBuffer, {
+        mimetype: s3Response.ContentType || '',
+        originalname: storedName,
+      });
+      textContent = extracted.textContent;
+    } catch (docErr) {
+      if (docErr.status === 400) {
+        return res.status(400).json({ message: docErr.message });
+      }
+      console.warn(
+        'Document analysis on reprocess — continuing without text:',
+        docErr.message,
+      );
+    }
+
+    const contentHash = textContent ? hashContent(textContent) : null;
 
     await Promise.all([
       Question.deleteMany({ examId }),
       Attempt.deleteMany({ examId }),
     ]);
-
-    let textContent = '';
-    let isImageBased = false;
-    try {
-      const analysis = await analyzePDF(pdfBuffer);
-      isImageBased = analysis.isImageBased;
-      if (!isImageBased) {
-        textContent = await extractTextFromPDF(pdfBuffer);
-      }
-    } catch (pdfErr) {
-      console.warn(
-        'PDF analysis on reprocess — continuing without text:',
-        pdfErr.message,
-      );
-    }
-
-    const contentHash = textContent ? hashContent(textContent) : null;
 
     await Exam.findByIdAndUpdate(examId, {
       textContent,
@@ -541,23 +571,15 @@ async function reprocessFailedExamController(req, res, next) {
       totalQuestions: 0,
     });
 
-    (async () => {
-      try {
-        let content;
-        if (isImageBased) {
-          content = await extractImagesFromPDF(pdfBuffer);
-        } else {
-          content = textContent;
-        }
-        await processExamInBatches(examId, content, userId);
-      } catch (err) {
-        console.error(`Background reprocess failed for exam ${examId}:`, err);
-        await Exam.findByIdAndUpdate(examId, {
-          processingStatus: 'failed',
-          processingError: err.message,
-        }).catch(() => {});
-      }
-    })();
+    void runExamBackgroundProcessing(
+      examId,
+      fileBuffer,
+      {
+        mimetype: s3Response.ContentType || '',
+        originalname: storedName,
+      },
+      userId,
+    );
 
     const populated = await Exam.findById(examId).populate(
       'uploadedBy',

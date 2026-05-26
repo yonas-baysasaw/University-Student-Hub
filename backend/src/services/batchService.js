@@ -1,6 +1,6 @@
-import { ENV } from '../config/env.js';
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
+import { resolveGeminiCredentialsForUser } from './geminiService.js';
 
 const CHUNK_WORDS = 700;
 const CHUNK_OVERLAP_WORDS = 120;
@@ -78,11 +78,12 @@ function normalizeQuestion(raw, index, batchNumber) {
   };
 }
 
-async function generateQuestionsFromChunk(chunkText) {
-  const apiKey = String(ENV.GEMINI_API_KEY || '').trim();
-  const modelId = String(ENV.GEMINI_MODEL_ID || 'gemini-2.5-flash').trim();
+async function generateQuestionsFromChunk(chunkText, userLike) {
+  const { apiKey, modelId } = resolveGeminiCredentialsForUser(userLike);
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is missing on the server.');
+    throw new Error(
+      'No Gemini API key. Add your key in Profile (Liqu AI Settings) or set GEMINI_API_KEY on the server.',
+    );
   }
   const prompt =
     `You are an exam-question extraction assistant.\n` +
@@ -129,8 +130,7 @@ async function generateQuestionsFromChunk(chunkText) {
   return Array.isArray(parsed?.questions) ? parsed.questions : [];
 }
 
-async function processExamInBatches(examId, content, uploaderId) {
-  void uploaderId;
+async function processExamInBatches(examId, content, userLike) {
   const rawText =
     typeof content === 'string'
       ? content
@@ -142,7 +142,7 @@ async function processExamInBatches(examId, content, uploaderId) {
     await Exam.findByIdAndUpdate(examId, {
       processingStatus: 'failed',
       processingError:
-        'Could not extract text from this file. Try a text-based PDF.',
+        'Could not extract text from this file. Try a text-based PDF, Word, PowerPoint, or plain text file.',
       totalQuestions: 0,
     });
     return;
@@ -165,7 +165,7 @@ async function processExamInBatches(examId, content, uploaderId) {
 
   const all = [];
   for (const chunk of chunks) {
-    const extracted = await generateQuestionsFromChunk(chunk.content);
+    const extracted = await generateQuestionsFromChunk(chunk.content, userLike);
     const trimmed = extracted.slice(0, MAX_QUESTIONS_PER_CHUNK);
     for (const q of trimmed) {
       const normalized = normalizeQuestion(q, all.length, chunk.batchNumber);
