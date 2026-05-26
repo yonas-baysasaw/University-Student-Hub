@@ -55,6 +55,22 @@ const examSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
+    processingBatchCurrent: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    processingBatchTotal: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    /** `standard`: default chunking; `thorough`: smaller chunks, more MCQs per section. */
+    extractionMode: {
+      type: String,
+      enum: ['standard', 'thorough'],
+      default: 'standard',
+    },
     subject: {
       type: String,
       default: '',

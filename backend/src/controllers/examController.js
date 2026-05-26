@@ -5,6 +5,7 @@ import Attempt from '../models/Attempt.js';
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
 import { processExamInBatches } from '../services/batchService.js';
+import { emitExamProcessingFailed } from '../services/examProcessingEvents.js';
 import { extractExamDocumentContent } from '../services/examDocumentService.js';
 import { extractImagesFromPDF, hashContent } from '../services/pdfService.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
@@ -50,9 +51,10 @@ function originalNameFromFileKey(fileKey) {
   return dash >= 0 ? base.slice(dash + 1) : base;
 }
 
-async function runExamBackgroundProcessing(examId, buffer, meta, userId) {
+async function runExamBackgroundProcessing(examId, buffer, meta, userId, opts = {}) {
   const credentials = await loadUserGeminiCredentials(userId);
   const userLike = userLikeFromCredentials(credentials);
+  const uid = String(userId);
 
   try {
     const { textContent, isImageBased } = await extractExamDocumentContent(
@@ -65,13 +67,19 @@ async function runExamBackgroundProcessing(examId, buffer, meta, userId) {
     } else {
       content = textContent;
     }
-    await processExamInBatches(examId, content, userLike);
+    await processExamInBatches(examId, content, userLike, {
+      userId: uid,
+      extractionMode: opts.extractionMode || 'standard',
+      filename: opts.filename || '',
+    });
   } catch (err) {
     console.error(`Background processing failed for exam ${examId}:`, err);
+    const message = err.message || 'Processing failed';
     await Exam.findByIdAndUpdate(examId, {
       processingStatus: 'failed',
-      processingError: err.message,
+      processingError: message,
     }).catch(() => {});
+    emitExamProcessingFailed({ examId, userId: uid, error: message });
   }
 }
 
@@ -131,6 +139,12 @@ async function uploadExamController(req, res, next) {
       file.originalname ||
       'Untitled exam';
 
+    const extractionModeRaw = String(req.body?.extractionMode || 'standard')
+      .trim()
+      .toLowerCase();
+    const extractionMode =
+      extractionModeRaw === 'thorough' ? 'thorough' : 'standard';
+
     const catalogFields = {
       academicTrack: String(req.body?.academicTrack || '')
         .trim()
@@ -178,6 +192,7 @@ async function uploadExamController(req, res, next) {
       textContent,
       processingStatus: 'pending',
       visibility,
+      extractionMode,
       ...catalogFields,
     });
 
@@ -191,6 +206,7 @@ async function uploadExamController(req, res, next) {
       fileBuffer,
       fileMeta,
       userId,
+      { extractionMode, filename: titleForRecord },
     );
 
     const populatedNew = await Exam.findById(exam._id).populate(
@@ -569,6 +585,8 @@ async function reprocessFailedExamController(req, res, next) {
       processingStatus: 'pending',
       processingError: '',
       totalQuestions: 0,
+      processingBatchCurrent: 0,
+      processingBatchTotal: 0,
     });
 
     void runExamBackgroundProcessing(
@@ -579,6 +597,10 @@ async function reprocessFailedExamController(req, res, next) {
         originalname: storedName,
       },
       userId,
+      {
+        extractionMode: exam.extractionMode || 'standard',
+        filename: exam.filename || storedName,
+      },
     );
 
     const populated = await Exam.findById(examId).populate(

@@ -399,6 +399,52 @@ function ExamFocusTimer({
   );
 }
 
+function ExtractionProgressPanel({ exam, compact = false }) {
+  const batchCurrent = exam?.processingBatchCurrent ?? 0;
+  const batchTotal = exam?.processingBatchTotal ?? 0;
+  const totalQuestions = exam?.totalQuestions ?? 0;
+  const pct =
+    batchTotal > 0 ? Math.round((batchCurrent / batchTotal) * 100) : 0;
+
+  if (
+    exam?.processingStatus !== 'processing' &&
+    exam?.processingStatus !== 'pending'
+  ) {
+    return null;
+  }
+
+  return (
+    <div
+      className={`rounded-xl border border-amber-200/80 bg-amber-50/90 dark:border-amber-900/40 dark:bg-amber-950/30 ${
+        compact ? 'px-3 py-2' : 'px-4 py-3'
+      }`}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
+          <span className="loading loading-spinner loading-xs" />
+          {compact ? 'Extracting more MCQs…' : 'AI extraction in progress'}
+        </div>
+        <span className="text-[10px] font-medium tabular-nums text-amber-800/90 dark:text-amber-200/90">
+          Batch {batchCurrent}/{batchTotal || '…'}
+          {totalQuestions > 0 ? ` · ${totalQuestions} ready` : ''}
+        </span>
+      </div>
+      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-amber-200/70 dark:bg-amber-900/50">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-amber-500 to-cyan-500 transition-all duration-500"
+          style={{ width: `${Math.max(pct, batchTotal > 0 ? 4 : 0)}%` }}
+        />
+      </div>
+      {!compact ? (
+        <p className="mt-2 text-[11px] leading-relaxed text-amber-900/80 dark:text-amber-100/80">
+          Questions appear batch-by-batch. You can start practicing as soon as
+          the first set is ready.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 function BackToExamHubLink({ variant = 'primary' }) {
   let cls =
     'inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-600 dark:bg-slate-900/80 dark:text-slate-300 dark:hover:border-cyan-600/55 dark:hover:text-cyan-100';
@@ -527,52 +573,86 @@ function ExamPractice() {
   useEffect(() => {
     if (!socket) return;
 
-    function onBatchComplete({ examId: eid, newQuestionCount }) {
-      if (eid !== examId) return;
-      // Refresh questions from backend to get the new ones
-      fetch(`/api/exams/${examId}/questions`, { credentials: 'include' })
-        .then((r) => r.json())
-        .then((d) => {
-          if (d.questions) {
-            setQuestions(d.questions);
-            toast.info(`+${newQuestionCount} new questions available`);
-          }
-        })
-        .catch(() => {});
-    }
-
-    function onProcessingComplete({ examId: eid }) {
+    function onBatchComplete({
+      examId: eid,
+      batchNumber,
+      totalBatches,
+      newQuestionCount,
+      totalQuestions,
+    }) {
       if (eid !== examId) return;
       setExam((prev) =>
-        prev ? { ...prev, processingStatus: 'complete' } : prev,
+        prev
+          ? {
+              ...prev,
+              totalQuestions: totalQuestions ?? prev.totalQuestions,
+              processingBatchCurrent:
+                batchNumber ?? prev.processingBatchCurrent,
+              processingBatchTotal: totalBatches ?? prev.processingBatchTotal,
+            }
+          : prev,
       );
-      clearInterval(pollRef.current);
+      fetchExamData({ silent: true });
+      if (newQuestionCount > 0) {
+        toast.info(`+${newQuestionCount} new questions available`);
+      }
     }
 
-    function onProcessingFailed({ examId: eid }) {
+    function onProcessingComplete({ examId: eid, totalQuestions }) {
+      if (eid !== examId) return;
+      setExam((prev) =>
+        prev
+          ? {
+              ...prev,
+              processingStatus: 'complete',
+              totalQuestions: totalQuestions ?? prev.totalQuestions,
+            }
+          : prev,
+      );
+      clearInterval(pollRef.current);
+      fetchExamData({ silent: true });
+    }
+
+    function onProcessingFailed({ examId: eid, error: failMsg }) {
       if (eid !== examId) return;
       setExam((prev) =>
         prev
           ? {
               ...prev,
               processingStatus: 'failed',
-              processingError: error || prev.processingError,
+              processingError: failMsg || prev.processingError,
             }
           : prev,
       );
       clearInterval(pollRef.current);
     }
 
+    function onProcessingStarted({ examId: eid, totalBatches }) {
+      if (eid !== examId) return;
+      setExam((prev) =>
+        prev
+          ? {
+              ...prev,
+              processingStatus: 'processing',
+              processingBatchCurrent: 0,
+              processingBatchTotal: totalBatches ?? prev.processingBatchTotal,
+            }
+          : prev,
+      );
+    }
+
+    socket.on('exam:processingStarted', onProcessingStarted);
     socket.on('exam:batchComplete', onBatchComplete);
     socket.on('exam:processingComplete', onProcessingComplete);
     socket.on('exam:processingFailed', onProcessingFailed);
 
     return () => {
+      socket.off('exam:processingStarted', onProcessingStarted);
       socket.off('exam:batchComplete', onBatchComplete);
       socket.off('exam:processingComplete', onProcessingComplete);
       socket.off('exam:processingFailed', onProcessingFailed);
     };
-  }, [socket, examId]);
+  }, [socket, examId, fetchExamData]);
 
   // Poll while still processing (fallback for when socket isn't available)
   const processingStatus = exam?.processingStatus;
@@ -647,12 +727,15 @@ function ExamPractice() {
             {exam.processingError}
           </p>
         ) : null}
-        {isProcessing && (
-          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500">
-            <span className="loading loading-spinner loading-sm" />
-            Questions are being extracted…
+        {isProcessing ? (
+          <div className="mt-4 space-y-3">
+            <ExtractionProgressPanel exam={exam} />
+            <div className="flex items-center justify-center gap-2 text-sm text-slate-500">
+              <span className="loading loading-spinner loading-sm" />
+              Questions are being extracted…
+            </div>
           </div>
-        )}
+        ) : null}
         <div className="mt-6 flex justify-center">
           <BackToExamHubLink variant="muted" />
         </div>
@@ -1191,6 +1274,12 @@ function QuizSession({ exam, questions, examId, onExamUpdate }) {
               </div>
             </div>
           </div>
+
+          {isProcessing ? (
+            <div className="mt-3">
+              <ExtractionProgressPanel exam={exam} compact />
+            </div>
+          ) : null}
 
           <div className="mt-3 grid gap-3 lg:grid-cols-2 lg:items-start">
             <ExamFocusTimer

@@ -35,6 +35,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
+import { useProcessing } from '../contexts/ProcessingContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
   ACADEMIC_TRACKS,
@@ -562,13 +563,18 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
     ];
   }, [form]);
 
-  async function startPractice() {
+  async function startPractice(selectedOnly = false) {
     try {
+      const ids = selectedOnly ? [...selSet] : [];
+      const body =
+        ids.length > 0
+          ? { count: Math.min(50, ids.length), questionIds: ids }
+          : { count: 10 };
       const res = await fetch('/api/vault/questions/practice-batch', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: 10 }),
+        body: JSON.stringify(body),
       });
       const data = await readJsonOrThrow(res, 'Practice fetch failed');
       if (!data.questions?.length) {
@@ -1217,24 +1223,33 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
 
       {/* Sticky footer for multi-select */}
       {selSet.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-[2147483620] flex w-[min(100%-1.25rem,32rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border border-cyan-200/80 bg-white/96 px-4 py-3 shadow-xl backdrop-blur-md dark:border-cyan-800/50 dark:bg-slate-900/95">
+        <div className="fixed bottom-6 left-1/2 z-[2147483620] flex w-[min(100%-1.25rem,36rem)] -translate-x-1/2 flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-200/80 bg-white/96 px-4 py-3 shadow-xl backdrop-blur-md dark:border-cyan-800/50 dark:bg-slate-900/95">
           <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             {selSet.size} selected
           </span>
-          <button
-            type="button"
-            className="btn-primary px-5 py-2 text-xs shadow-sm"
-            onClick={openPublishWizard}
-          >
-            Compose paper…
-          </button>
-          <button
-            type="button"
-            className="text-xs text-slate-500 underline hover:no-underline"
-            onClick={() => setSelSet(new Set())}
-          >
-            Clear
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2 text-xs"
+              onClick={() => startPractice(true)}
+            >
+              Practice selected
+            </button>
+            <button
+              type="button"
+              className="btn-primary px-5 py-2 text-xs shadow-sm"
+              onClick={openPublishWizard}
+            >
+              Compose paper…
+            </button>
+            <button
+              type="button"
+              className="text-xs text-slate-500 underline hover:no-underline"
+              onClick={() => setSelSet(new Set())}
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1755,8 +1770,8 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
     exam.processingStatus === 'pending';
   const isOwner =
     currentUserId &&
-    (exam.uploadedBy?._id ?? exam.uploadedBy?.id ?? exam.uploadedBy) ===
-      currentUserId;
+    String(exam.uploadedBy?.id ?? exam.uploadedBy?._id ?? '') ===
+      String(currentUserId);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(exam.filename);
@@ -1987,6 +2002,40 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
           <p className="mt-1 text-xs text-slate-500">
             {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''}
           </p>
+
+          {isProcessing && (exam.processingBatchTotal ?? 0) > 0 ? (
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                <span>
+                  Extracting batch {exam.processingBatchCurrent ?? 0}/
+                  {exam.processingBatchTotal}
+                </span>
+                <span>
+                  {Math.round(
+                    ((exam.processingBatchCurrent ?? 0) /
+                      exam.processingBatchTotal) *
+                      100,
+                  )}
+                  %
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500"
+                  style={{
+                    width: `${Math.max(
+                      4,
+                      Math.round(
+                        ((exam.processingBatchCurrent ?? 0) /
+                          exam.processingBatchTotal) *
+                          100,
+                      ),
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
 
           <ExamPaperEngagement
             exam={exam}
@@ -2243,6 +2292,84 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
 
 // ── PDF import ─────────────────────────────────────────────────────────────────
 
+function ExtractionPipelinePanel() {
+  const steps = [
+    { label: 'Upload', hint: 'Secure private storage' },
+    { label: 'Parse', hint: 'Text from PDF/DOCX/PPTX' },
+    { label: 'AI batches', hint: 'MCQs appear incrementally' },
+    { label: 'Ready', hint: 'Practice anytime' },
+  ];
+  return (
+    <div className="relative z-[1] mt-5 rounded-2xl border border-slate-200/90 bg-white/80 p-4 shadow-sm dark:border-slate-300/90 dark:bg-white/90">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800">
+        Extraction pipeline
+      </p>
+      <ol className="mt-3 grid gap-2 sm:grid-cols-4">
+        {steps.map((step, i) => (
+          <li
+            key={step.label}
+            className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 dark:border-slate-200 dark:bg-slate-50"
+          >
+            <span className="text-[10px] font-bold text-cyan-700">
+              {i + 1}. {step.label}
+            </span>
+            <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+              {step.hint}
+            </p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        Tip: text-based PDFs extract fastest. Scanned pages may yield fewer MCQs
+        unless OCR text is embedded.
+      </p>
+    </div>
+  );
+}
+
+function ActiveExtractionJobsStrip() {
+  const processing = useProcessing();
+  if (processing.size === 0) return null;
+
+  const items = Array.from(processing.entries());
+
+  return (
+    <div className="relative z-[1] mt-4 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+        Active extractions
+      </p>
+      {items.map(([examId, job]) => {
+        const pct =
+          job.totalBatches > 0
+            ? Math.round((job.batchNumber / job.totalBatches) * 100)
+            : 0;
+        return (
+          <div
+            key={examId}
+            className="rounded-xl border border-cyan-200/70 bg-cyan-50/80 px-3 py-2 dark:border-cyan-800/40 dark:bg-cyan-950/30"
+          >
+            <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <span className="min-w-0 truncate">
+                {job.filename || 'Processing exam…'}
+              </span>
+              <span className="shrink-0 tabular-nums text-[10px] text-slate-500">
+                {job.batchNumber}/{job.totalBatches}
+                {job.totalQuestions > 0 ? ` · ${job.totalQuestions} Q` : ''}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all"
+                style={{ width: `${Math.max(pct, 4)}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function validatePdfCatalogForUpload(form) {
   const track = String(form.academicTrack || '').trim().toLowerCase();
   if (!['engineering', 'social', 'natural'].includes(track)) {
@@ -2284,6 +2411,7 @@ function PdfImportTab({ onUploaded }) {
   const [importCourse, setImportCourse] = useState('');
   const [importPaperType, setImportPaperType] = useState('other');
   const [displayTitle, setDisplayTitle] = useState('');
+  const [extractionMode, setExtractionMode] = useState('standard');
   const inputRef = useRef(null);
 
   function pickFile(picked) {
@@ -2334,6 +2462,7 @@ function PdfImportTab({ onUploaded }) {
       form.append('department', resolvedDept);
       form.append('courseSubject', String(importCourse).trim());
       form.append('paperType', String(importPaperType).trim());
+      form.append('extractionMode', extractionMode);
       const dt = String(displayTitle || '').trim();
       if (dt) form.append('displayTitle', dt);
 
@@ -2410,8 +2539,8 @@ function PdfImportTab({ onUploaded }) {
                       Open practice workspace
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
-                      Start drills on these MCQs — the header shows extraction until every
-                      question is ready.
+                      Questions appear batch-by-batch — start practicing as soon
+                      as the first set is ready.
                     </span>
                   </span>
                   <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-300/90 opacity-90" aria-hidden />
@@ -2515,6 +2644,49 @@ function PdfImportTab({ onUploaded }) {
           </span>
         </div>
       </div>
+
+      <ActiveExtractionJobsStrip />
+
+      <div className="relative z-[1] mt-4 rounded-2xl border border-slate-200/90 bg-white/85 p-4 shadow-sm dark:border-slate-300/90 dark:bg-white/90">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+          Extraction depth
+        </p>
+        <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl border border-slate-200/90 bg-slate-50 p-1 dark:border-slate-200 dark:bg-slate-50">
+          {[
+            {
+              id: 'standard',
+              label: 'Standard',
+              hint: 'Balanced speed & coverage',
+            },
+            {
+              id: 'thorough',
+              label: 'Thorough',
+              hint: 'Smaller sections, more MCQs',
+            },
+          ].map(({ id, label, hint }) => (
+            <button
+              key={id}
+              type="button"
+              title={hint}
+              onClick={() => setExtractionMode(id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                extractionMode === id
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-white dark:text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          {extractionMode === 'thorough'
+            ? 'Scans the document in finer sections — best for dense syllabi and long papers.'
+            : 'Recommended for most past papers and mock exams.'}
+        </p>
+      </div>
+
+      <ExtractionPipelinePanel />
 
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop requires event handlers on a container div; clickable action is on the inner <button> */}
       <div

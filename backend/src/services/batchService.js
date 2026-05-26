@@ -1,10 +1,20 @@
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
+import {
+  emitExamBatchComplete,
+  emitExamProcessingComplete,
+  emitExamProcessingFailed,
+  emitExamProcessingStarted,
+} from './examProcessingEvents.js';
 import { resolveGeminiCredentialsForUser } from './geminiService.js';
 
-const CHUNK_WORDS = 700;
-const CHUNK_OVERLAP_WORDS = 120;
-const MAX_QUESTIONS_PER_CHUNK = 12;
+const STANDARD_CHUNK_WORDS = 700;
+const STANDARD_CHUNK_OVERLAP = 120;
+const STANDARD_MAX_PER_CHUNK = 12;
+
+const THOROUGH_CHUNK_WORDS = 500;
+const THOROUGH_CHUNK_OVERLAP = 100;
+const THOROUGH_MAX_PER_CHUNK = 15;
 
 function isFatalAIError(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -18,10 +28,10 @@ function isFatalAIError(error) {
 
 function chunkWords(words, chunkSize, overlap) {
   if (!Array.isArray(words) || words.length === 0) return [];
-  const safeChunkSize = Math.max(100, Number(chunkSize) || CHUNK_WORDS);
+  const safeChunkSize = Math.max(100, Number(chunkSize) || STANDARD_CHUNK_WORDS);
   const safeOverlap = Math.max(
     0,
-    Math.min(safeChunkSize - 1, Number(overlap) || CHUNK_OVERLAP_WORDS),
+    Math.min(safeChunkSize - 1, Number(overlap) || STANDARD_CHUNK_OVERLAP),
   );
 
   const out = [];
@@ -42,16 +52,40 @@ function chunkWords(words, chunkSize, overlap) {
   return out;
 }
 
-function createTextChunks(textContent) {
+function getChunkConfig(extractionMode) {
+  if (extractionMode === 'thorough') {
+    return {
+      chunkWords: THOROUGH_CHUNK_WORDS,
+      chunkOverlap: THOROUGH_CHUNK_OVERLAP,
+      maxPerChunk: THOROUGH_MAX_PER_CHUNK,
+    };
+  }
+  return {
+    chunkWords: STANDARD_CHUNK_WORDS,
+    chunkOverlap: STANDARD_CHUNK_OVERLAP,
+    maxPerChunk: STANDARD_MAX_PER_CHUNK,
+  };
+}
+
+function createTextChunks(textContent, extractionMode = 'standard') {
   const content = typeof textContent === 'string' ? textContent : '';
   const words = content.split(/\s+/).map((w) => w.trim()).filter(Boolean);
-  return chunkWords(words, CHUNK_WORDS, CHUNK_OVERLAP_WORDS);
+  const { chunkWords: size, chunkOverlap: overlap } =
+    getChunkConfig(extractionMode);
+  return chunkWords(words, size, overlap);
 }
 
 function stripCodeFences(text) {
   const t = String(text || '').trim();
   if (!t.startsWith('```')) return t;
   return t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+}
+
+function normalizeStemKey(stem) {
+  return String(stem || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function normalizeQuestion(raw, index, batchNumber) {
@@ -65,7 +99,10 @@ function normalizeQuestion(raw, index, batchNumber) {
 
   let correctAnswer = Number(raw?.correctAnswer);
   if (!Number.isFinite(correctAnswer)) correctAnswer = 0;
-  correctAnswer = Math.max(0, Math.min(options.length - 1, Math.floor(correctAnswer)));
+  correctAnswer = Math.max(
+    0,
+    Math.min(options.length - 1, Math.floor(correctAnswer)),
+  );
 
   return {
     questionIndex: index,
@@ -130,7 +167,28 @@ async function generateQuestionsFromChunk(chunkText, userLike) {
   return Array.isArray(parsed?.questions) ? parsed.questions : [];
 }
 
-async function processExamInBatches(examId, content, userLike) {
+async function markExamFailed(examId, userId, message) {
+  await Exam.findByIdAndUpdate(examId, {
+    processingStatus: 'failed',
+    processingError: message,
+    totalQuestions: 0,
+  });
+  emitExamProcessingFailed({ examId, userId, error: message });
+}
+
+/**
+ * @param {string} examId
+ * @param {string} content
+ * @param {object} userLike
+ * @param {{ userId?: string, extractionMode?: string, filename?: string }} [meta]
+ */
+async function processExamInBatches(examId, content, userLike, meta = {}) {
+  const userId = meta.userId ? String(meta.userId) : null;
+  const extractionMode =
+    meta.extractionMode === 'thorough' ? 'thorough' : 'standard';
+  const filename = meta.filename || '';
+  const { maxPerChunk } = getChunkConfig(extractionMode);
+
   const rawText =
     typeof content === 'string'
       ? content
@@ -139,73 +197,122 @@ async function processExamInBatches(examId, content, userLike) {
         : String(content || '');
 
   if (!rawText.trim()) {
-    await Exam.findByIdAndUpdate(examId, {
-      processingStatus: 'failed',
-      processingError:
-        'Could not extract text from this file. Try a text-based PDF, Word, PowerPoint, or plain text file.',
-      totalQuestions: 0,
-    });
+    await markExamFailed(
+      examId,
+      userId,
+      'Could not extract text from this file. Try a text-based PDF, Word, PowerPoint, or plain text file.',
+    );
     return;
   }
 
-  await Exam.findByIdAndUpdate(examId, {
-    processingStatus: 'processing',
-    processingError: '',
-  });
-
-  const chunks = createTextChunks(rawText);
+  const chunks = createTextChunks(rawText, extractionMode);
   if (chunks.length === 0) {
-    await Exam.findByIdAndUpdate(examId, {
-      processingStatus: 'failed',
-      processingError: 'No extractable exam text was found.',
-      totalQuestions: 0,
-    });
-    return;
-  }
-
-  const all = [];
-  for (const chunk of chunks) {
-    const extracted = await generateQuestionsFromChunk(chunk.content, userLike);
-    const trimmed = extracted.slice(0, MAX_QUESTIONS_PER_CHUNK);
-    for (const q of trimmed) {
-      const normalized = normalizeQuestion(q, all.length, chunk.batchNumber);
-      if (normalized) all.push(normalized);
-    }
-  }
-
-  // Deduplicate by normalized question text.
-  const seen = new Set();
-  const unique = [];
-  for (const q of all) {
-    const key = q.question.toLowerCase().replace(/\s+/g, ' ').trim();
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
-    unique.push({ ...q, questionIndex: unique.length });
-  }
-
-  if (unique.length === 0) {
-    await Exam.findByIdAndUpdate(examId, {
-      processingStatus: 'failed',
-      processingError:
-        'No multiple-choice questions were detected in the uploaded exam.',
-      totalQuestions: 0,
-    });
+    await markExamFailed(
+      examId,
+      userId,
+      'No extractable exam text was found.',
+    );
     return;
   }
 
   await Question.deleteMany({ examId });
-  await Question.insertMany(
-    unique.map((q) => ({
+  await Exam.findByIdAndUpdate(examId, {
+    processingStatus: 'processing',
+    processingError: '',
+    totalQuestions: 0,
+    processingBatchCurrent: 0,
+    processingBatchTotal: chunks.length,
+    extractionMode,
+  });
+
+  emitExamProcessingStarted({
+    examId,
+    userId,
+    totalBatches: chunks.length,
+    filename,
+  });
+
+  const seen = new Set();
+  let totalSaved = 0;
+
+  for (const chunk of chunks) {
+    try {
+      const extracted = await generateQuestionsFromChunk(chunk.content, userLike);
+      const trimmed = extracted.slice(0, maxPerChunk);
+      const batchDocs = [];
+
+      for (const q of trimmed) {
+        const normalized = normalizeQuestion(
+          q,
+          totalSaved + batchDocs.length,
+          chunk.batchNumber,
+        );
+        if (!normalized) continue;
+        const key = normalizeStemKey(normalized.question);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        batchDocs.push({
+          examId,
+          ...normalized,
+          questionIndex: totalSaved + batchDocs.length,
+        });
+      }
+
+      if (batchDocs.length > 0) {
+        await Question.insertMany(batchDocs, { ordered: true });
+        totalSaved += batchDocs.length;
+      }
+
+      await Exam.findByIdAndUpdate(examId, {
+        totalQuestions: totalSaved,
+        processingBatchCurrent: chunk.batchNumber,
+      });
+
+      emitExamBatchComplete({
+        examId,
+        userId,
+        batchNumber: chunk.batchNumber,
+        totalBatches: chunks.length,
+        newQuestionCount: batchDocs.length,
+        totalQuestions: totalSaved,
+      });
+    } catch (err) {
+      console.error(
+        `[batchService] chunk ${chunk.batchNumber}/${chunks.length} failed for exam ${examId}:`,
+        err,
+      );
+      if (isFatalAIError(err)) {
+        await markExamFailed(examId, userId, err.message);
+        return;
+      }
+      await Exam.findByIdAndUpdate(examId, {
+        processingBatchCurrent: chunk.batchNumber,
+      });
+    }
+  }
+
+  if (totalSaved === 0) {
+    await markExamFailed(
       examId,
-      ...q,
-    })),
-    { ordered: true },
-  );
+      userId,
+      'No multiple-choice questions were detected in the uploaded exam.',
+    );
+    return;
+  }
 
   await Exam.findByIdAndUpdate(examId, {
     processingStatus: 'complete',
     processingError: '',
-    totalQuestions: unique.length,
+    totalQuestions: totalSaved,
+    processingBatchCurrent: chunks.length,
+    processingBatchTotal: chunks.length,
+  });
+
+  emitExamProcessingComplete({
+    examId,
+    userId,
+    totalQuestions: totalSaved,
+    totalBatches: chunks.length,
   });
 }
 
