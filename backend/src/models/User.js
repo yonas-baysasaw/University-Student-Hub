@@ -183,6 +183,19 @@ const userSchema = new mongoose.Schema(
       maxlength: 400,
       default: '',
     },
+    geminiApiKey: {
+      type: String,
+      select: false,
+    },
+    geminiModelId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    geminiKeySet: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );
@@ -194,6 +207,7 @@ userSchema.methods.toJSON = function () {
   delete obj.emailVerificationExpires;
   delete obj.resetPasswordToken;
   delete obj.resetPasswordExpires;
+  delete obj.geminiApiKey;
   return obj;
 };
 

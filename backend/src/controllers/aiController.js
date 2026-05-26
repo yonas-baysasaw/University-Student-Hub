@@ -1,9 +1,14 @@
 import ChatSession from '../models/ChatSession.js';
-import { ENV } from '../config/env.js';
 import {
   augmentMessagesWithBookRag,
   buildGeneralRagContextForQuery,
 } from '../services/bookRagService.js';
+import { resolveGeminiCredentialsForUser } from '../services/geminiService.js';
+import { listGeminiModels } from '../utils/geminiApiClient.js';
+import {
+  loadUserGeminiCredentials,
+  userLikeFromCredentials,
+} from '../utils/geminiUserCredentials.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 const CONTEXT_ONLY_RULES = `Answer the user's question using ONLY the provided context.
@@ -32,11 +37,12 @@ function toGeminiRole(role) {
   return role === 'assistant' ? 'model' : 'user';
 }
 
-async function askGemini(messages) {
-  const apiKey = String(ENV.GEMINI_API_KEY || '').trim();
-  const modelId = String(ENV.GEMINI_MODEL_ID || 'gemini-2.0-flash').trim();
+async function askGemini(messages, credentials) {
+  const { apiKey, modelId } = credentials;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is missing on the server.');
+    throw new Error(
+      'No Gemini API key. Add your key in Settings (Liqu AI access) or set GEMINI_API_KEY on the server.',
+    );
   }
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
@@ -140,7 +146,10 @@ async function generateLiquAiReply({
     }
   }
 
-  let responseText = await askGemini(messagesForLlm);
+  const credentials = resolveGeminiCredentialsForUser(
+    userLikeFromCredentials(await loadUserGeminiCredentials(userId)),
+  );
+  let responseText = await askGemini(messagesForLlm, credentials);
   if (isClassroomScope) {
     responseText = responseText
       .replace(/The information was not found in the available books\./gi, '')
@@ -263,8 +272,18 @@ async function deleteSessionController(req, res, next) {
 
 async function listModelsController(req, res, next) {
   try {
-    const modelId = String(ENV.GEMINI_MODEL_ID || 'gemini-2.0-flash').trim();
-    return res.json({ models: [{ name: modelId, displayName: modelId }] });
+    const credentials = await loadUserGeminiCredentials(req.user._id);
+    const { apiKey } = resolveGeminiCredentialsForUser(
+      userLikeFromCredentials(credentials),
+    );
+    if (!apiKey) {
+      return res.status(400).json({
+        message:
+          'No Gemini API key available. Add your key in Settings or set GEMINI_API_KEY on the server.',
+      });
+    }
+    const models = await listGeminiModels(apiKey);
+    return res.json({ models });
   } catch (error) {
     return next(error);
   }

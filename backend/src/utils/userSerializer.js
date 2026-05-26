@@ -50,5 +50,7 @@ export const serializeCurrentUser = (user) => {
     platformReadOnly: !!u.platformReadOnly,
     instructorPostingSuspended: !!u.instructorPostingSuspended,
     status: u.status || 'active',
+    geminiConfigured: !!u.geminiKeySet,
+    geminiModelId: u.geminiModelId || '',
   };
 };

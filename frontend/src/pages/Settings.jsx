@@ -32,7 +32,7 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
@@ -77,7 +77,7 @@ const faqItems = [
   {
     question: 'Can I use my own AI key?',
     answer:
-      'Custom AI keys are currently disabled. Liqu AI uses server-managed configuration.',
+      'Yes. Add your Google Gemini API key under Settings → Liqu AI access. Your key is stored encrypted and used for Liqu AI chat. If you clear it, the assistant falls back to the server-managed key.',
   },
 ];
 
@@ -354,6 +354,7 @@ function Settings() {
   const [modelId, setModelId] = useState(user?.geminiModelId ?? '');
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
 
@@ -396,7 +397,33 @@ function Settings() {
     });
     setResetEmail(user?.email || '');
     setModelId(user?.geminiModelId || '');
+    if (user?.geminiConfigured) {
+      setApiKey('');
+    }
   }, [user]);
+
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true);
+    try {
+      const res = await fetch('/api/ai/models', { credentials: 'include' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || 'Could not load AI models.');
+      }
+      setModels(Array.isArray(payload.models) ? payload.models : []);
+    } catch (error) {
+      setModels([]);
+      toast.error(error.message || 'Could not load AI models.');
+    } finally {
+      setModelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadModels();
+    }
+  }, [user?.id, loadModels]);
 
   useEffect(() => {
     saveLocalSettings(user?.id, localSettings);
@@ -604,27 +631,87 @@ function Settings() {
   }
 
   async function testKey() {
-    void apiKey;
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      toast.error('Enter a Gemini API key to test.');
+      return;
+    }
     setTestingKey(true);
-    toast.info('Custom AI key testing is currently disabled.');
-    setTimeout(() => setTestingKey(false), 300);
+    try {
+      const res = await fetch('/api/profile/gemini/test', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: trimmedKey }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || 'API key test failed.');
+      }
+      if (Array.isArray(payload.models) && payload.models.length > 0) {
+        setModels(payload.models);
+      }
+      toast.success(payload.message || 'API key is valid.');
+    } catch (error) {
+      toast.error(error.message || 'API key test failed.');
+    } finally {
+      setTestingKey(false);
+    }
   }
 
   async function saveByok() {
-    void apiKey;
-    void modelId;
+    const trimmedKey = apiKey.trim();
+    if (!trimmedKey) {
+      toast.error('Enter a Gemini API key to save.');
+      return;
+    }
     setSavingKey(true);
-    toast.info('Custom AI key saving is currently disabled.');
-    setTimeout(() => setSavingKey(false), 300);
+    try {
+      const res = await fetch('/api/profile/gemini', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: trimmedKey, modelId: modelId.trim() }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || 'Could not save Liqu AI settings.');
+      }
+      setApiKey('');
+      if (payload.user?.geminiModelId) {
+        setModelId(payload.user.geminiModelId);
+      }
+      await refreshAuth();
+      await loadModels();
+      toast.success(payload.message || 'Liqu AI settings saved.');
+    } catch (error) {
+      toast.error(error.message || 'Could not save Liqu AI settings.');
+    } finally {
+      setSavingKey(false);
+    }
   }
 
   async function clearByok() {
     setSavingKey(true);
-    setApiKey('');
-    setModelId('');
-    setModels([]);
-    toast.info('Custom AI key controls are disabled.');
-    setTimeout(() => setSavingKey(false), 300);
+    try {
+      const res = await fetch('/api/profile/gemini', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || 'Could not clear Liqu AI key.');
+      }
+      setApiKey('');
+      setModelId('');
+      await refreshAuth();
+      await loadModels();
+      toast.success(payload.message || 'Liqu AI key cleared.');
+    } catch (error) {
+      toast.error(error.message || 'Could not clear Liqu AI key.');
+    } finally {
+      setSavingKey(false);
+    }
   }
 
   async function confirmModalAction() {
@@ -1348,12 +1435,13 @@ function Settings() {
                         byokActive ? 'success' : 'info',
                       )}`}
                     >
-                      {byokActive ? 'Legacy key detected' : 'Server-managed'}
+                      {byokActive ? 'Your key active' : 'Server-managed'}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Liqu AI key/model customization is currently disabled in this
-                    build. The assistant uses server-managed settings.
+                    Add your Google Gemini API key to use your own quota for Liqu
+                    AI chat. Leave the model on default to use the server&apos;s
+                    preferred model when no override is set.
                   </p>
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
                     <div className="relative">
@@ -1361,7 +1449,11 @@ function Settings() {
                         type={showKey ? 'text' : 'password'}
                         value={apiKey}
                         onChange={(event) => setApiKey(event.target.value)}
-                        placeholder="AIza..."
+                        placeholder={
+                          byokActive
+                            ? 'Key saved — enter a new key to replace'
+                            : 'AIza...'
+                        }
                         className="input-field pr-11 text-sm"
                         autoComplete="off"
                       />
@@ -1382,8 +1474,13 @@ function Settings() {
                       value={modelId}
                       onChange={(event) => setModelId(event.target.value)}
                       className="input-field text-sm"
+                      disabled={modelsLoading}
                     >
-                      <option value="">Default server model</option>
+                      <option value="">
+                        {modelsLoading
+                          ? 'Loading models...'
+                          : 'Default server model'}
+                      </option>
                       {models.map((model) => (
                         <option key={model.name} value={model.name}>
                           {model.displayName || model.name}
@@ -1411,7 +1508,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={clearByok}
-                      disabled={savingKey}
+                      disabled={savingKey || !byokActive}
                       className="btn-secondary px-4 py-2.5 text-sm text-rose-600 disabled:opacity-50"
                     >
                       Clear key
