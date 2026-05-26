@@ -7,6 +7,8 @@ export const toPublicUser = (user) => {
     resetPasswordExpires,
     emailVerificationToken,
     emailVerificationExpires,
+    geminiApiKey,
+    geminiModelId,
     ...publicData
   } = data;
   return publicData;
@@ -30,6 +32,8 @@ export const serializeCurrentUser = (user) => {
     photo: u.avatar,
     avatar: u.avatar || null,
     lastSeen: u.lastSeen || null,
+    geminiConfigured: !!String(u.geminiApiKey || '').trim(),
+    geminiModelId: u.geminiModelId || '',
     hasLocalPassword,
     role,
     permissions: Array.isArray(u.permissions) ? u.permissions : [],

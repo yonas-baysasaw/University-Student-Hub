@@ -197,13 +197,13 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     // ── AI streaming chat ────────────────────────────────────────────────────
     socket.on('ai:chat', async ({ messages, sessionId, bookId, mode, contextScope }) => {
       try {
-        assertCanWrite(user);
         const result = await generateLiquAiReply({
           messages,
           sessionId,
           bookId,
           mode,
           contextScope,
+          user,
           userId: user._id,
         });
         socket.emit('ai:sessionId', { sessionId: result.sessionId });

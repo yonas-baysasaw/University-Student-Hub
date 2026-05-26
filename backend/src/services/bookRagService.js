@@ -1,44 +1,54 @@
 import mongoose from 'mongoose';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { Agent, fetch as undiciFetch } from 'undici';
 import { ENV } from '../config/env.js';
-import { s3Client } from '../config/s3Client.js';
 import BookChunk from '../models/BookChunk.js';
 import Book from '../models/Books.js';
-import { splitTextForRagWithMetadata } from '../utils/bookRagChunker.js';
-import { extractTextFromPDF, extractTextPagesFromPDF } from './pdfService.js';
-import {
-  cosineSimilarity,
-  embedText,
-  rewriteQueryForSearch,
-} from './embeddingService.js';
+import { splitTextForRagEmbedding } from '../utils/bookRagChunker.js';
+import { resolveGeminiCredentialsForUser } from './geminiService.js';
+import { extractTextFromPDF } from './pdfService.js';
+
+/** @see https://ai.google.dev/gemini-api/docs/embeddings */
+function getEmbeddingModelId() {
+  const m =
+    ENV.GEMINI_EMBEDDING_MODEL && String(ENV.GEMINI_EMBEDDING_MODEL).trim();
+  return m || 'gemini-embedding-001';
+}
 
 const TOP_K = 5;
+const EMBED_DELAY_MS = 60;
 const MAX_CONTEXT_CHARS = 10000;
 const MIN_TEXT_TO_INDEX = 200;
-const CONTEXT_ONLY_RULES = `Answer the user's question using ONLY the provided context.
-
-Rules:
-- Give concise answers
-- Understand grammar mistakes and typos in the question
-- Mention chapter names if available
-- Do not include copyright or publisher text
-- Recommend related books if relevant
-- If answer is not found, say exactly:
-"The information was not found in the available books."`;
-const MODE_RULES = {
-  chat: 'Provide a direct helpful answer in 3-6 sentences.',
-  study_notes:
-    'Create structured study notes with headings: Topic, Explanation, Key Points, Example, Important Notes.',
-  summary: 'Give a short summary in 4-6 bullet points.',
-  exam_prep:
-    'Provide exam-prep notes: key concepts and 3 short practice questions with answers.',
-  beginner:
-    'Explain in simple language with short sentences and one easy example.',
-};
 /** Large PDFs over slow links can look “stuck” without a timeout. */
 const BOOK_DOWNLOAD_TIMEOUT_MS = 120_000;
 /** Log every N ms while a download (HTTP + body) is in flight — helps see “stuck on Step 1”. */
 const RAG_DOWNLOAD_HEARTBEAT_MS = 20_000;
+/** `embedText` — retries on Undici `UND_ERR_CONNECT_TIMEOUT` (default 10s connect) only. */
+const GEMINI_EMBED_RETRIES = 4;
+
+/** @type {import('undici').Agent} */
+const geminiEmbedHttpAgent = new Agent({
+  connect: { timeout: ENV.GEMINI_HTTP_CONNECT_TIMEOUT_MS },
+});
+
+/**
+ * @param {unknown} e
+ */
+function isGeminiConnectTimeoutError(e) {
+  const c = e?.cause;
+  if (c && typeof c === 'object') {
+    if (c.code === 'UND_ERR_CONNECT_TIMEOUT') return true;
+    if (c.name === 'ConnectTimeoutError') return true;
+  }
+  if (e?.name === 'ConnectTimeoutError') return true;
+  return false;
+}
+
+/**
+ * @param {number} ms
+ */
+function sleepMs(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 /**
  * Correlates RAG index logs: ISO time + book id + phase. Search the terminal for `[bookRag]`.
@@ -68,71 +78,8 @@ function shortUrlForLog(bookUrl, maxLen = 180) {
 }
 
 /**
- * @param {URL} url
- */
-function extractBucketKeyFromS3Url(url) {
-  const bucket = String(ENV.AWS_BUCKET_NAME || '').trim();
-  const region = String(ENV.AWS_REGION || '').trim();
-  if (!bucket || !region) return null;
-  const expectedHost = `${bucket}.s3.${region}.amazonaws.com`;
-  if (url.hostname !== expectedHost) return null;
-  const key = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
-  if (!key) return null;
-  return { bucket, key };
-}
-
-/**
- * @param {string} bookUrl
- * @param {string} [logBookId]
- */
-async function fetchBookBytesFromS3Url(bookUrl, logBookId = '') {
-  let parsed;
-  try {
-    parsed = new URL(String(bookUrl));
-  } catch {
-    return null;
-  }
-  const hit = extractBucketKeyFromS3Url(parsed);
-  if (!hit) return null;
-
-  if (logBookId) {
-    ragLog(logBookId, 'download', 'S3 direct read starting', {
-      bucket: hit.bucket,
-      keyPreview: hit.key.slice(0, 120),
-    });
-  }
-
-  const obj = await s3Client.send(
-    new GetObjectCommand({
-      Bucket: hit.bucket,
-      Key: hit.key,
-    }),
-  );
-  let bytes = null;
-  if (typeof obj.Body?.transformToByteArray === 'function') {
-    bytes = await obj.Body.transformToByteArray();
-  } else if (obj.Body && Symbol.asyncIterator in obj.Body) {
-    const chunks = [];
-    for await (const chunk of obj.Body) {
-      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
-    }
-    bytes = Buffer.concat(chunks);
-  }
-  if (!bytes || bytes.length === 0) {
-    throw new Error('S3 object is empty or unreadable');
-  }
-  if (logBookId) {
-    ragLog(logBookId, 'download', 'S3 direct read complete', {
-      bytes: bytes.length,
-    });
-  }
-  return Buffer.from(bytes);
-}
-
-
-/**
- * Map pipeline position to 0–100%.
- * @param {'downloading' | 'downloaded' | 'extracting' | 'chunking' | 'writing'} step
+ * Map pipeline position to 0–100% (download/extract/chunk = fixed bands; most work = embedding).
+ * @param {'downloading' | 'downloaded' | 'extracting' | 'chunking' | 'embedding'} step
  * @param {{ done?: number, total?: number }} [embed]
  */
 function computeRagProgressPercent(step, embed = {}) {
@@ -140,7 +87,7 @@ function computeRagProgressPercent(step, embed = {}) {
   if (step === 'downloaded') return 10;
   if (step === 'extracting') return 14;
   if (step === 'chunking') return 24;
-  if (step === 'writing') {
+  if (step === 'embedding') {
     const total = Math.max(1, Number(embed.total) || 1);
     const done = Math.min(Math.max(0, Number(embed.done) || 0), total);
     return Math.min(99, 28 + Math.floor((70 * done) / total));
@@ -157,147 +104,77 @@ function canReadBookFilter(userId) {
   };
 }
 
-function normalizeWords(input) {
-  return String(input || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .map((w) => w.trim())
-    .filter((w) => w.length >= 3);
-}
-
-function keywordScore(query, text) {
-  const qWords = normalizeWords(query);
-  if (!qWords.length) return 0;
-  const hay = String(text || '').toLowerCase();
-  let score = 0;
-  for (const w of qWords) {
-    if (hay.includes(w)) score += 1;
+/**
+ * @param {Array<number>} a
+ * @param {Array<number>} b
+ */
+function cosineSimilarity(a, b) {
+  if (!a.length || a.length !== b.length) return 0;
+  let dot = 0;
+  let na = 0;
+  let nb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    na += a[i] * a[i];
+    nb += b[i] * b[i];
   }
-  return score / qWords.length;
+  const denom = Math.sqrt(na) * Math.sqrt(nb);
+  return denom < 1e-12 ? 0 : dot / denom;
 }
 
-function semanticOrKeywordScore(queryEmbedding, queryText, rowText, rowEmbedding) {
-  if (
-    Array.isArray(queryEmbedding) &&
-    queryEmbedding.length > 0 &&
-    Array.isArray(rowEmbedding) &&
-    rowEmbedding.length > 0
-  ) {
-    return cosineSimilarity(queryEmbedding, rowEmbedding);
+/**
+ * @param {string} apiKey
+ * @param {string} text
+ */
+export async function embedText(apiKey, text) {
+  const trimmed = String(text).trim().slice(0, 20000);
+  if (!trimmed) {
+    throw new Error('Nothing to embed');
   }
-  return keywordScore(queryText, rowText);
-}
-
-function normalizeScoredChunkRow(row) {
-  return {
-    text: row.text,
-    score:
-      typeof row.score === 'number'
-        ? row.score
-        : Number(row.vectorScore || row.searchScore || 0),
-    chunkIndex: row.chunkIndex,
-    chapter: row.chapter || '',
-    section: row.section || '',
-    pageStart: row.pageStart ?? null,
-    pageEnd: row.pageEnd ?? null,
-    book: row.book ? String(row.book) : undefined,
-  };
-}
-
-async function searchChunksByVector({
-  filter = {},
-  queryEmbedding,
-  limit = TOP_K,
-}) {
-  if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) return null;
-  const indexName = String(ENV.RAG_VECTOR_INDEX_NAME || '').trim();
-  if (!indexName) return null;
-  try {
-    const rows = await BookChunk.aggregate([
-      {
-        $vectorSearch: {
-          index: indexName,
-          path: 'embedding',
-          queryVector: queryEmbedding,
-          numCandidates: Math.max(50, limit * 10),
-          limit,
-          filter,
-        },
-      },
-      {
-        $project: {
-          _id: 0,
-          book: 1,
-          chunkIndex: 1,
-          text: 1,
-          chapter: 1,
-          section: 1,
-          pageStart: 1,
-          pageEnd: 1,
-          vectorScore: { $meta: 'vectorSearchScore' },
-        },
-      },
-    ]);
-    return Array.isArray(rows) ? rows.map(normalizeScoredChunkRow) : [];
-  } catch (err) {
-    const msg = String(err?.message || '');
-    if (
-      msg.includes('$vectorSearch') ||
-      msg.toLowerCase().includes('atlas') ||
-      msg.toLowerCase().includes('index')
-    ) {
-      console.warn('[bookRag] vector search unavailable; falling back:', msg);
-      return null;
-    }
-    throw err;
-  }
-}
-
-function previewText(text, max = 180) {
-  const oneLine = String(text || '').replace(/\s+/g, ' ').trim();
-  if (oneLine.length <= max) return oneLine;
-  return `${oneLine.slice(0, max)}...`;
-}
-
-function removeRepeatedHeaderFooter(linesByPage) {
-  if (!Array.isArray(linesByPage) || linesByPage.length < 3) return linesByPage;
-  const headFreq = new Map();
-  const footFreq = new Map();
-  for (const p of linesByPage) {
-    const first = String(p?.lines?.[0] || '').trim();
-    const last = String(p?.lines?.[p.lines.length - 1] || '').trim();
-    if (first) headFreq.set(first, (headFreq.get(first) || 0) + 1);
-    if (last) footFreq.set(last, (footFreq.get(last) || 0) + 1);
-  }
-  const minRepeat = Math.ceil(linesByPage.length * 0.4);
-  const badHeads = new Set(
-    [...headFreq.entries()].filter(([, c]) => c >= minRepeat).map(([k]) => k),
-  );
-  const badFeet = new Set(
-    [...footFreq.entries()].filter(([, c]) => c >= minRepeat).map(([k]) => k),
-  );
-  return linesByPage.map((p) => {
-    const lines = [...p.lines];
-    if (lines.length && badHeads.has(String(lines[0]).trim())) lines.shift();
-    if (lines.length && badFeet.has(String(lines[lines.length - 1]).trim())) {
-      lines.pop();
-    }
-    return { ...p, lines };
+  const modelId = getEmbeddingModelId();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:embedContent?key=${encodeURIComponent(apiKey)}`;
+  const body = JSON.stringify({
+    content: { parts: [{ text: trimmed }] },
   });
-}
-
-function cleanPageTextForRag(t) {
-  return String(t || '')
-    .replace(/^.*copyright.*$/gim, '')
-    .replace(/^.*all rights reserved.*$/gim, '')
-    .replace(/^.*isbn[^a-z0-9].*$/gim, '')
-    .replace(/^.*packt publishing.*$/gim, '')
-    .replace(/^.*publisher.*$/gim, '')
-    .replace(/^.*table of contents.*$/gim, '')
-    .replace(/^.*contributors?.*$/gim, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim();
+  let lastErr;
+  for (let attempt = 0; attempt < GEMINI_EMBED_RETRIES; attempt += 1) {
+    if (attempt > 0) {
+      const backoff = 1_200 * 2 ** (attempt - 1);
+      console.warn(
+        `[bookRag] embedContent retry ${attempt + 1}/${GEMINI_EMBED_RETRIES} after connect issue (waiting ${backoff}ms)`,
+      );
+      await sleepMs(Math.min(backoff, 8_000));
+    }
+    try {
+      const res = await undiciFetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        dispatcher: geminiEmbedHttpAgent,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error?.message || `Embedding request failed: ${res.status}`,
+        );
+      }
+      const values = data.embedding?.values;
+      if (!Array.isArray(values) || values.length === 0) {
+        throw new Error('No embedding in response');
+      }
+      return values;
+    } catch (e) {
+      lastErr = e;
+      const retry =
+        isGeminiConnectTimeoutError(e) && attempt < GEMINI_EMBED_RETRIES - 1;
+      if (!retry) {
+        throw e;
+      }
+    }
+  }
+  throw lastErr instanceof Error
+    ? lastErr
+    : new Error('Embedding failed after retries');
 }
 
 /**
@@ -307,33 +184,15 @@ function cleanPageTextForRag(t) {
 async function textFromBuffer(buffer, hintUrl = '') {
   const u = (hintUrl || '').toLowerCase();
   if (u.endsWith('.pdf') || u.includes('application/pdf')) {
-    const pages = await extractTextPagesFromPDF(buffer);
-    const linesByPage = pages.map((p) => ({
-      pageNumber: p.pageNumber,
-      lines: String(p.text || '')
-        .split('\n')
-        .map((x) => x.trim())
-        .filter(Boolean),
-    }));
-    const stripped = removeRepeatedHeaderFooter(linesByPage);
-    const cleanedPages = stripped
-      .map((p) => ({
-        pageNumber: p.pageNumber,
-        text: cleanPageTextForRag(p.lines.join('\n')),
-      }))
-      .filter((p) => p.text.length > 0);
-    const text = cleanedPages.map((p) => p.text).join('\n\n');
-    return { text, pages: cleanedPages };
+    return extractTextFromPDF(buffer);
   }
   if (u.endsWith('.txt') || u.includes('text/plain')) {
-    const text = cleanPageTextForRag(buffer.toString('utf8'));
-    return { text, pages: [] };
+    return buffer.toString('utf8');
   }
   if (buffer.length > 4 && buffer[0] === 0x25 && buffer[1] === 0x50) {
-    const text = await extractTextFromPDF(buffer);
-    return { text: cleanPageTextForRag(text), pages: [] };
+    return extractTextFromPDF(buffer);
   }
-  return { text: cleanPageTextForRag(buffer.toString('utf8')), pages: [] };
+  return buffer.toString('utf8');
 }
 
 /**
@@ -346,9 +205,6 @@ export async function fetchBookBytes(
   timeoutMs = BOOK_DOWNLOAD_TIMEOUT_MS,
   logBookId = '',
 ) {
-  const s3Bytes = await fetchBookBytesFromS3Url(bookUrl, logBookId);
-  if (s3Bytes) return s3Bytes;
-
   const tAll = Date.now();
   const u = String(bookUrl);
   if (logBookId) {
@@ -452,6 +308,7 @@ async function patchBookRagFields(bookObjectId, patch) {
 /**
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
+ * @param { { geminiApiKey?: string; geminiModelId?: string } } userLike
  */
 async function findAccessibleBookDocument(bookId, userId) {
   if (!mongoose.Types.ObjectId.isValid(bookId)) {
@@ -483,10 +340,27 @@ async function findAccessibleBookLean(bookId, userId) {
  * Long-running: download → text → RAG chunk → embed each chunk. Updates `Book` progress fields.
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
+ * @param { { geminiApiKey?: string; geminiModelId?: string } } userLike
  */
-export async function runRagIndexPipeline(bookId, userId) {
+export async function runRagIndexPipeline(bookId, userId, userLike) {
   const bid = new mongoose.Types.ObjectId(String(bookId));
+  const { apiKey } = resolveGeminiCredentialsForUser(userLike);
   ragLog(String(bookId), 'pipeline', 'runRagIndexPipeline entered');
+  if (!apiKey) {
+    ragLog(
+      String(bookId),
+      'pipeline',
+      'aborted: no Gemini API key on user/env',
+    );
+    await patchBookRagFields(bid, {
+      ragIndexStatus: 'failed',
+      ragIndexPhase: '',
+      ragIndexError:
+        'No Gemini API key. Add one in profile or set GEMINI_API_KEY on the server.',
+      ragIndexProgressPercent: 0,
+    });
+    return;
+  }
 
   const bookDoc = await findAccessibleBookDocument(bookId, userId);
   if (!bookDoc) {
@@ -535,8 +409,7 @@ export async function runRagIndexPipeline(bookId, userId) {
     });
 
     const tExtract = Date.now();
-    const extracted = await textFromBuffer(bytes, bookDoc.bookUrl);
-    const text = extracted?.text || '';
+    const text = await textFromBuffer(bytes, bookDoc.bookUrl);
     ragLog(String(bookId), 'extracting', 'textFromBuffer finished', {
       ms: Date.now() - tExtract,
       textChars: text?.length ?? 0,
@@ -568,7 +441,7 @@ export async function runRagIndexPipeline(bookId, userId) {
       ragIndexProgressPercent: computeRagProgressPercent('chunking'),
     });
     const tChunk = Date.now();
-    const pieces = splitTextForRagWithMetadata(text);
+    const pieces = splitTextForRagEmbedding(text);
     ragLog(String(bookId), 'chunking', 'splitTextForRagEmbedding done', {
       pieces: pieces.length,
       ms: Date.now() - tChunk,
@@ -587,7 +460,7 @@ export async function runRagIndexPipeline(bookId, userId) {
 
     await BookChunk.deleteMany({ book: bid });
     await patchBookRagFields(bid, {
-      ragIndexPhase: 'writing',
+      ragIndexPhase: 'embedding',
       ragIndexTotalChunks: pieces.length,
       ragIndexDoneChunks: 0,
       ragIndexProgressPercent: computeRagProgressPercent('chunking'),
@@ -596,8 +469,8 @@ export async function runRagIndexPipeline(bookId, userId) {
     const tEmb = Date.now();
     ragLog(
       String(bookId),
-      'writing',
-      'loop start (DB insert per chunk)',
+      'embedding',
+      'loop start (Gemini embed + DB insert per chunk)',
       {
         totalChunks: pieces.length,
         logEachApprox: logEvery,
@@ -605,47 +478,34 @@ export async function runRagIndexPipeline(bookId, userId) {
     );
 
     for (let i = 0; i < pieces.length; i += 1) {
+      if (i > 0) {
+        await new Promise((r) => setTimeout(r, EMBED_DELAY_MS));
+      }
       if (i === 0 || (i + 1) % logEvery === 0 || i + 1 === pieces.length) {
-        ragLog(String(bookId), 'writing', 'writing chunk', {
+        ragLog(String(bookId), 'embedding', 'embedding chunk', {
           at: i + 1,
           of: pieces.length,
           elapsedSec: Math.round((Date.now() - tEmb) / 1000),
         });
       }
-      const piece = pieces[i];
-      let embedding = [];
-      try {
-        embedding = (await embedText(piece.text)) || [];
-      } catch (e) {
-        if (i === 0) {
-          console.warn('[bookRag] embedding disabled/fallback during indexing:', e?.message || e);
-        }
-      }
-      const pageHits = Array.isArray(extracted?.pages)
-        ? extracted.pages
-            .filter((p) => piece.text.includes(String(p.text || '').slice(0, 120)))
-            .map((p) => p.pageNumber)
-        : [];
+      const vector = await embedText(apiKey, pieces[i]);
       await BookChunk.create({
         book: bid,
         chunkIndex: i,
-        text: piece.text.slice(0, 20000),
-        chapter: piece.chapter || '',
-        section: piece.section || '',
-        pageStart: pageHits.length ? Math.min(...pageHits) : null,
-        pageEnd: pageHits.length ? Math.max(...pageHits) : null,
-        embedding,
+        text: pieces[i].slice(0, 20000),
+        embedding: vector,
+        embeddingModel: getEmbeddingModelId(),
       });
       await patchBookRagFields(bid, {
         ragIndexDoneChunks: i + 1,
-        ragIndexProgressPercent: computeRagProgressPercent('writing', {
+        ragIndexProgressPercent: computeRagProgressPercent('embedding', {
           done: i + 1,
           total: pieces.length,
         }),
       });
     }
 
-    ragLog(String(bookId), 'writing', 'all chunks written', {
+    ragLog(String(bookId), 'embedding', 'all chunks written', {
       totalMs: Date.now() - tEmb,
     });
     await patchBookRagFields(bid, {
@@ -675,9 +535,18 @@ export async function runRagIndexPipeline(bookId, userId) {
 /**
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
+ * @param { { geminiApiKey?: string; geminiModelId?: string; _id?: unknown } } userLike
  * @returns {Promise<{ error?: string, code?: string, status?: object, started?: boolean, bookId?: string }>}
  */
-export async function scheduleRagIndexForBook(bookId, userId) {
+export async function scheduleRagIndexForBook(bookId, userId, userLike) {
+  const { apiKey } = resolveGeminiCredentialsForUser(userLike);
+  if (!apiKey) {
+    return {
+      error:
+        'No Gemini API key. Add one in profile or set GEMINI_API_KEY on the server.',
+    };
+  }
+
   if (!mongoose.Types.ObjectId.isValid(bookId)) {
     return { error: 'Invalid book id' };
   }
@@ -698,7 +567,7 @@ export async function scheduleRagIndexForBook(bookId, userId) {
         ragIndexProgressPercent: 0,
       },
     },
-    { returnDocument: 'after', select: 'title' },
+    { new: true, select: 'title' },
   );
 
   if (!claimed) {
@@ -730,13 +599,17 @@ export async function scheduleRagIndexForBook(bookId, userId) {
     };
   }
 
+  const userRef = {
+    geminiApiKey: userLike.geminiApiKey,
+    geminiModelId: userLike.geminiModelId,
+  };
   setImmediate(() => {
     ragLog(
       String(bookId),
       'schedule',
       'setImmediate fired — starting runRagIndexPipeline (async after 202 response)',
     );
-    void runRagIndexPipeline(String(bookId), userId);
+    void runRagIndexPipeline(String(bookId), userId, userRef);
   });
 
   return { started: true, bookId: String(bookId) };
@@ -746,267 +619,56 @@ export async function scheduleRagIndexForBook(bookId, userId) {
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
  * @param {string} query
+ * @param { { geminiApiKey?: string; geminiModelId?: string } } userLike
  */
-export async function buildRagContextForQuery(bookId, userId, query) {
-  const rewrittenQuery = await rewriteQueryForSearch(query);
-  let queryEmbedding = null;
-  try {
-    queryEmbedding = await embedText(rewrittenQuery);
-  } catch {
-    queryEmbedding = null;
-  }
-
+export async function buildRagContextForQuery(bookId, userId, query, userLike) {
   const book = await findAccessibleBookLean(bookId, userId);
-  if (!book) {
-    return {
-      context: null,
-      bookTitle: null,
-      reason: 'no_access',
-      references: [],
-    };
+  if (!book) return { context: null, bookTitle: null, reason: 'no_access' };
+  const { apiKey } = resolveGeminiCredentialsForUser(userLike);
+  if (!apiKey) {
+    return { context: null, bookTitle: book.title, reason: 'no_key' };
   }
-
-  const vectorRows = await searchChunksByVector({
-    filter: { book: new mongoose.Types.ObjectId(String(bookId)) },
-    queryEmbedding,
-    limit: TOP_K,
-  });
 
   const rows = await BookChunk.find({ book: bookId })
-    .select('text chunkIndex chapter section pageStart pageEnd embedding')
+    .select('text embedding chunkIndex')
     .lean();
   if (rows.length === 0) {
-    return {
-      context: null,
-      bookTitle: book.title,
-      reason: 'not_indexed',
-      references: [],
-    };
+    return { context: null, bookTitle: book.title, reason: 'not_indexed' };
   }
 
-  const scoredBase = Array.isArray(vectorRows)
-    ? vectorRows
-    : rows
-        .map((r) => ({
-          text: r.text,
-          score: semanticOrKeywordScore(
-            queryEmbedding,
-            rewrittenQuery,
-            r.text,
-            r.embedding,
-          ),
-          chunkIndex: r.chunkIndex,
-          chapter: r.chapter || '',
-          section: r.section || '',
-          pageStart: r.pageStart ?? null,
-          pageEnd: r.pageEnd ?? null,
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, TOP_K);
-
-  const picked = new Set(scoredBase.map((s) => s.chunkIndex));
-  const scored = [...scoredBase];
-  for (const base of scoredBase) {
-    const near = rows.filter(
-      (r) =>
-        !picked.has(r.chunkIndex) &&
-        Math.abs((r.chunkIndex ?? 0) - (base.chunkIndex ?? 0)) <= 1,
-    );
-    for (const n of near) {
-      picked.add(n.chunkIndex);
-      scored.push({
-        text: n.text,
-        score: Math.max(
-          0.01,
-          semanticOrKeywordScore(queryEmbedding, rewrittenQuery, n.text, n.embedding) * 0.8,
-        ),
-        chunkIndex: n.chunkIndex,
-        chapter: n.chapter || '',
-        section: n.section || '',
-        pageStart: n.pageStart ?? null,
-        pageEnd: n.pageEnd ?? null,
-      });
-    }
-  }
-  scored.sort((a, b) => b.score - a.score);
-
-  const selectedForLog = scored.filter((s) => s.score > 0);
-  if (selectedForLog.length > 0) {
-    console.log(
-      `[bookRag] retrieval bookId=${String(bookId)} top=${selectedForLog.length} query="${previewText(query, 120)}"`,
-    );
-    for (const s of selectedForLog) {
-      console.log(
-        `[bookRag] chunk #${(s.chunkIndex ?? 0) + 1} score=${s.score.toFixed(3)} text="${previewText(s.text)}"`,
-      );
-    }
-  } else {
-    console.log(
-      `[bookRag] retrieval bookId=${String(bookId)} no keyword-matched chunks query="${previewText(query, 120)}"`,
-    );
-  }
+  const qv = await embedText(apiKey, query);
+  const scored = rows
+    .map((r) => ({
+      text: r.text,
+      score: cosineSimilarity(qv, r.embedding),
+      chunkIndex: r.chunkIndex,
+    }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, TOP_K);
 
   let combined = '';
   for (const s of scored) {
-    const pageLabel =
-      s.pageStart && s.pageEnd
-        ? s.pageStart === s.pageEnd
-          ? ` | Page ${s.pageStart}`
-          : ` | Pages ${s.pageStart}-${s.pageEnd}`
-        : '';
-    const chapterLabel = s.chapter ? ` | Chapter: ${s.chapter}` : '';
-    const sectionLabel = s.section ? ` | Section: ${s.section}` : '';
-    const block = `[Excerpt #${(s.chunkIndex ?? 0) + 1}${pageLabel}${chapterLabel}${sectionLabel}]\n${s.text}`;
+    const block = `[Excerpt #${(s.chunkIndex ?? 0) + 1}]\n${s.text}`;
     if (combined.length + block.length + 2 > MAX_CONTEXT_CHARS) break;
     combined = combined ? `${combined}\n\n${block}` : block;
   }
   if (!combined) {
-    return {
-      context: null,
-      bookTitle: book.title,
-      reason: 'empty',
-      references: [],
-    };
+    return { context: null, bookTitle: book.title, reason: 'empty' };
   }
-  const references = scored.map((s) => ({
-    bookId: String(bookId),
-    bookTitle: book.title || 'Untitled',
-    bookUrl: String(book.bookUrl || ''),
-    chunkIndex: s.chunkIndex ?? 0,
-    excerptNumber: (s.chunkIndex ?? 0) + 1,
-    score: s.score,
-    chapter: s.chapter || '',
-    section: s.section || '',
-    pageStart: s.pageStart ?? null,
-    pageEnd: s.pageEnd ?? null,
-  }));
-  return {
-    context: combined,
-    bookTitle: book.title,
-    reason: 'ok',
-    references,
-  };
-}
-
-/**
- * @param {import('mongoose').Types.ObjectId} userId
- * @param {string} query
- */
-export async function buildGeneralRagContextForQuery(userId, query) {
-  const rewrittenQuery = await rewriteQueryForSearch(query);
-  let queryEmbedding = null;
-  try {
-    queryEmbedding = await embedText(rewrittenQuery);
-  } catch {
-    queryEmbedding = null;
-  }
-
-  const books = await Book.find(canReadBookFilter(userId))
-    .select('_id title bookUrl')
-    .lean();
-  if (books.length === 0) {
-    return { context: null, reason: 'no_books', references: [] };
-  }
-
-  const bookIds = books.map((b) => b._id);
-  const titleById = new Map(books.map((b) => [String(b._id), b.title || 'Untitled']));
-  const urlById = new Map(books.map((b) => [String(b._id), String(b.bookUrl || '')]));
-
-  const vectorRows = await searchChunksByVector({
-    filter: { book: { $in: bookIds } },
-    queryEmbedding,
-    limit: TOP_K,
-  });
-
-  const rows = await BookChunk.find({ book: { $in: bookIds } })
-    .select('text chunkIndex book chapter section pageStart pageEnd embedding')
-    .lean();
-  if (rows.length === 0) {
-    return { context: null, reason: 'not_indexed', references: [] };
-  }
-
-  const scoredBase = Array.isArray(vectorRows)
-    ? vectorRows
-    : rows
-        .map((r) => ({
-          book: String(r.book),
-          text: r.text,
-          score: semanticOrKeywordScore(
-            queryEmbedding,
-            rewrittenQuery,
-            r.text,
-            r.embedding,
-          ),
-          chunkIndex: r.chunkIndex,
-          chapter: r.chapter || '',
-          section: r.section || '',
-          pageStart: r.pageStart ?? null,
-          pageEnd: r.pageEnd ?? null,
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, TOP_K);
-
-  const scored = [...scoredBase];
-
-  const selectedForLog = scored.filter((s) => s.score > 0);
-  if (selectedForLog.length > 0) {
-    console.log(
-      `[bookRag] retrieval-general top=${selectedForLog.length} query="${previewText(query, 120)}"`,
-    );
-    for (const s of selectedForLog) {
-      console.log(
-        `[bookRag] book="${titleById.get(s.book) || s.book}" chunk #${(s.chunkIndex ?? 0) + 1} score=${s.score.toFixed(3)} text="${previewText(s.text)}"`,
-      );
-    }
-  } else {
-    console.log(
-      `[bookRag] retrieval-general no keyword-matched chunks query="${previewText(query, 120)}"`,
-    );
-  }
-
-  let combined = '';
-  for (const s of scored) {
-    const bookTitle = titleById.get(s.book) || 'Untitled';
-    const pageLabel =
-      s.pageStart && s.pageEnd
-        ? s.pageStart === s.pageEnd
-          ? ` | Page ${s.pageStart}`
-          : ` | Pages ${s.pageStart}-${s.pageEnd}`
-        : '';
-    const chapterLabel = s.chapter ? ` | Chapter: ${s.chapter}` : '';
-    const sectionLabel = s.section ? ` | Section: ${s.section}` : '';
-    const block = `[Book: ${bookTitle} | Excerpt #${(s.chunkIndex ?? 0) + 1}${pageLabel}${chapterLabel}${sectionLabel}]\n${s.text}`;
-    if (combined.length + block.length + 2 > MAX_CONTEXT_CHARS) break;
-    combined = combined ? `${combined}\n\n${block}` : block;
-  }
-  if (!combined) {
-    return { context: null, reason: 'empty', references: [] };
-  }
-  const references = scored.map((s) => ({
-    bookId: s.book,
-    bookTitle: titleById.get(s.book) || 'Untitled',
-    bookUrl: urlById.get(s.book) || '',
-    chunkIndex: s.chunkIndex ?? 0,
-    excerptNumber: (s.chunkIndex ?? 0) + 1,
-    score: s.score,
-    chapter: s.chapter || '',
-    section: s.section || '',
-    pageStart: s.pageStart ?? null,
-    pageEnd: s.pageEnd ?? null,
-  }));
-  return { context: combined, reason: 'ok', references };
+  return { context: combined, bookTitle: book.title, reason: 'ok' };
 }
 
 /**
  * @param { Array<{ role: string, content: string }> } messages
  * @param {string} [bookId]
  * @param {import('mongoose').Types.ObjectId} userId
+ * @param { { geminiApiKey?: string; geminiModelId?: string } } userLike
  */
 export async function augmentMessagesWithBookRag(
   messages,
   bookId,
   userId,
-  mode = 'chat',
+  userLike,
 ) {
   if (
     !bookId ||
@@ -1014,18 +676,19 @@ export async function augmentMessagesWithBookRag(
     !Array.isArray(messages) ||
     messages.length === 0
   ) {
-    return { messages, ragUsed: false, ragNote: null, references: [] };
+    return { messages, ragUsed: false, ragNote: null };
   }
 
   const last = messages.at(-1);
   if (!last || last.role !== 'user' || typeof last.content !== 'string') {
-    return { messages, ragUsed: false, ragNote: null, references: [] };
+    return { messages, ragUsed: false, ragNote: null };
   }
 
-  const { context, bookTitle, reason, references } = await buildRagContextForQuery(
+  const { context, bookTitle, reason } = await buildRagContextForQuery(
     String(bookId),
     userId,
     last.content,
+    userLike,
   );
 
   if (reason === 'not_indexed') {
@@ -1033,29 +696,16 @@ export async function augmentMessagesWithBookRag(
       messages: [...messages],
       ragUsed: false,
       ragNote: 'index_required',
-      references: [],
     };
   }
   if (!context) {
-    return {
-      messages: [...messages],
-      ragUsed: false,
-      ragNote: reason,
-      references: [],
-    };
+    return { messages: [...messages], ragUsed: false, ragNote: reason };
   }
 
-  const modeKey = String(mode || 'chat').toLowerCase();
-  const modeRule = MODE_RULES[modeKey] || MODE_RULES.chat;
-  const prefix = `The student is asking about the book **${bookTitle || 'this book'}**.\n${CONTEXT_ONLY_RULES}\n- Output mode: ${modeKey}\n- Mode behavior: ${modeRule}\n\nProvided context:\n\n${context}\n\n---\n\nStudent question:\n`;
+  const prefix = `The student is asking about the book **${bookTitle || 'this book'}**. Use ONLY the following excerpts as factual grounding; if something is not in the excerpts, say you do not have that in the indexed text. Excerpts:\n\n${context}\n\n---\n\nStudent question:\n`;
   const out = messages.slice(0, -1).map((m) => ({ ...m }));
   out.push({ role: 'user', content: `${prefix}${last.content}` });
-  return {
-    messages: out,
-    ragUsed: true,
-    ragNote: 'ok',
-    references,
-  };
+  return { messages: out, ragUsed: true, ragNote: 'ok' };
 }
 
 /**
@@ -1069,7 +719,7 @@ function legacyRagIndexPercentEstimate(book) {
   const ph = book.ragIndexPhase || '';
   const t = book.ragIndexTotalChunks ?? 0;
   const d = book.ragIndexDoneChunks ?? 0;
-  if ((ph === 'embedding' || ph === 'writing') && t > 0) {
+  if (ph === 'embedding' && t > 0) {
     return Math.min(99, 28 + Math.floor((70 * d) / t));
   }
   if (ph === 'downloading') return 4;

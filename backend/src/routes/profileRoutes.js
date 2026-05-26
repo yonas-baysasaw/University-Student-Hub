@@ -451,6 +451,18 @@ router.put(
     }
     if (skills !== undefined) req.user.skills = skills;
 
+    const geminiApiKey = readOptionalTrimmedString(req.body, 'geminiApiKey', 4096);
+    if (geminiApiKey === null) {
+      return res.status(400).json({ message: 'Invalid geminiApiKey' });
+    }
+    if (geminiApiKey !== undefined) req.user.geminiApiKey = geminiApiKey;
+
+    const geminiModelId = readOptionalTrimmedString(req.body, 'geminiModelId', 128);
+    if (geminiModelId === null) {
+      return res.status(400).json({ message: 'Invalid geminiModelId' });
+    }
+    if (geminiModelId !== undefined) req.user.geminiModelId = geminiModelId;
+
     const socialKeys = [
       ['socialTelegram', 'socialTelegram'],
       ['socialLinkedIn', 'socialLinkedIn'],
