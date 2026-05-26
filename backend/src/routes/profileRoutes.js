@@ -455,6 +455,30 @@ router.put(
       if (v !== undefined) req.user[docKey] = v;
     }
 
+    const phone = readOptionalTrimmedString(req.body, 'phone', 40);
+    if (phone === null) {
+      return res.status(400).json({ message: 'Invalid phone' });
+    }
+    if (phone !== undefined) req.user.phone = phone;
+
+    const campus = readOptionalTrimmedString(req.body, 'campus', 120);
+    if (campus === null) {
+      return res.status(400).json({ message: 'Invalid campus' });
+    }
+    if (campus !== undefined) req.user.campus = campus;
+
+    const emergencyContact = readOptionalTrimmedString(
+      req.body,
+      'emergencyContact',
+      200,
+    );
+    if (emergencyContact === null) {
+      return res.status(400).json({ message: 'Invalid emergencyContact' });
+    }
+    if (emergencyContact !== undefined) {
+      req.user.emergencyContact = emergencyContact;
+    }
+
     if (username !== undefined) req.user.username = username;
     if (displayName !== undefined) req.user.displayName = displayName;
 

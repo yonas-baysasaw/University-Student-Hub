@@ -3,13 +3,11 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRight,
-  Award,
   BadgeCheck,
   Bell,
   BookOpen,
   BriefcaseBusiness,
   Calendar,
-  CalendarDays,
   Camera,
   Check,
   CheckCircle2,
@@ -17,8 +15,6 @@ import {
   Download,
   Edit3,
   FileCheck2,
-  FileText,
-  GraduationCap,
   KeyRound,
   Laptop,
   LayoutDashboard,
@@ -36,8 +32,6 @@ import {
   ShieldCheck,
   Sparkles,
   Target,
-  Trophy,
-  Upload,
   UserPlus,
   UserRound,
   Users,
@@ -74,17 +68,6 @@ const peerTabs = [
   { id: "overview", label: "Overview", Icon: LayoutDashboard },
   { id: "about", label: "About", Icon: UserRound },
 ];
-
-const mockAcademic = {
-  gpa: "3.72",
-  currentSemester: "Spring 2026",
-  enrolledCourses: 6,
-  completedCourses: 38,
-  attendance: 92,
-  standing: "Good",
-  credits: 114,
-  graduationProgress: 78,
-};
 
 const mockSessions = [
   {
@@ -152,21 +135,6 @@ const mockActivities = [
     meta: "Machine Learning fundamentals",
     time: "Apr 30, 2026",
     Icon: Sparkles,
-  },
-];
-
-const achievements = [
-  { label: "Active Learner", detail: "14-day learning streak", Icon: Trophy },
-  {
-    label: "Top Contributor",
-    detail: "Shared 12 study resources",
-    Icon: Award,
-  },
-  { label: "Milestone", detail: "75% degree progress", Icon: Target },
-  {
-    label: "Certificate Ready",
-    detail: "Future credential vault",
-    Icon: FileText,
   },
 ];
 
@@ -509,7 +477,7 @@ function mapPeerApiToProfileRow(peer) {
     status:
       peer.accountType === "instructor" ? "Instructor" : "Student",
     department: identity.department,
-    studentId: "",
+    studentId: peer.id ? String(peer.id) : "",
     academicLevel: identity.academicLevel,
     email: publicEmail,
     phone: "",
@@ -973,6 +941,7 @@ function Profile({ viewMode = "owner" }) {
   const [avatarPreview, setAvatarPreview] = useState(
     user?.photo || defaultProfile,
   );
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   const [peerLoading, setPeerLoading] = useState(isPeerView);
   const [peerError, setPeerError] = useState("");
@@ -1084,13 +1053,12 @@ function Profile({ viewMode = "owner" }) {
           ? String(user.studentId)
           : user?.id != null
             ? String(user.id)
-            : "USH-2026-0147",
+            : "",
       academicLevel: ownerIdentity.academicLevel,
-      email: user?.email || "student@university.edu",
-      phone: user?.phone || "+251 91 234 5678",
-      location: user?.campus || "Main Campus",
-      emergencyContact:
-        user?.emergencyContact || "Mekdes Bekele - +251 91 555 0182",
+      email: user?.email || "",
+      phone: user?.phone || "",
+      location: user?.campus || "",
+      emergencyContact: user?.emergencyContact || "",
       showEmailPublic: Boolean(user?.showEmailPublic),
       bio: typeof user?.bio === "string" ? user.bio : "",
       interests: typeof user?.interests === "string" ? user.interests : "",
@@ -1176,10 +1144,8 @@ function Profile({ viewMode = "owner" }) {
 
   const validateContact = () => {
     const nextErrors = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
-      nextErrors.email = "Enter a valid email address.";
-    }
-    if (!/^[+()\-\s0-9]{7,20}$/.test(draft.phone)) {
+    const phone = draft.phone?.trim() || "";
+    if (phone && !/^[+()\-\s0-9]{7,20}$/.test(phone)) {
       nextErrors.phone = "Enter a valid phone number.";
     }
     setErrors(nextErrors);
@@ -1194,6 +1160,40 @@ function Profile({ viewMode = "owner" }) {
         ? event.target.checked
         : event.target.value;
     setDraft((current) => ({ ...current, [name]: value }));
+  };
+
+  const saveShowEmailPublic = async (checked) => {
+    if (isPeerView) return;
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ showEmailPublic: Boolean(checked) }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || "Could not save preference.");
+      }
+      await refreshAuth();
+      setProfile((current) => ({ ...current, showEmailPublic: Boolean(checked) }));
+      setDraft((current) => ({ ...current, showEmailPublic: Boolean(checked) }));
+      toast.success(
+        checked ? "Email will show on your public profile" : "Email hidden on public profile",
+      );
+    } catch (e) {
+      setDraft((current) => ({
+        ...current,
+        showEmailPublic: profile.showEmailPublic,
+      }));
+      toast.error(e.message || "Could not save preference.");
+    }
+  };
+
+  const handleShowEmailPublicChange = (event) => {
+    const checked = event.target.checked;
+    updateDraft(event);
+    void saveShowEmailPublic(checked);
   };
 
   const saveProfile = async (scope) => {
@@ -1212,6 +1212,9 @@ function Profile({ viewMode = "owner" }) {
           body.skills = draft.skills;
         } else if (scope === "contact") {
           body.showEmailPublic = Boolean(draft.showEmailPublic);
+          body.phone = draft.phone.trim();
+          body.campus = draft.location.trim();
+          body.emergencyContact = draft.emergencyContact.trim();
           body.socialTelegram = draft.socialTelegram;
           body.socialLinkedIn = draft.socialLinkedIn;
           body.socialInstagram = draft.socialInstagram;
@@ -1232,6 +1235,48 @@ function Profile({ viewMode = "owner" }) {
           throw new Error(payload.message || "Could not save profile.");
         }
         await refreshAuth();
+        setProfile((current) => ({
+          ...current,
+          ...(scope === "bio"
+            ? {
+                bio: draft.bio,
+                interests: draft.interests,
+                careerGoals: draft.careerGoals,
+                skills: draft.skills,
+              }
+            : {
+                showEmailPublic: Boolean(draft.showEmailPublic),
+                phone: draft.phone.trim(),
+                location: draft.location.trim(),
+                emergencyContact: draft.emergencyContact.trim(),
+                socialTelegram: draft.socialTelegram,
+                socialLinkedIn: draft.socialLinkedIn,
+                socialInstagram: draft.socialInstagram,
+                socialFacebook: draft.socialFacebook,
+                socialUpwork: draft.socialUpwork,
+              }),
+        }));
+        setDraft((current) => ({
+          ...current,
+          ...(scope === "bio"
+            ? {
+                bio: draft.bio,
+                interests: draft.interests,
+                careerGoals: draft.careerGoals,
+                skills: draft.skills,
+              }
+            : {
+                showEmailPublic: Boolean(draft.showEmailPublic),
+                phone: draft.phone.trim(),
+                location: draft.location.trim(),
+                emergencyContact: draft.emergencyContact.trim(),
+                socialTelegram: draft.socialTelegram,
+                socialLinkedIn: draft.socialLinkedIn,
+                socialInstagram: draft.socialInstagram,
+                socialFacebook: draft.socialFacebook,
+                socialUpwork: draft.socialUpwork,
+              }),
+        }));
         toast.success("Profile updated");
         setEditingContact(false);
         setEditingBio(false);
@@ -1337,19 +1382,40 @@ function Profile({ viewMode = "owner" }) {
     }
   };
 
-  const uploadAvatar = (event) => {
+  const uploadAvatar = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Choose an image file for your profile picture.");
       return;
     }
-    const nextUrl = URL.createObjectURL(file);
-    setAvatarPreview((current) => {
-      if (current?.startsWith("blob:")) URL.revokeObjectURL(current);
-      return nextUrl;
-    });
-    toast.success("Profile picture ready to save");
+    setPhotoUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload/profile", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || "Could not upload photo.");
+      }
+      const nextAvatar =
+        payload?.user?.avatar || payload?.location || user?.photo;
+      if (avatarPreview?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatarPreview);
+      }
+      setAvatarPreview(nextAvatar || defaultProfile);
+      await refreshAuth();
+      toast.success("Profile picture updated.");
+    } catch (e) {
+      toast.error(e.message || "Could not upload photo.");
+    } finally {
+      setPhotoUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const removeSession = (sessionId) => {
@@ -1502,7 +1568,7 @@ function Profile({ viewMode = "owner" }) {
         {showOwnerDashboard || showPeerDashboard ? (
           <>
         <div className="overflow-hidden rounded-[2rem] border border-slate-200/90 bg-white shadow-xl shadow-slate-200/60 dark:border-slate-700/80 dark:bg-slate-900 dark:shadow-black/30">
-          <div className="relative z-0 h-40 bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 sm:h-52">
+          <div className="relative z-0 min-h-[11rem] bg-gradient-to-r from-cyan-700 via-blue-700 to-indigo-700 pb-6 pt-6 sm:min-h-[13rem] sm:pb-8 sm:pt-8">
             <div
               className="absolute inset-0 z-0 workspace-hero-mesh opacity-80"
               aria-hidden
@@ -1513,16 +1579,15 @@ function Profile({ viewMode = "owner" }) {
               Student record synced
             </div>
             ) : null}
-          </div>
 
-          <div className="relative z-10 min-h-[10rem] bg-white px-4 pb-6 pt-8 sm:min-h-[11rem] sm:px-6 sm:pb-7 sm:pt-10 lg:px-8 dark:bg-slate-900">
-            <div className="-mt-8 flex flex-col gap-5 sm:-mt-10 lg:flex-row lg:items-end lg:justify-between">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end lg:items-start">
+            <div className="relative z-[1] flex flex-col gap-5 px-4 sm:px-6 lg:px-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
                 {!isPeerView ? (
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="group relative z-10 h-28 w-28 shrink-0 overflow-hidden rounded-3xl bg-slate-100 text-left ring-2 ring-white/80 profile-avatar-ring dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32"
+                  disabled={photoUploading}
+                  className="group relative z-10 h-28 w-28 shrink-0 overflow-hidden rounded-3xl bg-slate-100 text-left ring-2 ring-white/80 profile-avatar-ring dark:bg-slate-800 dark:ring-slate-700 sm:h-32 sm:w-32 disabled:cursor-wait disabled:opacity-70"
                   aria-label="Upload profile picture"
                   title="Change profile picture"
                 >
@@ -1539,7 +1604,7 @@ function Profile({ viewMode = "owner" }) {
                   )}
                   <span className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-slate-950/65 py-2 text-xs font-bold text-white opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100">
                     <Camera className="h-4 w-4" aria-hidden />
-                    Change
+                    {photoUploading ? "Uploading…" : "Change"}
                   </span>
                 </button>
                 ) : (
@@ -1563,59 +1628,97 @@ function Profile({ viewMode = "owner" }) {
                   type="file"
                   accept="image/*"
                   className="sr-only"
-                  onChange={uploadAvatar}
+                  onChange={(e) => void uploadAvatar(e)}
                 />
                 ) : null}
 
-                <div className="relative z-10 min-w-0 pt-2 lg:pt-0">
+                <div className="min-w-0 flex-1 pt-1 sm:pt-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h1 className="relative z-10 max-w-full text-balance break-words font-display text-3xl font-bold leading-tight tracking-tight text-slate-950 dark:text-white sm:text-4xl">
+                    <h1 className="max-w-full text-balance break-words font-display text-3xl font-bold leading-tight tracking-tight text-white sm:text-4xl">
                       {profile.fullName || profile.username || "Student"}
                     </h1>
-                    <span className="relative z-10 inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:ring-emerald-400/30">
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs font-bold text-white ring-1 ring-white/25 backdrop-blur">
                       <CheckCircle2 className="h-3.5 w-3.5" aria-hidden />
                       {profile.status}
                     </span>
                   </div>
-                  {isPeerView && profile.email ? (
-                    <a
-                      href={`mailto:${profile.email}`}
-                      className="relative z-10 mt-2 inline-flex w-fit max-w-full items-center gap-2 rounded-full border border-cyan-200/90 bg-gradient-to-r from-white via-cyan-50/95 to-teal-50/80 px-3.5 py-1.5 text-sm font-semibold text-slate-800 shadow-sm shadow-cyan-900/10 ring-1 ring-cyan-400/25 dark:border-cyan-500/35 dark:from-slate-800 dark:via-cyan-950/50 dark:to-slate-900 dark:text-cyan-50 dark:ring-cyan-400/25"
-                      title={`Email ${profile.email}`}
-                    >
-                      <Mail
-                        className="h-4 w-4 shrink-0 text-cyan-700 dark:text-cyan-300"
-                        aria-hidden
-                      />
-                      <span className="truncate">{profile.email}</span>
-                    </a>
-                  ) : null}
-                  <p
-                    className={`text-sm font-semibold text-slate-600 dark:text-slate-400 ${isPeerView && profile.email ? "mt-2" : "mt-3"}`}
-                  >
+                  <p className="mt-2 text-sm font-semibold text-blue-100/95">
                     @{profile.username} / {profile.department} /{" "}
                     {profile.academicLevel}
                   </p>
-                  {!isPeerView ? (
-                  <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-                    Student ID:{" "}
-                    <span className="font-semibold text-slate-800 dark:text-slate-200">
-                      {profile.studentId}
-                    </span>
-                  </p>
-                  ) : null}
-                  {isPeerView && peerJoinedDate ? (
-                    <p className="mt-3 inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                      <Calendar className="h-4 w-4 shrink-0 text-slate-400" aria-hidden />
-                      <span>
-                        Member since{" "}
-                        <span className="font-semibold text-slate-800 dark:text-slate-200">
-                          {peerJoinedDate}
-                        </span>
+                  {profile.studentId ? (
+                    <p className="mt-1 text-sm text-blue-100/80">
+                      {isPeerView ? "Member ID" : "Student ID"}:{" "}
+                      <span className="font-semibold text-white">
+                        {profile.studentId}
                       </span>
                     </p>
                   ) : null}
+                  {(isPeerView && profile.email) ||
+                  (!isPeerView &&
+                    profile.showEmailPublic &&
+                    profile.email) ? (
+                    <a
+                      href={`mailto:${profile.email}`}
+                      className="mt-2 inline-flex w-fit max-w-full items-center gap-2 rounded-full border border-white/25 bg-white/12 px-3.5 py-1.5 text-sm font-semibold text-white shadow-sm ring-1 ring-white/20 backdrop-blur transition hover:bg-white/20"
+                      title={`Email ${profile.email}`}
+                    >
+                      <Mail className="h-4 w-4 shrink-0" aria-hidden />
+                      <span className="truncate">{profile.email}</span>
+                    </a>
+                  ) : null}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 bg-white px-4 pb-6 pt-5 sm:px-6 sm:pb-7 lg:px-8 dark:bg-slate-900">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1 space-y-2">
+                {isPeerView && peerJoinedDate ? (
+                  <p className="inline-flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <Calendar
+                      className="h-4 w-4 shrink-0 text-slate-400"
+                      aria-hidden
+                    />
+                    <span>
+                      Member since{" "}
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {peerJoinedDate}
+                      </span>
+                    </span>
+                  </p>
+                ) : null}
+                {profile.bio?.trim() ? (
+                  <p className="max-w-3xl text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                    {profile.bio.trim()}
+                  </p>
+                ) : null}
+                {profile.careerGoals?.trim() ? (
+                  <p className="flex max-w-3xl items-start gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <Target
+                      className="mt-0.5 h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400"
+                      aria-hidden
+                    />
+                    <span>{profile.careerGoals.trim()}</span>
+                  </p>
+                ) : null}
+                {!profile.bio?.trim() &&
+                !profile.careerGoals?.trim() &&
+                !isPeerView ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Add your bio and career goals in the About tab — they’ll
+                    appear here.
+                  </p>
+                ) : null}
+                {isPeerView &&
+                !profile.bio?.trim() &&
+                !profile.careerGoals?.trim() &&
+                !peerJoinedDate ? (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    No bio or goals shared yet.
+                  </p>
+                ) : null}
               </div>
 
               <div className="relative z-10 flex flex-wrap gap-2">
@@ -1696,71 +1799,6 @@ function Profile({ viewMode = "owner" }) {
         {!isPeerView && activeTab === "overview" ? (
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-6">
-              <>
-              <section aria-labelledby="academic-title">
-                <div className="mb-4 flex items-center gap-2">
-                  <GraduationCap
-                    className="h-6 w-6 text-cyan-700 dark:text-cyan-300"
-                    aria-hidden
-                  />
-                  <h2
-                    id="academic-title"
-                    className="font-display text-2xl font-bold text-slate-950 dark:text-white"
-                  >
-                    Academic Overview
-                  </h2>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <StatCard
-                    icon={Medal}
-                    label="GPA"
-                    value={mockAcademic.gpa}
-                    hint="Cumulative"
-                    progress={93}
-                    tone="cyan"
-                  />
-                  <StatCard
-                    icon={CalendarDays}
-                    label="Semester"
-                    value={mockAcademic.currentSemester}
-                    hint="Registration active"
-                    tone="indigo"
-                  />
-                  <StatCard
-                    icon={BookOpen}
-                    label="Enrolled"
-                    value={mockAcademic.enrolledCourses}
-                    hint="Courses this term"
-                    progress={67}
-                    tone="emerald"
-                  />
-                  <StatCard
-                    icon={FileCheck2}
-                    label="Completed"
-                    value={mockAcademic.completedCourses}
-                    hint="Courses passed"
-                    progress={mockAcademic.graduationProgress}
-                    tone="cyan"
-                  />
-                  <StatCard
-                    icon={Clock3}
-                    label="Attendance"
-                    value={`${mockAcademic.attendance}%`}
-                    hint="Across current courses"
-                    progress={mockAcademic.attendance}
-                    tone="emerald"
-                  />
-                  <StatCard
-                    icon={ShieldCheck}
-                    label="Standing"
-                    value={mockAcademic.standing}
-                    hint="No academic holds"
-                    progress={100}
-                    tone="amber"
-                  />
-                </div>
-              </section>
-
               <section aria-labelledby="contact-title">
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
@@ -1813,11 +1851,10 @@ function Profile({ viewMode = "owner" }) {
                     name="email"
                     type="email"
                     value={draft.email}
-                    editing={editingContact}
-                    onChange={updateDraft}
-                    error={errors.email}
+                    editing={false}
+                    readOnly
                     icon={Mail}
-                    badge="Verified"
+                    badge={draft.email ? "Verified" : undefined}
                   />
                   <FieldRow
                     label="Phone number"
@@ -1851,7 +1888,7 @@ function Profile({ viewMode = "owner" }) {
                     type="checkbox"
                     name="showEmailPublic"
                     checked={Boolean(draft.showEmailPublic)}
-                    onChange={updateDraft}
+                    onChange={handleShowEmailPublicChange}
                     className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
                   />
                   <span className="min-w-0 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
@@ -1859,8 +1896,9 @@ function Profile({ viewMode = "owner" }) {
                       Show email on public profile
                     </span>
                     <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">
-                      Lets visitors see your university email under your name on
-                      your shared profile (/users/…/) as a tap-to-mail link.
+                      Lets visitors see your university email under your student
+                      ID on your shared profile (/users/…/) as a tap-to-mail
+                      link.
                     </span>
                   </span>
                 </label>
@@ -1933,40 +1971,6 @@ function Profile({ viewMode = "owner" }) {
                   )}
                 </div>
               </section>
-
-              <section aria-labelledby="achievements-title">
-                <div className="mb-4 flex items-center gap-2">
-                  <Trophy
-                    className="h-6 w-6 text-cyan-700 dark:text-cyan-300"
-                    aria-hidden
-                  />
-                  <h2
-                    id="achievements-title"
-                    className="font-display text-2xl font-bold text-slate-950 dark:text-white"
-                  >
-                    Achievements & Progress
-                  </h2>
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                  {achievements.map(({ label, detail, Icon }) => (
-                    <article
-                      key={label}
-                      className="dashboard-card-lift rounded-2xl border border-slate-200/90 bg-white/90 p-4 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60"
-                    >
-                      <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-50 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-200 dark:ring-amber-400/20">
-                        <Icon className="h-5 w-5" aria-hidden />
-                      </span>
-                      <h3 className="mt-4 font-display text-lg font-bold text-slate-950 dark:text-white">
-                        {label}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                        {detail}
-                      </p>
-                    </article>
-                  ))}
-                </div>
-              </section>
-              </>
             </div>
 
             <aside className="space-y-6">
@@ -2436,19 +2440,6 @@ function Profile({ viewMode = "owner" }) {
                 onChange={updateDraft}
                 icon={Check}
               />
-              <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-800/40">
-                <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
-                  <Upload
-                    className="h-4 w-4 text-cyan-700 dark:text-cyan-300"
-                    aria-hidden
-                  />
-                  Certificates
-                </div>
-                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-                  Credential uploads and verified certificates are ready for a
-                  future backend endpoint.
-                </p>
-              </div>
             </div>
           </section>
         ) : null}
@@ -2481,7 +2472,8 @@ function Profile({ viewMode = "owner" }) {
       {!isPeerView ? (
       <button
         type="button"
-        className="fixed bottom-5 right-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-cyan-600 text-white shadow-xl shadow-cyan-600/25 transition hover:-translate-y-0.5 hover:bg-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500"
+        disabled={photoUploading}
+        className="fixed bottom-5 right-5 z-30 flex h-12 w-12 items-center justify-center rounded-full bg-cyan-600 text-white shadow-xl shadow-cyan-600/25 transition hover:-translate-y-0.5 hover:bg-cyan-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-500 disabled:cursor-wait disabled:opacity-70"
         onClick={() => fileInputRef.current?.click()}
         aria-label="Upload profile picture"
         title="Upload profile picture"

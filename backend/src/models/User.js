@@ -129,6 +129,24 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: 40,
+      default: '',
+    },
+    campus: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: '',
+    },
+    emergencyContact: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: '',
+    },
     bio: {
       type: String,
       trim: true,
