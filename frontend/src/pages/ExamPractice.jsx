@@ -459,24 +459,56 @@ function ExamPractice() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const pollRef = useRef(null);
+  const fetchSucceededRef = useRef(false);
+  const examIdRef = useRef(examId);
+  examIdRef.current = examId;
 
-  const fetchExamData = useCallback(async () => {
+  useEffect(() => {
+    fetchSucceededRef.current = false;
+    setLoading(true);
+    setError('');
+    setExam(null);
+    setQuestions([]);
+  }, [examId]);
+
+  const fetchExamData = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    const rid = examId;
     try {
       const [examRes, questionsRes] = await Promise.all([
-        fetch(`/api/exams/${examId}`, { credentials: 'include' }),
-        fetch(`/api/exams/${examId}/questions`, { credentials: 'include' }),
+        fetch(`/api/exams/${rid}`, { credentials: 'include' }),
+        fetch(`/api/exams/${rid}/questions`, { credentials: 'include' }),
       ]);
       const examData = await readJsonOrThrow(examRes, 'Failed to load exam');
       const qData = await readJsonOrThrow(
         questionsRes,
         'Failed to load questions',
       );
+      if (rid !== examIdRef.current) return;
       setExam(examData);
-      setQuestions(qData.questions);
+      const nextQs = qData.questions ?? [];
+      setQuestions((prev) => {
+        if (rid !== examIdRef.current) return prev;
+        if (
+          silent &&
+          prev.length > 0 &&
+          getQuestionsSignature(prev) === getQuestionsSignature(nextQs)
+        ) {
+          return prev;
+        }
+        return nextQs;
+      });
+      fetchSucceededRef.current = true;
+      if (!silent) setError('');
     } catch (err) {
-      setError(err.message);
+      if (rid !== examIdRef.current) return;
+      if (!silent || !fetchSucceededRef.current) {
+        setError(err.message);
+      }
     } finally {
-      setLoading(false);
+      if (!silent && rid === examIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [examId]);
 
@@ -537,21 +569,21 @@ function ExamPractice() {
   }, [socket, examId]);
 
   // Poll while still processing (fallback for when socket isn't available)
+  const processingStatus = exam?.processingStatus;
   useEffect(() => {
-    if (
-      exam?.processingStatus === 'processing' ||
-      exam?.processingStatus === 'pending'
-    ) {
-      pollRef.current = setInterval(fetchExamData, 5000);
+    if (processingStatus === 'processing' || processingStatus === 'pending') {
+      pollRef.current = setInterval(() => {
+        fetchExamData({ silent: true });
+      }, 5000);
     } else {
       clearInterval(pollRef.current);
     }
     return () => clearInterval(pollRef.current);
-  }, [exam, fetchExamData]);
+  }, [processingStatus, fetchExamData]);
 
   if (loading) {
     return (
-      <div className="page-surface flex items-center justify-center py-24 text-slate-500">
+      <div className="page-surface flex items-center justify-center py-14 md:py-24 text-slate-500">
         <span className="loading loading-spinner mr-2" />
         Loading exam…
       </div>
@@ -560,7 +592,7 @@ function ExamPractice() {
 
   if (error) {
     return (
-      <div className="page-surface px-4 py-16 text-center">
+      <div className="page-surface px-3 py-10 text-center md:px-6 md:py-16">
         <p className="text-rose-600">{error}</p>
         <div className="mt-6 flex justify-center">
           <BackToExamHubLink />
@@ -591,7 +623,7 @@ function ExamPractice() {
     exam.processingStatus === 'pending';
 
   return (
-    <div className="page-surface flex flex-col items-center justify-center px-4 py-16 text-center md:py-24">
+    <div className="page-surface flex flex-col items-center justify-center px-3 py-10 text-center md:px-6 md:py-24">
       <div className="mb-8 w-full max-w-md">
         <BackToExamHubLink />
       </div>
@@ -1919,7 +1951,7 @@ function ResultsScreen({
   }
 
   return (
-    <div className="page-surface relative min-h-[calc(100vh-3.5rem)] overflow-hidden px-4 pb-14 pt-5 md:px-6 md:pb-16 md:pt-6">
+    <div className="page-surface relative min-h-[calc(100vh-3.5rem)] overflow-hidden px-3 pb-10 pt-4 md:px-6 md:pb-16 md:pt-6">
       <div
         className="pointer-events-none absolute inset-0 opacity-90 dark:opacity-100"
         aria-hidden

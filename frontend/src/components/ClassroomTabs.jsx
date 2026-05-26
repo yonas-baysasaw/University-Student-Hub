@@ -1,4 +1,4 @@
-import { Megaphone, MessageSquare, FolderOpen } from 'lucide-react';
+import { Megaphone, MessageSquare, FolderOpen, Sparkles } from 'lucide-react';
 import { NavLink, useParams } from 'react-router-dom';
 
 const ICONS = {
@@ -7,7 +7,7 @@ const ICONS = {
   resources: FolderOpen,
 };
 
-function ClassroomTabs({ trailing = null }) {
+function ClassroomTabs({ trailing = null, liquAction = null }) {
   const { chatId } = useParams();
   if (!chatId) return null;
 
@@ -37,6 +37,7 @@ function ClassroomTabs({ trailing = null }) {
                 <NavLink
                   to={tab.to}
                   end={tab.end}
+                  aria-label={tab.label}
                   className={({ isActive }) =>
                     `flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition md:px-4 ${
                       isActive
@@ -45,13 +46,27 @@ function ClassroomTabs({ trailing = null }) {
                     }`
                   }
                 >
-                  <Icon className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-                  <span>{tab.label}</span>
+                  <Icon
+                    className="h-4 w-4 shrink-0 opacity-90 max-md:h-5 max-md:w-5"
+                    aria-hidden
+                  />
+                  <span className="hidden md:inline">{tab.label}</span>
                 </NavLink>
               </li>
             );
           })}
         </ul>
+        {liquAction ? (
+          <button
+            type="button"
+            aria-label={liquAction.label || 'Liqu AI'}
+            onClick={liquAction.onClick}
+            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-md shadow-cyan-900/25 transition hover:brightness-110 md:px-4 dark:from-cyan-700 dark:to-indigo-950"
+          >
+            <Sparkles className="h-4 w-4 shrink-0 opacity-90 max-md:h-5 max-md:w-5" aria-hidden />
+            <span className="hidden md:inline">{liquAction.label || 'Liqu AI'}</span>
+          </button>
+        ) : null}
         {trailing ? (
           <div className="flex shrink-0 items-center border-l border-slate-200/90 pl-2 dark:border-slate-600/90">
             {trailing}

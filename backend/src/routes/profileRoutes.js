@@ -11,6 +11,22 @@ import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
 const router = express.Router();
 
+const PUBLIC_PROFILE_FIELDS =
+  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialTelegram socialLinkedIn socialInstagram socialFacebook socialUpwork';
+
+/** @param {unknown} body @param {string} key @param {number} maxLen */
+function readOptionalTrimmedString(body, key, maxLen) {
+  if (body[key] === undefined) return undefined;
+  if (typeof body[key] !== 'string') return null;
+  return body[key].trim().slice(0, maxLen);
+}
+
+function readOptionalBoolean(body, key) {
+  if (body[key] === undefined) return undefined;
+  if (typeof body[key] === 'boolean') return body[key];
+  return null;
+}
+
 /* ===== Middleware: Ensure Authenticated ===== */
 function ensureAuth(req, res, next) {
   if (req.isAuthenticated?.()) {
@@ -31,7 +47,7 @@ router.get(
     }
 
     const user = await User.findById(userId)
-      .select('username name avatar createdAt subscribers')
+      .select(PUBLIC_PROFILE_FIELDS)
       .lean();
     if (!user) {
       return res
@@ -60,10 +76,39 @@ router.get(
       profile: {
         id: String(user._id),
         name: user.name || user.username || 'User',
+        displayName: user.displayName || '',
         username: user.username || '',
         avatar: user.avatar || '',
         joinedAt: user.createdAt || null,
         subscribersCount: subscribers.length,
+        department: user.department || '',
+        schoolYear:
+          typeof user.schoolYear === 'number' && Number.isFinite(user.schoolYear)
+            ? user.schoolYear
+            : null,
+        accountType:
+          user.accountType === 'instructor' ? 'instructor' : 'student',
+        email:
+          user.showEmailPublic &&
+          typeof user.email === 'string' &&
+          user.email.trim()
+            ? user.email.trim()
+            : '',
+        bio: typeof user.bio === 'string' ? user.bio : '',
+        interests: typeof user.interests === 'string' ? user.interests : '',
+        careerGoals:
+          typeof user.careerGoals === 'string' ? user.careerGoals : '',
+        skills: typeof user.skills === 'string' ? user.skills : '',
+        socialTelegram:
+          typeof user.socialTelegram === 'string' ? user.socialTelegram : '',
+        socialLinkedIn:
+          typeof user.socialLinkedIn === 'string' ? user.socialLinkedIn : '',
+        socialInstagram:
+          typeof user.socialInstagram === 'string' ? user.socialInstagram : '',
+        socialFacebook:
+          typeof user.socialFacebook === 'string' ? user.socialFacebook : '',
+        socialUpwork:
+          typeof user.socialUpwork === 'string' ? user.socialUpwork : '',
       },
       stats: {
         sharedBooks: sharedBooks.length,
@@ -167,6 +212,39 @@ router.get('/', ensureAuth, (req, res) => {
     hasLocalPassword: !!req.user.password,
   });
 });
+
+/** Directory search for host invite pickers (min 2 chars). */
+router.get(
+  '/users/search',
+  ensureAuth,
+  asyncHandler(async (req, res) => {
+    const q = String(req.query.q || '').trim();
+    if (q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Enter at least 2 characters.',
+      });
+    }
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(escaped, 'i');
+    const users = await User.find({
+      $or: [{ username: re }, { name: re }],
+    })
+      .select('username name avatar')
+      .limit(20)
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      users: users.map((u) => ({
+        id: String(u._id),
+        username: u.username || '',
+        name: u.name || u.username || 'User',
+        avatar: u.avatar || '',
+      })),
+    });
+  }),
+);
 
 /* ===== Get Current User Activity ===== */
 router.get(
@@ -339,7 +417,58 @@ router.put(
   ensureAuth,
   blockReadOnlyUser,
   asyncHandler(async (req, res) => {
+<<<<<<< HEAD
     const { username, name, displayName, avatar } = req.body || {};
+=======
+    const { username, displayName, department, schoolYear } = req.body;
+
+    const showEmailPublic = readOptionalBoolean(req.body, 'showEmailPublic');
+    if (showEmailPublic === null) {
+      return res.status(400).json({ message: 'Invalid showEmailPublic' });
+    }
+    if (showEmailPublic !== undefined) {
+      req.user.showEmailPublic = showEmailPublic;
+    }
+
+    const bio = readOptionalTrimmedString(req.body, 'bio', 1600);
+    if (bio === null) {
+      return res.status(400).json({ message: 'Invalid bio' });
+    }
+    if (bio !== undefined) req.user.bio = bio;
+
+    const interests = readOptionalTrimmedString(req.body, 'interests', 600);
+    if (interests === null) {
+      return res.status(400).json({ message: 'Invalid interests' });
+    }
+    if (interests !== undefined) req.user.interests = interests;
+
+    const careerGoals = readOptionalTrimmedString(req.body, 'careerGoals', 600);
+    if (careerGoals === null) {
+      return res.status(400).json({ message: 'Invalid career goals' });
+    }
+    if (careerGoals !== undefined) req.user.careerGoals = careerGoals;
+
+    const skills = readOptionalTrimmedString(req.body, 'skills', 600);
+    if (skills === null) {
+      return res.status(400).json({ message: 'Invalid skills' });
+    }
+    if (skills !== undefined) req.user.skills = skills;
+
+    const socialKeys = [
+      ['socialTelegram', 'socialTelegram'],
+      ['socialLinkedIn', 'socialLinkedIn'],
+      ['socialInstagram', 'socialInstagram'],
+      ['socialFacebook', 'socialFacebook'],
+      ['socialUpwork', 'socialUpwork'],
+    ];
+    for (const [bodyKey, docKey] of socialKeys) {
+      const v = readOptionalTrimmedString(req.body, bodyKey, 400);
+      if (v === null) {
+        return res.status(400).json({ message: `Invalid ${bodyKey}` });
+      }
+      if (v !== undefined) req.user[docKey] = v;
+    }
+>>>>>>> ai-2-sol
 
     if (username !== undefined) {
       const nextUsername = String(username).trim();
@@ -387,10 +516,39 @@ router.put(
       req.user.avatar = nextAvatar || '';
     }
 
+    if (req.user.accountType === 'student') {
+      if (department !== undefined) {
+        if (typeof department !== 'string') {
+          return res.status(400).json({ message: 'Invalid department' });
+        }
+        const d = department.trim();
+        if (d.length > 120) {
+          return res
+            .status(400)
+            .json({ message: 'Department must be at most 120 characters' });
+        }
+        req.user.department = d;
+      }
+      if (schoolYear !== undefined) {
+        const y = Number(schoolYear);
+        if (!Number.isFinite(y)) {
+          return res.status(400).json({ message: 'Invalid school year' });
+        }
+        const yi = Math.round(y);
+        if (yi < 1 || yi > 7) {
+          return res
+            .status(400)
+            .json({ message: 'School year must be between 1 and 7' });
+        }
+        req.user.schoolYear = yi;
+      }
+    }
+
     await req.user.save();
 
     res.json({
       message: 'Profile updated',
+<<<<<<< HEAD
       profile: {
         id: req.user._id,
         username: req.user.username,
@@ -405,6 +563,9 @@ router.put(
         geminiModelId: req.user.geminiModelId || '',
         hasLocalPassword: !!req.user.password,
       },
+=======
+      user: serializeCurrentUser(req.user),
+>>>>>>> ai-2-sol
     });
   }),
 );
@@ -421,33 +582,6 @@ router.delete(
       if (err) return next(err);
       res.json({ message: 'Account deleted' });
     });
-  }),
-);
-
-/* ===== Save BYOK API Key + Model ===== */
-router.post(
-  '/api-key',
-  ensureAuth,
-  blockReadOnlyUser,
-  asyncHandler(async (req, res) => {
-    const { geminiApiKey = '', geminiModelId = '' } = req.body;
-    req.user.geminiApiKey = geminiApiKey.trim();
-    req.user.geminiModelId = geminiModelId.trim();
-    await req.user.save();
-    res.json({ message: 'API key saved' });
-  }),
-);
-
-/* ===== Clear BYOK API Key ===== */
-router.delete(
-  '/api-key',
-  ensureAuth,
-  blockReadOnlyUser,
-  asyncHandler(async (req, res) => {
-    req.user.geminiApiKey = '';
-    req.user.geminiModelId = '';
-    await req.user.save();
-    res.json({ message: 'API key cleared' });
   }),
 );
 

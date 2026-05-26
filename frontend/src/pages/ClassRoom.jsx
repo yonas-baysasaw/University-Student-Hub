@@ -13,12 +13,18 @@ import { toast } from 'sonner';
 import ClassroomCardMenu from '../components/ClassroomCardMenu.jsx';
 import ClassroomScheduleEditor from '../components/ClassroomScheduleEditor';
 import { CLASSROOM_LIST_CHANGED_EVENT } from '../constants/dashboardEvents.js';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { useAuth } from '../contexts/AuthContext';
-import { canManageClassroom, isClassroomMember } from '../utils/classroom';
+import {
+  canManageClassroom,
+  getMemberName,
+  isClassroomMember,
+} from '../utils/classroom';
 import { readJsonOrThrow } from '../utils/http';
 
 function notifyClassroomsChanged() {
   window.dispatchEvent(new CustomEvent(CLASSROOM_LIST_CHANGED_EVENT));
+  notifyCalendarInvalidate();
 }
 
 async function copyInvitationCode(code) {
@@ -313,18 +319,31 @@ function ClassRoom() {
           ) : null}
         </div>
 
-        <div className="relative mt-4 rounded-xl border border-slate-200/90 bg-white/90 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-950/40">
+        {classroom.creator ? (
+          <p className="relative mt-3 text-sm text-slate-600 dark:text-slate-400">
+            <span className="font-semibold text-slate-500 dark:text-slate-500">
+              Instructor:
+            </span>{' '}
+            <span className="font-medium text-slate-900 dark:text-slate-100">
+              {getMemberName(classroom.creator)}
+            </span>
+          </p>
+        ) : null}
+
+        <div className="relative mt-4 inline-flex w-fit max-w-full flex-col rounded-lg border border-slate-200/90 bg-white/90 px-2.5 py-2 dark:border-slate-700 dark:bg-slate-950/40">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
             Invite code
           </p>
-          <div className="mt-1 flex items-center gap-2">
-            <code className="min-w-0 flex-1 truncate font-mono text-sm font-semibold text-cyan-900 dark:text-cyan-100">
+          <div className="mt-1 flex min-w-0 max-w-full items-center gap-1.5">
+            <code className="min-w-0 max-w-[11rem] truncate font-mono text-sm font-semibold text-cyan-900 sm:max-w-[13rem] dark:text-cyan-100">
               {classroom.invitationCode}
             </code>
             <button
               type="button"
               onClick={() => copyInvitationCode(classroom.invitationCode)}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
+              aria-label="Copy invitation code"
+              title="Copy code"
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/60 dark:text-cyan-100 dark:hover:bg-cyan-900/60"
             >
               <Copy className="h-3 w-3" aria-hidden />
               Copy
@@ -332,7 +351,7 @@ function ClassRoom() {
           </div>
         </div>
 
-        <p className="relative mt-3 flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+        <p className="relative mt-3 flex min-w-0 items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
           <Users className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
           <span className="font-semibold text-slate-800 dark:text-slate-200">
             {classroom.members?.length ?? 0}
@@ -342,10 +361,11 @@ function ClassRoom() {
 
         <Link
           to={`/classroom/${id}`}
-          className="relative mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
+          className="relative mt-5 inline-flex w-full whitespace-nowrap items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
+          aria-label={`Open classroom: ${classroom.name}`}
         >
           Open classroom
-          <ArrowRight className="h-4 w-4 opacity-90" aria-hidden />
+          <ArrowRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
         </Link>
       </article>
     );
@@ -353,7 +373,7 @@ function ClassRoom() {
 
   if (loading) {
     return (
-      <div className="classroom-ambient relative page-surface px-4 py-10 md:px-6">
+      <div className="classroom-ambient relative page-surface px-3 py-6 md:px-6 md:py-10">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(280px,36vh)] workspace-hero-mesh opacity-80 dark:opacity-50" />
         <div className="relative z-[2] mx-auto max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
@@ -372,7 +392,7 @@ function ClassRoom() {
 
   if (error) {
     return (
-      <div className="classroom-ambient relative page-surface px-4 py-10 md:px-6">
+      <div className="classroom-ambient relative page-surface px-3 py-6 md:px-6 md:py-10">
         <div className="relative z-[2] mx-auto max-w-6xl">
           <div className="panel-card rounded-3xl p-8">
             <p className="text-sm font-medium text-rose-600">{error}</p>
@@ -390,7 +410,7 @@ function ClassRoom() {
   }
 
   return (
-    <div className="classroom-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-4 pb-14 pt-6 text-slate-900 md:px-6 md:pt-8 dark:text-slate-100">
+    <div className="classroom-ambient relative page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 text-slate-900 md:px-6 md:pb-14 md:pt-8 dark:text-slate-100">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-[1] h-[min(320px,42vh)] workspace-hero-mesh opacity-90 dark:opacity-60" />
 
       <div className="relative z-[2] mx-auto max-w-6xl space-y-8">
@@ -416,10 +436,6 @@ function ClassRoom() {
               <h1 className="font-display text-balance text-3xl font-bold tracking-tight md:text-4xl">
                 Course classrooms
               </h1>
-              <p className="max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-                Use the menu on each card for schedule, edits, and archiving—your
-                dashboard picks up weekly slots automatically.
-              </p>
             </div>
           </div>
 
@@ -427,18 +443,18 @@ function ClassRoom() {
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm shadow-lg shadow-cyan-900/15"
+              className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 text-sm shadow-lg shadow-cyan-900/15 max-md:px-3 max-md:py-2 max-md:text-xs"
             >
-              <Sparkles className="h-4 w-4 opacity-90" aria-hidden />
+              <Sparkles className="h-4 w-4 shrink-0 opacity-90 max-md:h-3.5 max-md:w-3.5" aria-hidden />
               Create classroom
             </button>
             <button
               type="button"
               onClick={() => setShowJoinModal(true)}
-              className="btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold"
+              className="btn-secondary inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold max-md:px-3 max-md:py-2 max-md:text-xs"
             >
               Join with code
-              <ArrowRight className="h-4 w-4 opacity-80" aria-hidden />
+              <ArrowRight className="h-4 w-4 shrink-0 opacity-80 max-md:h-3.5 max-md:w-3.5" aria-hidden />
             </button>
           </div>
         </header>
@@ -452,10 +468,6 @@ function ClassRoom() {
               <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
                 Your spaces
               </h2>
-              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                Cards stay interactive—open the ⋯ menu for schedule and admin
-                actions.
-              </p>
             </div>
           </div>
 
@@ -496,7 +508,7 @@ function ClassRoom() {
                     create a new space.
                   </p>
                 ) : (
-                  <div className="mt-4 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="mt-4 grid gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
                     {activeRooms.map((c, i) => renderClassroomCard(c, i))}
                   </div>
                 )}
@@ -513,7 +525,7 @@ function ClassRoom() {
                       Hidden from dashboard summaries—restore anytime.
                     </span>
                   </div>
-                  <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
                     {archivedRooms.map((c, i) =>
                       renderClassroomCard(c, i + activeRooms.length),
                     )}
@@ -529,6 +541,7 @@ function ClassRoom() {
         <ClassroomScheduleEditor
           key={scheduleForId}
           chatId={scheduleForId}
+          classroomName={scheduleClassroom.name}
           initialSlots={scheduleClassroom.metadata?.classSchedule?.slots}
           onSaved={() => {
             fetchChats();
@@ -637,7 +650,7 @@ function ClassRoom() {
 
       {showCreateModal && (
         <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-md"
+          className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 py-4 backdrop-blur-md sm:items-center sm:py-8"
           role="presentation"
           onClick={() => setShowCreateModal(false)}
           onKeyDown={(e) => e.key === 'Escape' && setShowCreateModal(false)}
@@ -646,7 +659,7 @@ function ClassRoom() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="create-class-title"
-            className="fade-in-up relative w-full max-w-md rounded-3xl border border-cyan-100/90 bg-white p-7 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900"
+            className="fade-in-up relative my-4 w-full max-h-[min(90dvh,40rem)] max-w-md overflow-y-auto rounded-3xl border border-cyan-100/90 bg-white p-5 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900 sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-start gap-3">
@@ -656,7 +669,7 @@ function ClassRoom() {
               <div>
                 <h3
                   id="create-class-title"
-                  className="font-display text-2xl font-bold text-slate-900 dark:text-white"
+                  className="font-display text-xl font-bold text-slate-900 sm:text-2xl dark:text-white"
                 >
                   Create classroom
                 </h3>
@@ -705,7 +718,7 @@ function ClassRoom() {
 
       {showJoinModal && (
         <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/55 px-4 py-8 backdrop-blur-md"
+          className="fixed inset-0 z-[1000] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 py-4 backdrop-blur-md sm:items-center sm:py-8"
           role="presentation"
           onClick={() => setShowJoinModal(false)}
           onKeyDown={(e) => e.key === 'Escape' && setShowJoinModal(false)}
@@ -714,7 +727,7 @@ function ClassRoom() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="join-class-title"
-            className="relative w-full max-w-md rounded-3xl border border-slate-200/90 bg-white p-7 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900"
+            className="relative my-4 w-full max-h-[min(90dvh,40rem)] max-w-md overflow-y-auto rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900 sm:p-7"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-5 flex items-start gap-3">
@@ -724,11 +737,11 @@ function ClassRoom() {
               <div>
                 <h3
                   id="join-class-title"
-                  className="font-display text-2xl font-bold text-slate-900 dark:text-white"
+                  className="font-display text-xl font-bold text-slate-900 sm:text-2xl dark:text-white"
                 >
                   Join with code
                 </h3>
-                <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                <p className="mt-1 text-xs text-slate-600 sm:text-sm dark:text-slate-400">
                   Enter the invitation code from your instructor (invite links
                   open this screen with the code filled in — confirm and tap Join).
                 </p>

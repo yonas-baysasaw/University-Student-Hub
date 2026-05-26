@@ -29,11 +29,14 @@ function PasswordReset() {
         body: JSON.stringify({ email: trimmedEmail }),
       });
 
+      const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const payload = await res.json().catch(() => ({}));
         throw new Error(payload.message || 'Unable to send reset link.');
       }
-      setStatus('Check your inbox for a password reset link.');
+      setStatus(
+        payload.message ||
+          'If an account exists for this email, we sent reset instructions.',
+      );
     } catch (submitError) {
       console.error(submitError);
       setError(submitError.message || 'Unable to send reset email.');
@@ -45,7 +48,7 @@ function PasswordReset() {
   return (
     <AuthShell
       title="Reset password"
-      subtitle="We will email you a secure reset link"
+      subtitle="We email you a secure link that opens our set-new-password page"
     >
       <form className="space-y-4" onSubmit={handleSubmit}>
         <input
@@ -61,7 +64,7 @@ function PasswordReset() {
           disabled={loading}
           className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? 'Sending reset link...' : 'Send reset link'}
+          {loading ? 'Sending email…' : 'Email password reset link'}
         </button>
 
         {(error || status) && (

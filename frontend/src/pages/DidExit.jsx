@@ -53,9 +53,9 @@ function DidExit() {
   };
 
   return (
-    <div className="page-surface px-4 pb-10 pt-8 md:px-6">
+    <div className="page-surface px-3 pb-8 pt-6 md:px-6">
       <section className="mx-auto max-w-6xl space-y-5">
-        <div className="panel-card rounded-3xl p-6 md:p-8">
+        <div className="panel-card rounded-2xl p-4 md:rounded-3xl md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700">

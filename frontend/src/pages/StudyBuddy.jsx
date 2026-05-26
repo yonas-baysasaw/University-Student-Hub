@@ -269,7 +269,7 @@ function StudyBuddy() {
                       <span className="truncate">{contextPillLabel}</span>
                     </span>
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      Gemini · Liqu AI
+                      Liqu AI
                     </span>
                   </div>
                 </div>
@@ -421,3 +421,4 @@ function StudyBuddy() {
 }
 
 export default StudyBuddy;
+

@@ -1,398 +1,212 @@
+import { ENV } from '../config/env.js';
 import Exam from '../models/Exam.js';
 import Question from '../models/Question.js';
-import User from '../models/User.js';
-import { getIo } from '../socket/index.js';
-import { getGeminiServiceForUser } from './geminiService.js';
 
-// Ported and adapted from did-exit/js/batch-processor.js
-// Key changes: MongoDB/Mongoose instead of IndexedDB, async background processing via Promise chain
-
-const RATE_LIMIT_DELAY_MS = 5000; // 5s between background batches
-const BATCH_TIMEOUT_MS = 120_000; // 120s per batch
-
-// ── Fatal error detection (ported verbatim) ───────────────────────────────────
+const CHUNK_WORDS = 700;
+const CHUNK_OVERLAP_WORDS = 120;
+const MAX_QUESTIONS_PER_CHUNK = 12;
 
 function isFatalAIError(error) {
-  const m = (error?.message || String(error)).toLowerCase();
+  const message = String(error?.message || '').toLowerCase();
   return (
-    /\b429\b/.test(m) ||
-    (m.includes('quota') && (m.includes('exceed') || m.includes('exceeded'))) ||
-    /\b403\b/.test(m) ||
-    /\b401\b/.test(m) ||
-    m.includes('invalid api key') ||
-    m.includes('api_key_invalid') ||
-    m.includes('permission denied') ||
-    m.includes('billing')
+    message.includes('api key') ||
+    message.includes('permission') ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden')
   );
 }
 
-// ── Text chunking (ported verbatim from did-exit) ─────────────────────────────
-
-function estimateQuestionCount(textContent) {
-  const questionPatterns = [
-    /\d+[.)]\s+[A-Z]/g,
-    /Question\s+\d+/gi,
-    /^\s*\d+\.\s+/gm,
-    /\?\s*$/gm,
-  ];
-
-  let maxCount = 0;
-  for (const pattern of questionPatterns) {
-    const matches = textContent.match(pattern) || [];
-    maxCount = Math.max(maxCount, matches.length);
-  }
-
-  const mcMarkers = [/^\s*[A-Ea-e][.)]/gm, /^\s*\([A-Ea-e]\)/gm];
-  let optionCount = 0;
-  for (const pattern of mcMarkers) {
-    optionCount += (textContent.match(pattern) || []).length;
-  }
-
-  const mcEstimate = Math.floor(optionCount / 4);
-  return Math.min(150, Math.max(10, maxCount, mcEstimate));
-}
-
-function createMultipleBatches(textContent, estimatedQuestions) {
-  const questionsPerBatch = 20;
-  const targetBatches = Math.min(
-    5,
-    Math.max(2, Math.ceil(estimatedQuestions / questionsPerBatch)),
-  );
-  console.log(
-    `📊 Creating ${targetBatches} batches for ~${estimatedQuestions} questions`,
+function chunkWords(words, chunkSize, overlap) {
+  if (!Array.isArray(words) || words.length === 0) return [];
+  const safeChunkSize = Math.max(100, Number(chunkSize) || CHUNK_WORDS);
+  const safeOverlap = Math.max(
+    0,
+    Math.min(safeChunkSize - 1, Number(overlap) || CHUNK_OVERLAP_WORDS),
   );
 
-  const words = textContent.split(/\s+/);
-  const wordsPerChunk = Math.floor(words.length / targetBatches);
-  const chunks = [];
-
-  for (let i = 0; i < words.length; i += wordsPerChunk) {
-    const remainingWords = words.length - (i + wordsPerChunk);
-    const isNearEnd =
-      remainingWords < wordsPerChunk * 0.3 && remainingWords > 0;
-
-    if (isNearEnd) {
-      const allRemaining = words.slice(i);
-      chunks.push({
-        content: allRemaining.join(' '),
-        batchNumber: chunks.length + 1,
-        wordsCount: allRemaining.length,
-      });
-      break;
-    }
-
-    const chunkWords = words.slice(i, i + wordsPerChunk);
-    chunks.push({
-      content: chunkWords.join(' '),
-      batchNumber: chunks.length + 1,
-      wordsCount: chunkWords.length,
+  const out = [];
+  let i = 0;
+  let n = 1;
+  while (i < words.length) {
+    const end = Math.min(words.length, i + safeChunkSize);
+    const slice = words.slice(i, end);
+    out.push({
+      content: slice.join(' '),
+      batchNumber: n,
+      wordsCount: slice.length,
     });
-
-    if (chunks.length >= targetBatches) {
-      if (i + wordsPerChunk < words.length) {
-        const rest = words.slice(i + wordsPerChunk);
-        chunks[chunks.length - 1].content += ` ${rest.join(' ')}`;
-        chunks[chunks.length - 1].wordsCount += rest.length;
-      }
-      break;
-    }
+    if (end >= words.length) break;
+    i = Math.max(0, end - safeOverlap);
+    n += 1;
   }
-
-  return chunks;
+  return out;
 }
 
 function createTextChunks(textContent) {
-  const estimated = estimateQuestionCount(textContent);
-  console.log(`📊 Estimated ${estimated} questions in document`);
-
-  if (estimated > 20 || textContent.length > 20000) {
-    return createMultipleBatches(textContent, estimated);
-  }
-
-  if (textContent.length < 20000 && estimated <= 10) {
-    return [
-      {
-        content: textContent,
-        batchNumber: 1,
-        wordsCount: textContent.split(/\s+/).length,
-      },
-    ];
-  }
-
-  return createMultipleBatches(textContent, estimated);
+  const content = typeof textContent === 'string' ? textContent : '';
+  const words = content.split(/\s+/).map((w) => w.trim()).filter(Boolean);
+  return chunkWords(words, CHUNK_WORDS, CHUNK_OVERLAP_WORDS);
 }
 
-function createBatchPrompt(chunk) {
-  return `Extract ALL multiple choice questions from this content. Focus on creating high-quality educational questions.
-
-IMPORTANT INSTRUCTIONS:
-- Extract ALL existing questions if they're already in the content
-- LOOK FOR CORRECT ANSWERS: Many exam PDFs have the correct answer right after the question (e.g., "Answer: A", "Correct Answer: B", "Ans: C")
-- If a correct answer is provided in the text, USE THAT as the correctAnswer index
-- If no answer is provided, use your knowledge to determine the most likely correct answer
-- Handle 4 OR 5 options dynamically
-- Provide the correct answer index where 0=A, 1=B, 2=C, 3=D, 4=E
-- Include brief explanations
-
-FORMAT AS JSON:
-{
-  "questions": [
-    {
-      "id": 1,
-      "question": "Question text?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correctAnswer": 0,
-      "explanation": "Why this answer is correct"
-    }
-  ]
+function stripCodeFences(text) {
+  const t = String(text || '').trim();
+  if (!t.startsWith('```')) return t;
+  return t.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
 }
 
-ANSWER DETECTION PATTERNS:
-- Look for: "Answer: A", "Ans: B", "Correct Answer: C"
-- Convert A=0, B=1, C=2, D=3, E=4 for the correctAnswer field
+function normalizeQuestion(raw, index, batchNumber) {
+  const question = String(raw?.question || '').trim();
+  const optionsRaw = Array.isArray(raw?.options) ? raw.options : [];
+  const options = optionsRaw
+    .map((x) => String(x || '').trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  if (!question || options.length < 2) return null;
 
-Batch ${chunk.batchNumber} content:
-${chunk.content}`;
-}
+  let correctAnswer = Number(raw?.correctAnswer);
+  if (!Number.isFinite(correctAnswer)) correctAnswer = 0;
+  correctAnswer = Math.max(0, Math.min(options.length - 1, Math.floor(correctAnswer)));
 
-// ── Core batch processing ─────────────────────────────────────────────────────
-
-async function processChunkWithAI(chunk, ai) {
-  try {
-    let questions;
-    if (chunk.isImage) {
-      console.log(`🤖 Processing image batch ${chunk.batchNumber} with AI`);
-      questions = await ai.generateQuestionsFromImage(
-        chunk.content,
-        chunk.mimeType,
-      );
-    } else {
-      console.log(
-        `🤖 Processing text batch ${chunk.batchNumber} (${chunk.wordsCount || '?'} words)`,
-      );
-      const prompt = createBatchPrompt(chunk);
-      questions = await ai.generateQuestionsFromText(chunk.content, prompt);
-    }
-
-    console.log(
-      `✅ Batch ${chunk.batchNumber}: ${questions?.length ?? 0} questions`,
-    );
-    return questions ?? [];
-  } catch (error) {
-    console.error(`❌ Error on batch ${chunk.batchNumber}:`, error);
-    if (isFatalAIError(error)) throw error;
-    return [];
-  }
-}
-
-async function storeQuestions(examId, questions, batchNumber, totalBatches) {
-  if (!questions || questions.length === 0) return 0;
-
-  // Determine the current max questionIndex for this exam to append correctly
-  const existing = await Question.countDocuments({ examId });
-  const startIndex = existing;
-
-  const docs = questions.map((q, i) => ({
-    examId,
-    questionIndex: startIndex + i,
-    question: q.question,
-    options: q.options,
-    correctAnswer: q.correctAnswer,
-    explanation: q.explanation || '',
+  return {
+    questionIndex: index,
+    question,
+    options,
+    correctAnswer,
+    explanation: String(raw?.explanation || '').trim(),
     batchNumber,
     source: 'ai',
-  }));
-
-  // Use ordered:false so duplicate-key errors don't abort the whole insert
-  try {
-    await Question.insertMany(docs, { ordered: false });
-  } catch (err) {
-    // Ignore duplicate key errors (E11000) — can occur on retry
-    if (err.code !== 11000 && !err.message?.includes('E11000')) throw err;
-  }
-
-  const total = await Question.countDocuments({ examId });
-  await Exam.findByIdAndUpdate(examId, { totalQuestions: total });
-
-  // Emit socket event so connected clients can append new questions
-  try {
-    const io = getIo();
-    if (io) {
-      io.to(`exam:${examId}`).emit('exam:batchComplete', {
-        examId,
-        batchNumber,
-        totalBatches: totalBatches ?? batchNumber,
-        newQuestionCount: questions.length,
-        totalQuestions: total,
-      });
-    }
-  } catch (_) {}
-
-  return total;
+  };
 }
 
-/**
- * Main entry point — called after PDF is uploaded and text extracted.
- * Processes the PDF in background batches, updating the Exam record as it goes.
- *
- * @param {string} examId  - MongoDB ObjectId string of the Exam document
- * @param {string|Array} content - Extracted text OR array of { base64, mimeType } image objects
- * @param {import('mongoose').Types.ObjectId | string} [uploaderId] - exam uploader; used for Gemini key (DB then env)
- */
+async function generateQuestionsFromChunk(chunkText) {
+  const apiKey = String(ENV.GEMINI_API_KEY || '').trim();
+  const modelId = String(ENV.GEMINI_MODEL_ID || 'gemini-2.5-flash').trim();
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is missing on the server.');
+  }
+  const prompt =
+    `You are an exam-question extraction assistant.\n` +
+    `From the given exam text, extract multiple-choice questions if present.\n` +
+    `Return ONLY strict JSON with this shape:\n` +
+    `{"questions":[{"question":"...","options":["A","B","C","D"],"correctAnswer":0,"explanation":"..."}]}\n` +
+    `Rules:\n` +
+    `- If no MCQ can be extracted, return {"questions":[]}\n` +
+    `- options length must be 2-5\n` +
+    `- correctAnswer must be zero-based index\n` +
+    `- Do not include markdown or extra text.\n\n` +
+    `Exam text:\n${chunkText}`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        responseMimeType: 'application/json',
+      },
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      data?.error?.message || `Gemini request failed with ${res.status}`,
+    );
+  }
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      ?.map((p) => (typeof p?.text === 'string' ? p.text : ''))
+      .join('')
+      .trim() || '';
+  if (!text) return [];
+
+  let parsed = {};
+  try {
+    parsed = JSON.parse(stripCodeFences(text));
+  } catch {
+    return [];
+  }
+  return Array.isArray(parsed?.questions) ? parsed.questions : [];
+}
+
 async function processExamInBatches(examId, content, uploaderId) {
-  try {
-    console.log(`🚀 Starting batch processing for exam ${examId}`);
+  void uploaderId;
+  const rawText =
+    typeof content === 'string'
+      ? content
+      : Array.isArray(content)
+        ? ''
+        : String(content || '');
 
-    // Guard: reject empty or trivially short text content up front (no Gemini load)
-    if (typeof content === 'string' && content.trim().length < 50) {
-      await Exam.findByIdAndUpdate(examId, {
-        processingStatus: 'failed',
-        processingError:
-          'PDF text extraction produced no usable content. The file may be scanned/image-based or password-protected.',
-      });
-      console.warn(
-        `⚠️ Exam ${examId} aborted — extracted text too short to process.`,
-      );
-      return;
-    }
-
-    const uploader = uploaderId ? await User.findById(uploaderId).lean() : null;
-    const ai = await getGeminiServiceForUser(uploader);
-
-    await Exam.findByIdAndUpdate(examId, { processingStatus: 'processing' });
-
-    // Build chunks
-    let chunks;
-    if (Array.isArray(content)) {
-      chunks = content.map((img, idx) => ({
-        content: img.base64,
-        mimeType: img.mimeType,
-        batchNumber: idx + 1,
-        isImage: true,
-      }));
-    } else {
-      chunks = createTextChunks(content);
-    }
-
-    console.log(`📋 Processing ${chunks.length} batch(es)`);
-
-    // Process first batch immediately
-    const firstQuestions = await Promise.race([
-      processChunkWithAI(chunks[0], ai),
-      new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error('Batch 1 timeout')),
-          BATCH_TIMEOUT_MS,
-        ),
-      ),
-    ]);
-
-    if (!firstQuestions || firstQuestions.length === 0) {
-      await Exam.findByIdAndUpdate(examId, {
-        processingStatus: 'failed',
-        processingError: 'First batch generated no questions.',
-      });
-      return;
-    }
-
-    const totalBatches = chunks.length;
-    await storeQuestions(examId, firstQuestions, 1, totalBatches);
-    console.log(`✅ First batch stored: ${firstQuestions.length} questions`);
-
-    // Process remaining batches sequentially in the background
-    if (chunks.length > 1) {
-      processRemainingBatches(examId, chunks.slice(1), totalBatches, ai).catch(
-        (err) => {
-          console.error(
-            `Background batch processing failed for exam ${examId}:`,
-            err,
-          );
-          Exam.findByIdAndUpdate(examId, {
-            processingStatus: 'failed',
-            processingError: err.message,
-          }).catch(() => {});
-          try {
-            const io = getIo();
-            if (io)
-              io.to(`exam:${examId}`).emit('exam:processingFailed', {
-                examId,
-                error: err.message,
-              });
-          } catch (_) {}
-        },
-      );
-    } else {
-      await Exam.findByIdAndUpdate(examId, { processingStatus: 'complete' });
-      try {
-        const io = getIo();
-        const total = await Question.countDocuments({ examId });
-        if (io)
-          io.to(`exam:${examId}`).emit('exam:processingComplete', {
-            examId,
-            totalQuestions: total,
-          });
-      } catch (_) {}
-    }
-  } catch (error) {
-    console.error(`processExamInBatches error for ${examId}:`, error);
-    const statusUpdate = isFatalAIError(error)
-      ? {
-          processingStatus: 'failed',
-          processingError: `Fatal AI error: ${error.message}`,
-        }
-      : { processingStatus: 'failed', processingError: error.message };
-    await Exam.findByIdAndUpdate(examId, statusUpdate).catch(() => {});
-    try {
-      const io = getIo();
-      if (io)
-        io.to(`exam:${examId}`).emit('exam:processingFailed', {
-          examId,
-          error: error.message,
-        });
-    } catch (_) {}
-    throw error;
+  if (!rawText.trim()) {
+    await Exam.findByIdAndUpdate(examId, {
+      processingStatus: 'failed',
+      processingError:
+        'Could not extract text from this file. Try a text-based PDF.',
+      totalQuestions: 0,
+    });
+    return;
   }
-}
 
-async function processRemainingBatches(examId, chunks, totalBatches, ai) {
+  await Exam.findByIdAndUpdate(examId, {
+    processingStatus: 'processing',
+    processingError: '',
+  });
+
+  const chunks = createTextChunks(rawText);
+  if (chunks.length === 0) {
+    await Exam.findByIdAndUpdate(examId, {
+      processingStatus: 'failed',
+      processingError: 'No extractable exam text was found.',
+      totalQuestions: 0,
+    });
+    return;
+  }
+
+  const all = [];
   for (const chunk of chunks) {
-    // Rate limit between background batches
-    await new Promise((r) => setTimeout(r, RATE_LIMIT_DELAY_MS));
-
-    const questions = await Promise.race([
-      processChunkWithAI(chunk, ai),
-      new Promise((_, reject) =>
-        setTimeout(
-          () => reject(new Error(`Batch ${chunk.batchNumber} timeout`)),
-          BATCH_TIMEOUT_MS,
-        ),
-      ),
-    ]);
-
-    if (questions && questions.length > 0) {
-      const total = await storeQuestions(
-        examId,
-        questions,
-        chunk.batchNumber,
-        totalBatches,
-      );
-      console.log(
-        `✅ Batch ${chunk.batchNumber} stored: ${questions.length} new, ${total} total`,
-      );
+    const extracted = await generateQuestionsFromChunk(chunk.content);
+    const trimmed = extracted.slice(0, MAX_QUESTIONS_PER_CHUNK);
+    for (const q of trimmed) {
+      const normalized = normalizeQuestion(q, all.length, chunk.batchNumber);
+      if (normalized) all.push(normalized);
     }
   }
 
-  await Exam.findByIdAndUpdate(examId, { processingStatus: 'complete' });
-  console.log(`🏁 All batches complete for exam ${examId}`);
-  try {
-    const io = getIo();
-    const total = await Question.countDocuments({ examId });
-    if (io)
-      io.to(`exam:${examId}`).emit('exam:processingComplete', {
-        examId,
-        totalQuestions: total,
-      });
-  } catch (_) {}
+  // Deduplicate by normalized question text.
+  const seen = new Set();
+  const unique = [];
+  for (const q of all) {
+    const key = q.question.toLowerCase().replace(/\s+/g, ' ').trim();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push({ ...q, questionIndex: unique.length });
+  }
+
+  if (unique.length === 0) {
+    await Exam.findByIdAndUpdate(examId, {
+      processingStatus: 'failed',
+      processingError:
+        'No multiple-choice questions were detected in the uploaded exam.',
+      totalQuestions: 0,
+    });
+    return;
+  }
+
+  await Question.deleteMany({ examId });
+  await Question.insertMany(
+    unique.map((q) => ({
+      examId,
+      ...q,
+    })),
+    { ordered: true },
+  );
+
+  await Exam.findByIdAndUpdate(examId, {
+    processingStatus: 'complete',
+    processingError: '',
+    totalQuestions: unique.length,
+  });
 }
 
 export { createTextChunks, isFatalAIError, processExamInBatches };

@@ -22,6 +22,10 @@ export function mapBookToResource(book, index = 0) {
     bookUrl: book?.bookUrl ?? '',
     thumbnailUrl: book?.thumbnailUrl ?? '',
     likesCount: Number.isFinite(book?.likesCount) ? book.likesCount : 0,
+    dislikesCount: Number.isFinite(book?.dislikesCount)
+      ? book.dislikesCount
+      : 0,
+    viewsCount: Number.isFinite(book?.views) ? book.views : 0,
     ragIndexStatus: book?.ragIndexStatus ?? 'idle',
     downloadsCount: Number.isFinite(book?.downloadsCount)
       ? book.downloadsCount
@@ -65,6 +69,28 @@ export async function fetchLibraryBooks(signal, queryParams) {
   });
   if (!res.ok) {
     throw new Error('Failed to fetch books.');
+  }
+
+  const data = await res.json();
+  const books = Array.isArray(data)
+    ? data
+    : Array.isArray(data?.data)
+      ? data.data
+      : [];
+  return books.map((book, index) => mapBookToResource(book, index));
+}
+
+export async function searchLibraryBooksByContent(signal, query, limit = 50) {
+  const res = await fetch('/api/books/search/books', {
+    method: 'POST',
+    credentials: 'include',
+    signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, limit }),
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to search books.');
   }
 
   const data = await res.json();

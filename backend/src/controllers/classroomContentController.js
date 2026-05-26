@@ -13,6 +13,7 @@ import {
   loadChatForClassroomRequest,
 } from '../utils/classroomContentAuth.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { notifyChatMembersCalendarInvalidate } from '../utils/calendarNotify.js';
 
 function authorLabel(user) {
   return (
@@ -105,6 +106,7 @@ function announcementToDto(a, now = Date.now()) {
     title: a.title,
     body: a.body,
     author: a.authorName || 'Instructor',
+    authorId: a.createdBy ? String(a.createdBy) : null,
     importance,
     kind,
     expiresAt: expiresAtIso,
@@ -198,6 +200,8 @@ export const createAnnouncement = asyncHandler(async (req, res) => {
     console.error('[createAnnouncement] announcement email notify failed', err);
   });
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   return res.status(201).json({
     announcement: announcementToDto(created),
   });
@@ -250,6 +254,8 @@ export const patchAnnouncement = asyncHandler(async (req, res) => {
 
   await doc.save();
 
+  notifyChatMembersCalendarInvalidate(chat);
+
   return res.json({
     announcement: announcementToDto(doc),
   });
@@ -276,6 +282,7 @@ export const deleteAnnouncement = asyncHandler(async (req, res) => {
   }
 
   await ann.deleteOne();
+  notifyChatMembersCalendarInvalidate(chat);
   return res.json({ message: 'Deleted' });
 });
 
@@ -298,6 +305,7 @@ export const listResources = asyncHandler(async (req, res) => {
     fileName: r.fileName || '',
     fileUrl: r.fileUrl || '',
     author: r.authorName || 'Instructor',
+    authorId: r.createdBy ? String(r.createdBy) : null,
     category: r.category || 'other',
     description: r.description || '',
     createdAt: r.createdAt
@@ -368,6 +376,7 @@ export const createResource = asyncHandler(async (req, res) => {
       fileName: created.fileName,
       fileUrl: created.fileUrl,
       author: created.authorName,
+      authorId: String(created.createdBy),
       category: created.category || 'other',
       description: created.description || '',
       createdAt: created.createdAt.toISOString(),

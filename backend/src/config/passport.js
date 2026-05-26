@@ -29,9 +29,21 @@ const configurePassport = () => {
           if (!user) {
             return done(null, false, { message: 'User not found' });
           }
+          if (!user.password) {
+            return done(null, false, { message: 'Invalid credentials' });
+          }
           const match = await bcrypt.compare(password, user.password);
           if (!match) {
             return done(null, false, { message: 'Invalid credentials' });
+          }
+          if (user.role === 'admin') {
+            return done(null, user);
+          }
+          if (user.email_verified === false) {
+            return done(null, false, {
+              message:
+                'VERIFY_EMAIL: Please verify your email before signing in. You can resend the confirmation email from the sign-in page.',
+            });
           }
           return done(null, user);
         } catch (err) {

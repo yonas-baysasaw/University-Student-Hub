@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "node --watch src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "migrate-staff-to-admin": "node scripts/migrate-staff-to-admin.mjs",
+    "migrate:bookchunks:remove-embeddings": "node scripts/remove-bookchunk-embedding-fields.mjs"
   },
   "keywords": [],
   "author": "",

@@ -12,7 +12,7 @@ router.post(
     const user = await User.findOne({
       resetPasswordToken: req.params.token,
       resetPasswordExpires: { $gt: Date.now() },
-    });
+    }).select('+resetPasswordToken +resetPasswordExpires');
 
     if (!user) {
       const error = new Error('Invalid or expired token');

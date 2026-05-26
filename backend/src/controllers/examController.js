@@ -1,4 +1,4 @@
-import { DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { ENV } from '../config/env.js';
 import { s3Client } from '../config/s3Client.js';
 import Attempt from '../models/Attempt.js';
@@ -458,6 +458,117 @@ async function updateExamController(req, res, next) {
   }
 }
 
+// ── Reprocess failed PDF (retry extraction) ───────────────────────────────────
+
+async function reprocessFailedExamController(req, res, next) {
+  try {
+    assertCanWrite(req.user);
+    const userId = req.user._id;
+    const { examId } = req.params;
+
+    const exam = await Exam.findById(examId);
+    if (!exam) return res.status(404).json({ message: 'Exam not found.' });
+    if (exam.uploadedBy.toString() !== userId.toString()) {
+      return res
+        .status(403)
+        .json({ message: 'Only the uploader can retry processing.' });
+    }
+    if (exam.examKind === 'vault_compiled') {
+      return res
+        .status(400)
+        .json({ message: 'Vault papers cannot be reprocessed.' });
+    }
+    if (exam.isDuplicate) {
+      return res.status(400).json({
+        message: 'Linked duplicate exams cannot be reprocessed.',
+      });
+    }
+    if (exam.processingStatus !== 'failed') {
+      return res.status(400).json({
+        message: 'Only failed exams can be retried.',
+      });
+    }
+    if (!exam.fileKey?.trim()) {
+      return res.status(400).json({ message: 'No PDF on file for this exam.' });
+    }
+
+    let s3Response;
+    try {
+      s3Response = await s3Client.send(
+        new GetObjectCommand({
+          Bucket: ENV.AWS_BUCKET_NAME,
+          Key: exam.fileKey.trim(),
+        }),
+      );
+    } catch (s3Err) {
+      console.error('[reprocessFailedExam] S3 get failed:', s3Err);
+      return res.status(502).json({
+        message:
+          'Could not load the PDF from storage. Try uploading the file again.',
+      });
+    }
+
+    const bytes = await s3Response.Body.transformToByteArray();
+    const pdfBuffer = Buffer.from(bytes);
+
+    await Promise.all([
+      Question.deleteMany({ examId }),
+      Attempt.deleteMany({ examId }),
+    ]);
+
+    let textContent = '';
+    let isImageBased = false;
+    try {
+      const analysis = await analyzePDF(pdfBuffer);
+      isImageBased = analysis.isImageBased;
+      if (!isImageBased) {
+        textContent = await extractTextFromPDF(pdfBuffer);
+      }
+    } catch (pdfErr) {
+      console.warn(
+        'PDF analysis on reprocess — continuing without text:',
+        pdfErr.message,
+      );
+    }
+
+    const contentHash = textContent ? hashContent(textContent) : null;
+
+    await Exam.findByIdAndUpdate(examId, {
+      textContent,
+      contentHash,
+      processingStatus: 'pending',
+      processingError: '',
+      totalQuestions: 0,
+    });
+
+    (async () => {
+      try {
+        let content;
+        if (isImageBased) {
+          content = await extractImagesFromPDF(pdfBuffer);
+        } else {
+          content = textContent;
+        }
+        await processExamInBatches(examId, content, userId);
+      } catch (err) {
+        console.error(`Background reprocess failed for exam ${examId}:`, err);
+        await Exam.findByIdAndUpdate(examId, {
+          processingStatus: 'failed',
+          processingError: err.message,
+        }).catch(() => {});
+      }
+    })();
+
+    const populated = await Exam.findById(examId).populate(
+      'uploadedBy',
+      'username name avatar subscribers',
+    );
+    return res.json(formatExamForClient(req, populated));
+  } catch (error) {
+    return controllerError(res, next, error, 'reprocessFailedExam');
+  }
+}
+
 // ── Delete Exam ───────────────────────────────────────────────────────────────
 
 async function deleteExamController(req, res, next) {
@@ -614,6 +725,7 @@ export {
   getQuestionsController,
   listExamsController,
   reactToExamController,
+  reprocessFailedExamController,
   submitAttemptController,
   toggleSaveExamController,
   updateExamController,

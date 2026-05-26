@@ -182,7 +182,7 @@ function SupportChatWidget() {
   return (
     <>
       <div
-        className={`support-fab-float fixed bottom-5 right-5 z-[20000] max-md:right-4 max-md:bottom-4 ${open ? 'support-fab-float--paused' : ''}`}
+        className={`support-fab-float fixed z-[20000] max-md:right-3 max-md:bottom-[max(1rem,env(safe-area-inset-bottom,0px))] bottom-5 right-5 ${open ? 'support-fab-float--paused' : ''}`}
       >
         <div
           className={`support-fab-ring ${open ? 'support-fab-ring--quiet' : ''}`}
@@ -190,7 +190,7 @@ function SupportChatWidget() {
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
-            className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/25 bg-gradient-to-br from-cyan-600 via-cyan-700 to-slate-900 text-white shadow-[0_14px_36px_rgba(8,92,116,0.45)] transition duration-300 hover:scale-105 hover:shadow-[0_18px_44px_rgba(8,92,116,0.55)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 dark:border-cyan-400/20 dark:from-cyan-500 dark:via-cyan-600 dark:to-slate-900"
+            className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-white/25 bg-gradient-to-br from-cyan-600 via-cyan-700 to-slate-900 text-white shadow-[0_14px_36px_rgba(8,92,116,0.45)] transition duration-300 hover:scale-105 hover:shadow-[0_18px_44px_rgba(8,92,116,0.55)] focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400 focus-visible:ring-offset-2 dark:border-cyan-400/20 dark:from-cyan-500 dark:via-cyan-600 dark:to-slate-900 md:h-14 md:w-14 md:rounded-2xl"
             aria-expanded={open}
             aria-label={
               open
@@ -200,14 +200,19 @@ function SupportChatWidget() {
           >
             {open ? (
               <span
-                className="text-2xl font-light leading-none text-white"
+                className="text-xl font-light leading-none text-white md:text-2xl"
                 aria-hidden
               >
                 ×
               </span>
             ) : (
               <span className="text-white">
-                <SupportBrandIcon size="lg" />
+                <span className="inline-flex md:hidden">
+                  <SupportBrandIcon size="md" />
+                </span>
+                <span className="hidden md:inline-flex">
+                  <SupportBrandIcon size="lg" />
+                </span>
               </span>
             )}
           </button>
@@ -224,12 +229,12 @@ function SupportChatWidget() {
           />
 
           <div
-            className="support-chat-panel fixed bottom-[5.25rem] right-5 z-[20000] flex w-[min(100vw-1.25rem,26rem)] max-h-[min(78vh,36rem)] flex-col overflow-hidden rounded-3xl border border-slate-200/80 bg-white/95 shadow-[0_28px_64px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-slate-600/60 dark:bg-slate-900/95 dark:shadow-[0_28px_64px_rgba(0,0,0,0.5)] sm:w-[min(100vw-2rem,24rem)]"
+            className="support-chat-panel fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom,0px))] right-3 z-[20000] flex w-[min(100vw-1.5rem,26rem)] max-h-[min(70dvh,32rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white/95 shadow-[0_28px_64px_rgba(15,23,42,0.2)] backdrop-blur-xl dark:border-slate-600/60 dark:bg-slate-900/95 dark:shadow-[0_28px_64px_rgba(0,0,0,0.5)] sm:right-4 sm:max-h-[min(78vh,36rem)] sm:w-[min(100vw-2rem,24rem)] sm:rounded-3xl md:bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] md:right-5"
             role="dialog"
             aria-modal="true"
             aria-label="USH Support assistant"
           >
-            <header className="relative shrink-0 overflow-hidden border-b border-slate-100/90 bg-gradient-to-br from-slate-50 via-white to-cyan-50/40 px-4 py-3.5 dark:border-slate-700/80 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/30">
+            <header className="relative shrink-0 overflow-hidden border-b border-slate-100/90 bg-gradient-to-br from-slate-50 via-white to-cyan-50/40 px-3 py-2.5 dark:border-slate-700/80 dark:from-slate-900 dark:via-slate-900 dark:to-cyan-950/30 sm:px-4 sm:py-3.5">
               <div
                 className="pointer-events-none absolute -right-8 -top-12 h-36 w-36 rounded-full bg-cyan-400/15 blur-2xl dark:bg-cyan-400/10"
                 aria-hidden

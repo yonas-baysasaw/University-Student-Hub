@@ -1,4 +1,5 @@
 import { Building2, UserRound } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 function AccessPanelsSection() {
   return (
@@ -80,6 +81,14 @@ function AccessPanelsSection() {
                     Coordinate schedules alongside department tools
                   </li>
                 </ul>
+                <p className="mt-5">
+                  <Link
+                    to="/admin/login"
+                    className="text-sm font-semibold text-violet-700 underline-offset-2 hover:underline dark:text-violet-300"
+                  >
+                    Administrator portal →
+                  </Link>
+                </p>
               </div>
             </div>
           </article>

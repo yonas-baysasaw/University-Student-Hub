@@ -14,6 +14,7 @@ import {
   isClassroomCreator,
 } from '../utils/classroomContentAuth.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { notifyChatMembersCalendarInvalidate } from '../utils/calendarNotify.js';
 import { getIo } from '../socket/index.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
 
@@ -542,6 +543,8 @@ export const patchChatSchedule = asyncHandler(async (req, res) => {
   }
   chat.metadata.classSchedule = { slots };
   await chat.save();
+
+  notifyChatMembersCalendarInvalidate(chat);
 
   res.json({
     message: 'Schedule updated',

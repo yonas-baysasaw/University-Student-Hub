@@ -118,3 +118,26 @@ export function resolveDepartmentForSubmit(form) {
   }
   return String(form.department || '').trim();
 }
+
+const TRACK_IDS = ['engineering', 'social', 'natural'];
+
+/**
+ * Client-side catalog check for events (matches backend validateEventCatalogMeta).
+ * @returns {string|null} Error message or null when valid.
+ */
+export function validateEventCatalogFields({ academicTrack, department }) {
+  const track = String(academicTrack || "").trim().toLowerCase();
+  if (!TRACK_IDS.includes(track)) {
+    return "Choose a field: Engineering, Social sciences, or Natural sciences.";
+  }
+
+  const dept = String(department || "").trim();
+  if (!dept || dept.length > 160) {
+    return "Pick a school, faculty, or department.";
+  }
+  if (dept === "Other") {
+    return "Specify your department when selecting Other.";
+  }
+
+  return null;
+}

@@ -1,6 +1,9 @@
 import mongoose from 'mongoose';
 import asyncHandler from '../middlewares/asyncHandler.js';
 import Book from '../models/Books.js';
+import BookChunk from '../models/BookChunk.js';
+import BookComment from '../models/BookComment.js';
+import BookReview from '../models/BookReview.js';
 import {
   browseListFilter,
   directAccessOutcome,
@@ -8,6 +11,7 @@ import {
 } from '../utils/bookAccess.js';
 import { parsePublishYear, validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { scheduleRagIndexForBook } from '../services/bookRagService.js';
 
 const ensureValidBookId = (bookId) => mongoose.Types.ObjectId.isValid(bookId);
 
@@ -168,6 +172,186 @@ export const getBookById = asyncHandler(async (req, res) => {
   });
 });
 
+export const searchBookChunks = asyncHandler(async (req, res) => {
+  const q = String(req.query.q || '').trim();
+  const limitRaw = Number.parseInt(String(req.query.limit || '10'), 10);
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(Math.max(limitRaw, 1), 50)
+    : 10;
+
+  if (!q) {
+    return res.status(400).json({
+      success: false,
+      message: 'Query parameter "q" is required',
+    });
+  }
+
+  const chunks = await BookChunk.find(
+    { $text: { $search: q } },
+    { score: { $meta: 'textScore' } },
+  )
+    .select('book chunkIndex text chapter section pageStart pageEnd createdAt updatedAt')
+    .sort({ score: { $meta: 'textScore' } })
+    .limit(limit)
+    .lean();
+
+  return res.status(200).json({
+    success: true,
+    query: q,
+    count: chunks.length,
+    limit,
+    data: chunks.map((chunk) => ({
+      id: String(chunk._id),
+      book: String(chunk.book),
+      chunkIndex: chunk.chunkIndex,
+      text: chunk.text,
+      chapter: chunk.chapter || '',
+      section: chunk.section || '',
+      pageStart: chunk.pageStart ?? null,
+      pageEnd: chunk.pageEnd ?? null,
+      score: chunk.score ?? null,
+      createdAt: chunk.createdAt,
+      updatedAt: chunk.updatedAt,
+    })),
+  });
+});
+
+export const searchBooksByChunkContent = asyncHandler(async (req, res) => {
+  const query = String(req.body?.query || req.body?.content || '').trim();
+  const limitRaw = Number.parseInt(String(req.body?.limit || '10'), 10);
+  const limit = Number.isFinite(limitRaw)
+    ? Math.min(Math.max(limitRaw, 1), 50)
+    : 10;
+
+  if (!query) {
+    return res.status(400).json({
+      success: false,
+      message: 'Request body field "query" is required',
+    });
+  }
+
+  const visibilityFilter = browseListFilter(req);
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const queryRegex = new RegExp(escaped, 'i');
+
+  const matchedBooks = await BookChunk.aggregate([
+    {
+      $match: {
+        $text: { $search: query },
+      },
+    },
+    {
+      $addFields: {
+        score: { $meta: 'textScore' },
+      },
+    },
+    {
+      $group: {
+        _id: '$book',
+        bestScore: { $max: '$score' },
+        matchedChunks: { $sum: 1 },
+      },
+    },
+    {
+      $sort: {
+        bestScore: -1,
+        matchedChunks: -1,
+      },
+    },
+    {
+      $limit: limit,
+    },
+  ]);
+
+  const titleDescriptionBooks = await Book.find({
+    ...visibilityFilter,
+    $or: [{ title: queryRegex }, { description: queryRegex }],
+  })
+    .select('_id')
+    .limit(limit * 3)
+    .lean();
+
+  const scoreById = new Map();
+  for (const m of matchedBooks) {
+    const id = String(m._id);
+    scoreById.set(id, {
+      bestScore: m.bestScore ?? null,
+      matchedChunks: m.matchedChunks ?? 0,
+      titleDescriptionMatch: false,
+      relevanceScore: (Number(m.bestScore) || 0) + Math.min(Number(m.matchedChunks) || 0, 5) * 0.15,
+    });
+  }
+
+  for (const b of titleDescriptionBooks) {
+    const id = String(b._id);
+    const existing = scoreById.get(id);
+    if (existing) {
+      existing.titleDescriptionMatch = true;
+      existing.relevanceScore += 1;
+      scoreById.set(id, existing);
+    } else {
+      scoreById.set(id, {
+        bestScore: null,
+        matchedChunks: 0,
+        titleDescriptionMatch: true,
+        relevanceScore: 1,
+      });
+    }
+  }
+
+  const rankedIds = [...scoreById.entries()]
+    .sort((a, b) => (b[1].relevanceScore || 0) - (a[1].relevanceScore || 0))
+    .slice(0, limit)
+    .map(([id]) => id);
+
+  if (rankedIds.length === 0) {
+    return res.status(200).json({
+      success: true,
+      query,
+      count: 0,
+      limit,
+      data: [],
+    });
+  }
+
+  const books = await Book.find({
+    _id: { $in: rankedIds },
+    ...visibilityFilter,
+  })
+    .populate('userId', 'username name avatar subscribers')
+    .lean();
+
+  const byId = new Map(books.map((b) => [String(b._id), b]));
+
+  const data = rankedIds
+    .map((id) => {
+      const book = byId.get(String(id));
+      if (!book) return null;
+      const stats = scoreById.get(String(id)) || {
+        bestScore: null,
+        matchedChunks: 0,
+        titleDescriptionMatch: false,
+        relevanceScore: 0,
+      };
+      return {
+        ...toBookResponse(book, req),
+        relevanceScore: stats.bestScore,
+        matchedChunks: stats.matchedChunks,
+        titleDescriptionMatch: stats.titleDescriptionMatch,
+        combinedRelevanceScore: stats.relevanceScore,
+      };
+    })
+    .filter(Boolean);
+
+  return res.status(200).json({
+    success: true,
+    query,
+    count: data.length,
+    limit,
+    data,
+  });
+});
+
 export const createBook = asyncHandler(async (req, res) => {
   assertCanWrite(req.user);
   const { title, description, bookUrl, thumbnailUrl, format, visibility } =
@@ -190,9 +374,98 @@ export const createBook = asyncHandler(async (req, res) => {
     visibility: typeof visibility === 'string' ? visibility : 'public',
   });
 
+  // Fire-and-forget indexing so uploaded PDFs become searchable automatically.
+  void scheduleRagIndexForBook(String(book._id), req.user._id, req.user);
+
   res.status(201).json({
     success: true,
     data: book,
+  });
+});
+
+export const reindexMyBooks = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const userId = req.user._id;
+
+  const books = await Book.find({ userId })
+    .select('_id ragIndexStatus title')
+    .lean();
+
+  if (books.length === 0) {
+    return res.status(200).json({
+      success: true,
+      total: 0,
+      queued: 0,
+      skipped: 0,
+      details: [],
+    });
+  }
+
+  const ids = books.map((b) => b._id);
+  const counts = await BookChunk.aggregate([
+    { $match: { book: { $in: ids } } },
+    { $group: { _id: '$book', count: { $sum: 1 } } },
+  ]);
+  const chunkCountByBookId = new Map(
+    counts.map((c) => [String(c._id), Number(c.count) || 0]),
+  );
+
+  let queued = 0;
+  let skipped = 0;
+  const details = [];
+
+  for (const book of books) {
+    const bid = String(book._id);
+    const chunkCount = chunkCountByBookId.get(bid) || 0;
+    const status = String(book.ragIndexStatus || 'idle');
+
+    if (status === 'indexing') {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: 'already_indexing',
+      });
+      continue;
+    }
+
+    if (status === 'ready' && chunkCount > 0) {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: 'already_indexed',
+      });
+      continue;
+    }
+
+    const out = await scheduleRagIndexForBook(bid, userId, req.user);
+    if (out?.started) {
+      queued += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'queued',
+      });
+    } else {
+      skipped += 1;
+      details.push({
+        bookId: bid,
+        title: book.title,
+        action: 'skipped',
+        reason: out?.error || 'could_not_queue',
+      });
+    }
+  }
+
+  return res.status(202).json({
+    success: true,
+    total: books.length,
+    queued,
+    skipped,
+    details,
   });
 });
 
@@ -330,6 +603,13 @@ export const deleteBook = asyncHandler(async (req, res) => {
     });
   }
 
+  const bid = deleted._id;
+  await Promise.all([
+    BookReview.deleteMany({ bookId: bid }),
+    BookComment.deleteMany({ bookId: bid }),
+    BookChunk.deleteMany({ book: bid }),
+  ]);
+
   res.status(200).json({
     success: true,
     message: 'Book deleted',
@@ -463,7 +743,7 @@ export const incrementBookDownload = asyncHandler(async (req, res) => {
   }
 
   const book = await Book.findOneAndUpdate({ _id: bookId }, update, {
-    new: true,
+    returnDocument: 'after',
   }).lean();
 
   res.status(200).json({

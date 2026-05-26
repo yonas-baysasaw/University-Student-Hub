@@ -1,0 +1,18 @@
+[2m2:26:46 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m2:26:46 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/profile[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+[2m2:26:53 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/auth/google[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+ectMultiple (node:net:1723:7)
+[2m2:35:48 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /api/auth/google[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1142:49)
+    at afterConnectMultiple (node:net:1723:7)
+^C

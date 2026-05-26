@@ -1,4 +1,4 @@
-const TRACKS = ['engineering', 'social', 'natural'];
+﻿const TRACKS = ['engineering', 'social', 'natural'];
 
 /**
  * Shared validation for library catalog fields (upload + PATCH metadata).
@@ -42,6 +42,28 @@ export function validateBookCatalogMeta({
 
   if (!String(courseSubject || '').trim()) {
     return 'Course or subject is required (e.g. Operating Systems, Java).';
+  }
+
+  return null;
+}
+
+/**
+ * Minimal catalog validation for events: field + department only.
+ * Event year is taken from start time; course/subject is not collected for events.
+ * @returns {string|null} Error message or null when valid.
+ */
+export function validateEventCatalogMeta({ academicTrack, department }) {
+  const track = String(academicTrack || '').trim().toLowerCase();
+  if (!TRACKS.includes(track)) {
+    return 'Choose a field: Engineering, Social sciences, or Natural sciences.';
+  }
+
+  const dept = String(department || '').trim();
+  if (!dept || dept.length > 160) {
+    return 'Pick a school, faculty, or department.';
+  }
+  if (dept === 'Other') {
+    return 'Specify your department when selecting Other.';
   }
 
   return null;

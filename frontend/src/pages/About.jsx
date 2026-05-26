@@ -26,13 +26,13 @@ const stats = [
 
 function About() {
   return (
-    <div className="page-surface px-4 pb-12 pt-8 md:px-6">
+    <div className="page-surface px-3 pb-8 pt-6 md:px-6">
       <main className="mx-auto max-w-6xl space-y-7">
-        <section className="panel-card fade-in-up rounded-3xl p-6 md:p-9">
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-700">
+        <section className="panel-card fade-in-up rounded-2xl p-4 md:rounded-3xl md:p-9">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-cyan-700 sm:text-xs">
             University Student Hub
           </p>
-          <h1 className="mt-3 font-display text-4xl text-slate-900 md:text-5xl">
+          <h1 className="mt-2 font-display text-2xl text-slate-900 sm:mt-3 sm:text-3xl md:text-5xl">
             A professional digital campus experience.
           </h1>
           <p className="mt-4 max-w-3xl text-base text-slate-600 md:text-lg">

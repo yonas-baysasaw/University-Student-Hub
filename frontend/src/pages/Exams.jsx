@@ -148,7 +148,7 @@ function Exams() {
   const [tab, setTab] = useState('vault');
 
   return (
-    <div className="liqu-ai-ambient page-surface px-4 pb-14 pt-6 md:px-6 md:pt-8">
+    <div className="liqu-ai-ambient page-surface px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
       <div className="mx-auto max-w-6xl">
         <div className="mb-4">
           <Link
@@ -169,13 +169,8 @@ function Exams() {
               Liqu AI · Exam studio
             </p>
             <h1 className="mt-2 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50 md:text-4xl">
-              Vault &amp; shared papers
+              Welcome to the exam collections
             </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-600 dark:text-slate-400">
-              Author MCQs only you see in your vault, then publish snapshots to
-              the community bank when you&apos;re ready. Import PDFs for fast AI
-              extraction—all in one cohesive workspace.
-            </p>
           </div>
         </header>
 
@@ -308,8 +303,9 @@ function VaultWorkspace({ onOpenImport }) {
     fetchVault();
   }, [fetchVault]);
 
-  const fetchMyPapers = useCallback(async () => {
-    setMyPapersLoading(true);
+  const fetchMyPapers = useCallback(async (opts = {}) => {
+    const silent = opts.silent === true;
+    if (!silent) setMyPapersLoading(true);
     try {
       const params = new URLSearchParams({
         page: String(myPapersPage),
@@ -329,10 +325,12 @@ function VaultWorkspace({ onOpenImport }) {
       setMyPapersTotal(Number(data.total) || 0);
     } catch (e) {
       toast.error(e.message);
-      setMyPapers([]);
-      setMyPapersTotal(0);
+      if (!silent) {
+        setMyPapers([]);
+        setMyPapersTotal(0);
+      }
     } finally {
-      setMyPapersLoading(false);
+      if (!silent) setMyPapersLoading(false);
     }
   }, [myPapersPage, papersVisibility, papersSearch]);
 
@@ -347,7 +345,9 @@ function VaultWorkspace({ onOpenImport }) {
         e.processingStatus === 'pending',
     );
     if (busy) {
-      papersPollRef.current = setInterval(fetchMyPapers, 4000);
+      papersPollRef.current = setInterval(() => {
+        fetchMyPapers({ silent: true });
+      }, 4000);
     } else {
       clearInterval(papersPollRef.current);
     }
@@ -594,11 +594,6 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
                 Your papers
               </h2>
             </div>
-            <p className="mt-2 max-w-2xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-              Imported PDFs and snapshots you curated — same shelf as drafts, with
-              a visibility lens so you see private imports, bank-ready papers, or
-              everything together.
-            </p>
           </div>
           <PapersVisibilityControl
             value={papersVisibility}
@@ -630,9 +625,6 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
               Import PDF
             </button>
           ) : null}
-          <span className="hidden whitespace-nowrap text-xs text-slate-500 dark:text-slate-400 sm:inline">
-            {myPapersTotal} · your uploads in this lens
-          </span>
         </div>
 
         {myPapersLoading ? (
@@ -1404,7 +1396,6 @@ function BankTab() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [visibilityFilter, setVisibilityFilter] = useState('all');
   const pollRef = useRef(null);
 
   const fetchExams = useCallback(async () => {
@@ -1415,9 +1406,6 @@ function BankTab() {
       });
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
-      if (visibilityFilter !== 'all') {
-        params.set('visibility', visibilityFilter);
-      }
 
       const res = await fetch(`/api/exams?${params}`, {
         credentials: 'include',
@@ -1430,7 +1418,7 @@ function BankTab() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, statusFilter, visibilityFilter]);
+  }, [page, search, statusFilter]);
 
   useEffect(() => {
     setLoading(true);
@@ -1452,29 +1440,6 @@ function BankTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="min-w-[200px] flex-1">
-          <span className="mb-1.5 block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            Who can browse
-          </span>
-          <PapersVisibilityControl
-            value={visibilityFilter}
-            onChange={(id) => {
-              setVisibilityFilter(id);
-              setPage(1);
-            }}
-          />
-        </div>
-        <span className="hidden text-[11px] leading-snug text-slate-400 dark:text-slate-500 md:block md:max-w-xs">
-          <strong className="text-slate-600 dark:text-slate-300">Public</strong>{' '}
-          is the whole bank.&nbsp;
-          <strong className="text-slate-600 dark:text-slate-300">
-            Private
-          </strong>{' '}
-          is only drafts you uploaded.
-        </span>
-      </div>
-
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="text"
@@ -1524,11 +1489,7 @@ function BankTab() {
             No papers yet.
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            {visibilityFilter === 'private'
-              ? 'Nothing private-import in this list — widen to All or add a PDF from your vault tab.'
-              : visibilityFilter === 'public'
-                ? 'No community papers match — invite classmates to publish or widen your lens.'
-                : 'Import a PDF or publish from your vault.'}
+            Import a PDF or publish from your vault.
           </p>
         </div>
       )}
@@ -1777,10 +1738,6 @@ function ExamPaperEngagement({ exam, currentUserId, onUpdate }) {
           </button>
         ) : null}
       </div>
-      <p className="mt-2 text-[10px] text-slate-400 dark:text-slate-500">
-        Reactions steer discovery; saves keep papers one tap away in your profile
-        rhythm.
-      </p>
     </div>
   );
 }
@@ -1814,8 +1771,32 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
   const [editSaving, setEditSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reprocessing, setReprocessing] = useState(false);
 
   const examKind = exam.examKind ?? 'pdf';
+  const canRetryExtraction =
+    exam.processingStatus === 'failed' &&
+    examKind !== 'vault_compiled' &&
+    !exam.isDuplicate;
+
+  async function retryExtraction() {
+    setReprocessing(true);
+    try {
+      const res = await fetch(`/api/exams/${exam.id}/reprocess`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: '{}',
+      });
+      const data = await readJsonOrThrow(res, 'Retry failed');
+      onUpdate?.(data);
+      toast.success('Extraction started again');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setReprocessing(false);
+    }
+  }
 
   async function saveEdit() {
     setEditSaving(true);
@@ -1917,7 +1898,7 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                 >
                   ⋯
                 </button>
-                <ul className="menu dropdown-content menu-sm z-[999] mt-1 w-40 rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
+                <ul className="menu dropdown-content menu-sm z-[999] mt-1 min-w-[11rem] rounded-2xl border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-700 dark:bg-slate-900">
                   <li>
                     <button
                       type="button"
@@ -1937,6 +1918,20 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                       Edit / visibility…
                     </button>
                   </li>
+                  {canRetryExtraction ? (
+                    <li>
+                      <button
+                        type="button"
+                        disabled={reprocessing}
+                        onClick={() => {
+                          void retryExtraction();
+                        }}
+                        className="rounded-xl px-3 py-2 text-sm text-cyan-700 disabled:opacity-50 dark:text-cyan-300"
+                      >
+                        {reprocessing ? 'Starting…' : 'Retry extraction'}
+                      </button>
+                    </li>
+                  ) : null}
                   <li>
                     <button
                       type="button"

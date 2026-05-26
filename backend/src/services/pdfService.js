@@ -105,24 +105,36 @@ async function analyzePDF(buffer) {
  * Ported from did-exit/js/pdf-processor.js extractTextFromPDF.
  */
 async function extractTextFromPDF(buffer) {
+  const pages = await extractTextPagesFromPDF(buffer);
+  const joined = pages.map((p) => p.text).join('\n\n');
+  return cleanExtractedText(joined);
+}
+
+/**
+ * Extract per-page text from a PDF buffer.
+ * Returns [{ pageNumber, text }].
+ */
+async function extractTextPagesFromPDF(buffer) {
   const pdfjs = await getPdfjs();
   const data = new Uint8Array(buffer);
   const pdf = await pdfjs.getDocument(getPdfjsOptions({ data })).promise;
 
-  let fullText = '';
+  const pages = [];
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     try {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
       const pageText = processPageText(textContent);
-      fullText += `${pageText}\n\n`;
+      pages.push({
+        pageNumber: pageNum,
+        text: cleanExtractedText(pageText),
+      });
       console.log(`Page ${pageNum} processed: ${pageText.trim().length} chars`);
     } catch (err) {
       console.warn(`Error processing page ${pageNum}:`, err);
     }
   }
-
-  return cleanExtractedText(fullText);
+  return pages;
 }
 
 /**
@@ -188,11 +200,12 @@ function processPageText(textContent) {
 
 function cleanExtractedText(text) {
   return text
-    .replace(/\s+/g, ' ')
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+/g, ' ')
     .replace(/^\s*\d+\s*$/gm, '')
-    .replace(/\n\s*\n\s*\n+/g, '\n\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
-    .replace(/(.{100,}?)(\s)/g, '$1\n');
+    .replace(/[ \t]+\n/g, '\n');
 }
 
 function createCanvasFactory(canvasCreate) {
@@ -212,4 +225,10 @@ function createCanvasFactory(canvasCreate) {
   };
 }
 
-export { analyzePDF, extractImagesFromPDF, extractTextFromPDF, hashContent };
+export {
+  analyzePDF,
+  extractImagesFromPDF,
+  extractTextFromPDF,
+  extractTextPagesFromPDF,
+  hashContent,
+};

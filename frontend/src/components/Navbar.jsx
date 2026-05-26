@@ -1,4 +1,12 @@
-import { ChevronDown, LogOut, Settings, Shield, User } from 'lucide-react';
+import {
+  Bell,
+  ChevronDown,
+  ExternalLink,
+  LogOut,
+  Settings,
+  Shield,
+  User,
+} from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, NavLink } from 'react-router-dom';
@@ -9,11 +17,11 @@ const menuWidth = 272;
 
 const baseNavLinks = [
   { to: '/', label: 'Dashboard', end: true },
+  { to: '/calendar', label: 'Calendar', end: false },
   { to: '/classroom', label: 'Classroom', end: false },
-  { to: '/notifications', label: 'Notifications', end: false },
+  { to: '/events', label: 'Events', end: false },
   { to: '/library', label: 'Library', end: false },
   { to: '/liqu-ai', label: 'Liqu AI', end: false },
-  { to: '/profile', label: 'Profile', end: false },
 ];
 
 function Navbar({ children }) {
@@ -30,7 +38,7 @@ function Navbar({ children }) {
 
   const byokActive = !!user?.geminiConfigured;
 
-  const navLinks = user?.isStaff
+  const navLinks = user?.isAdmin
     ? [
         ...baseNavLinks,
         { to: '/admin', label: 'Admin', end: false, icon: Shield },
@@ -79,9 +87,9 @@ function Navbar({ children }) {
   }, [menuOpen]);
 
   return (
-    <div className="pb-8">
+    <div className="pb-4 md:pb-8">
       <header className="nav-shell sticky top-0 z-50">
-        <div className="mx-auto flex min-h-[3.75rem] max-w-6xl items-center gap-3 px-4 py-2.5 sm:gap-4 sm:px-6">
+        <div className="mx-auto flex min-h-[3.35rem] max-w-6xl items-center gap-2 px-3 py-2 sm:min-h-[3.75rem] sm:gap-3 sm:px-4 sm:py-2.5 md:gap-4 md:px-6">
           <Link
             to="/"
             className="group flex shrink-0 items-center gap-3 rounded-xl outline-none ring-cyan-500/0 transition hover:ring-cyan-500/25 focus-visible:ring-2 focus-visible:ring-cyan-500"
@@ -115,7 +123,7 @@ function Navbar({ children }) {
                   to={to}
                   end={end}
                   className={({ isActive }) =>
-                    `relative shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition-colors duration-150 sm:px-3.5 sm:text-[13px] ${
+                    `relative shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors duration-150 sm:px-3 sm:py-2 sm:text-[13px] ${
                       isActive
                         ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:bg-slate-700 dark:text-white dark:ring-slate-600/90'
                         : 'text-slate-600 hover:bg-white/70 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-100'
@@ -133,7 +141,21 @@ function Navbar({ children }) {
             </div>
           </nav>
 
-          <div className="flex shrink-0 items-center">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            <NavLink
+              to="/notifications"
+              title="Notifications"
+              aria-label="Notifications"
+              className={({ isActive }) =>
+                `flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-slate-600 transition-colors duration-150 dark:text-slate-400 ${
+                  isActive
+                    ? 'border-slate-200/90 bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:ring-slate-600/90'
+                    : 'border-slate-200/70 bg-white/90 hover:border-cyan-300/80 hover:text-slate-900 hover:shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:hover:border-cyan-600/50 dark:hover:text-slate-100'
+                }`
+              }
+            >
+              <Bell className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+            </NavLink>
             <div className="relative">
               <button
                 ref={buttonRef}
@@ -229,6 +251,22 @@ function Navbar({ children }) {
                 />
                 My profile
               </Link>
+            </li>
+            <li>
+              <a
+                href="https://portal.aau.edu.et/login"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/80"
+                onClick={() => setMenuOpen(false)}
+              >
+                <ExternalLink
+                  className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
+                  strokeWidth={2}
+                  aria-hidden
+                />
+                Portal
+              </a>
             </li>
 
             <li className="my-1.5 h-px bg-slate-200/90 dark:bg-slate-600/80" />

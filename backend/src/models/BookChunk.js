@@ -16,18 +16,33 @@ const bookChunkSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    chapter: {
+      type: String,
+      default: '',
+      index: true,
+    },
+    section: {
+      type: String,
+      default: '',
+    },
+    pageStart: {
+      type: Number,
+      default: null,
+    },
+    pageEnd: {
+      type: Number,
+      default: null,
+    },
     embedding: {
       type: [Number],
-      required: true,
-    },
-    embeddingModel: {
-      type: String,
-      default: 'gemini-embedding-001',
+      default: [],
+      select: false,
     },
   },
   { timestamps: true },
 );
 
 bookChunkSchema.index({ book: 1, chunkIndex: 1 }, { unique: true });
+bookChunkSchema.index({ text: 'text' });
 
 export default mongoose.model('BookChunk', bookChunkSchema);
