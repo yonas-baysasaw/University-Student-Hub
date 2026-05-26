@@ -11,6 +11,7 @@ import Navbar from './components/Navbar';
 import AdminRoute from './components/AdminRoute';
 import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
 import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
@@ -83,7 +84,8 @@ function AppRoutes() {
 
   if (user) {
     return (
-      <Navbar>
+      <NotificationsProvider>
+        <Navbar>
         <SupportChatWidget />
         <div key={location.pathname} className="route-fade">
           <Routes>
@@ -168,6 +170,7 @@ function AppRoutes() {
           </Routes>
         </div>
       </Navbar>
+      </NotificationsProvider>
     );
   }
 

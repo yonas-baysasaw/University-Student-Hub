@@ -71,6 +71,9 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    notificationsLastSeenAt: {
+      type: Date,
+    },
     subscriptions: [
       {
         type: mongoose.Schema.Types.ObjectId,

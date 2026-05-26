@@ -98,93 +98,121 @@ export default function ClassroomCardMenu({
           className="absolute right-0 top-[calc(100%+6px)] z-[60] min-w-[15.5rem] overflow-hidden rounded-2xl border border-slate-200/95 bg-white py-1.5 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.28)] ring-1 ring-slate-900/5 dark:border-slate-600 dark:bg-slate-900 dark:ring-black/40"
           role="menu"
         >
-          <Link
-            to={`/classroom/${classroomId}`}
-            role="menuitem"
-            className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
-            onClick={() => setOpen(false)}
-          >
-            <GraduationCap className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
-            Open classroom
-            <ArrowRight className="ml-auto h-3.5 w-3.5 opacity-60" aria-hidden />
-          </Link>
-
-          <button
-            type="button"
-            role="menuitem"
-            disabled={!classroomId}
-            className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-800"
-            onClick={() => void handleShareClass()}
-          >
-            <Share2 className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400" aria-hidden />
-            Share class
-          </button>
-
-          {canSchedule ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
-              onClick={() => {
-                setOpen(false);
-                onSchedule?.();
-              }}
-            >
-              <CalendarClock className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
-              Weekly schedule
-            </button>
-          ) : null}
-
-          {!manageDisabled ? (
+          {archived ? (
+            !manageDisabled ? (
+              <>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    setOpen(false);
+                    onArchiveToggle?.();
+                  }}
+                >
+                  <RotateCcw className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
+                  Restore from archive
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-rose-700 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                  onClick={() => {
+                    setOpen(false);
+                    onDelete?.();
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                  Delete classroom
+                </button>
+              </>
+            ) : (
+              <p className="px-4 py-3 text-sm font-medium text-slate-500 dark:text-slate-400">
+                Only classroom admins can restore or delete this class.
+              </p>
+            )
+          ) : (
             <>
-              <div className="my-1 border-t border-slate-100 dark:border-slate-700/90" />
+              <Link
+                to={`/classroom/${classroomId}`}
+                role="menuitem"
+                className="flex items-center gap-3 px-4 py-2.5 text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                onClick={() => setOpen(false)}
+              >
+                <GraduationCap className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                Open classroom
+                <ArrowRight className="ml-auto h-3.5 w-3.5 opacity-60" aria-hidden />
+              </Link>
+
               <button
                 type="button"
                 role="menuitem"
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
-                onClick={() => {
-                  setOpen(false);
-                  onEdit?.();
-                }}
+                disabled={!classroomId}
+                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                onClick={() => void handleShareClass()}
               >
-                <Pencil className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
-                Edit name
+                <Share2 className="h-4 w-4 shrink-0 text-teal-600 dark:text-teal-400" aria-hidden />
+                Share class
               </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
-                onClick={() => {
-                  setOpen(false);
-                  onArchiveToggle?.();
-                }}
-              >
-                {archived ? (
-                  <>
-                    <RotateCcw className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden />
-                    Restore from archive
-                  </>
-                ) : (
-                  <>
+
+              {canSchedule ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    setOpen(false);
+                    onSchedule?.();
+                  }}
+                >
+                  <CalendarClock className="h-4 w-4 shrink-0 text-indigo-600 dark:text-indigo-400" aria-hidden />
+                  Weekly schedule
+                </button>
+              ) : null}
+
+              {!manageDisabled ? (
+                <>
+                  <div className="my-1 border-t border-slate-100 dark:border-slate-700/90" />
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setOpen(false);
+                      onEdit?.();
+                    }}
+                  >
+                    <Pencil className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden />
+                    Edit name
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-slate-800 transition hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800"
+                    onClick={() => {
+                      setOpen(false);
+                      onArchiveToggle?.();
+                    }}
+                  >
                     <Archive className="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400" aria-hidden />
                     Archive
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-rose-700 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
-                onClick={() => {
-                  setOpen(false);
-                  onDelete?.();
-                }}
-              >
-                <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
-                Delete classroom
-              </button>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-semibold text-rose-700 transition hover:bg-rose-50 dark:text-rose-300 dark:hover:bg-rose-950/40"
+                    onClick={() => {
+                      setOpen(false);
+                      onDelete?.();
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 shrink-0" aria-hidden />
+                    Delete classroom
+                  </button>
+                </>
+              ) : null}
             </>
-          ) : null}
+          )}
         </div>
       ) : null}
     </div>
