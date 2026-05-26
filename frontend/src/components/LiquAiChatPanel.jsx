@@ -1,13 +1,11 @@
 import {
   ArrowDown,
   BookOpen,
-  ChevronDown,
   Cloud,
   Copy,
   Image,
   Menu,
   MessageSquare,
-  Mic,
   MoreVertical,
   Paperclip,
   Plus,
@@ -29,26 +27,19 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { readJsonOrThrow } from '../utils/http';
+import BookPrepProgressCard from './BookPrepProgressCard.jsx';
+import StudyBuddyToolbar from './StudyBuddyToolbar.jsx';
 import {
   formatSourceLabel,
   groundingChip,
+  prepReadyToast,
   ragBannerMessage,
-  ragPhaseLabel,
   ragStatusSubtitle,
-  STUDY_MODES,
 } from '../constants/studyBuddyCopy.js';
 
 const GEMINI_TXT_ATTACH_MAX = 12000;
 /** Distance from scroll bottom below which we keep "follow stream" on for Gemini. */
 const GEMINI_SCROLL_STICK_THRESHOLD_PX = 96;
-
-/** Accent rings for Study Buddy quick-start tiles (cycles by index). */
-const STUDY_QUICK_PILL_ACCENTS = [
-  'border-amber-400/55 bg-amber-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(245,158,11,0.4)] hover:bg-amber-500/[0.14] dark:border-amber-400/45 dark:bg-amber-950/45 dark:text-amber-50 dark:shadow-[0_0_28px_-12px_rgba(251,191,36,0.22)] dark:hover:bg-amber-900/40',
-  'border-cyan-400/50 bg-cyan-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(34,211,238,0.35)] hover:bg-cyan-500/[0.14] dark:border-cyan-400/40 dark:bg-cyan-950/45 dark:text-cyan-50 dark:shadow-[0_0_28px_-12px_rgba(34,211,238,0.2)] dark:hover:bg-cyan-900/35',
-  'border-violet-400/50 bg-violet-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(167,139,250,0.35)] hover:bg-violet-500/[0.14] dark:border-violet-400/40 dark:bg-violet-950/45 dark:text-violet-50 dark:shadow-[0_0_28px_-12px_rgba(167,139,250,0.2)] dark:hover:bg-violet-900/35',
-  'border-emerald-400/50 bg-emerald-500/[0.07] text-slate-800 shadow-[0_0_20px_-10px_rgba(52,211,153,0.35)] hover:bg-emerald-500/[0.14] dark:border-emerald-400/45 dark:bg-emerald-950/45 dark:text-emerald-50 dark:shadow-[0_0_28px_-12px_rgba(52,211,153,0.2)] dark:hover:bg-emerald-900/35',
-];
 
 function useIsMinWidth(px) {
   const [matches, setMatches] = useState(() =>
@@ -472,7 +463,7 @@ function LiquAiChatPanel({
             setRagPoll(false);
             if (data.ragIndexStatus === 'ready') {
               toast.success(
-                `Book ready — ${data.chunkCount} passages for AI context`,
+                prepReadyToast(data.title || bookTitle || 'your book'),
               );
             }
             if (data.ragIndexStatus === 'failed' && data.ragIndexError) {
@@ -534,9 +525,7 @@ function LiquAiChatPanel({
   }
 
   const ragIsIndexing = ragStatus?.ragIndexStatus === 'indexing';
-  const phaseLabel = ragIsIndexing
-    ? ragPhaseLabel(ragStatus?.ragIndexPhase)
-    : '';
+  const ragIsFailed = ragStatus?.ragIndexStatus === 'failed';
   const embTotal = Number(ragStatus?.ragIndexTotalChunks) || 0;
   const embDone = Number(ragStatus?.ragIndexDoneChunks) || 0;
   const serverPct = Number(ragStatus?.ragIndexProgressPercent);
@@ -545,14 +534,6 @@ function LiquAiChatPanel({
     : embTotal > 0
       ? Math.min(100, Math.round((embDone / embTotal) * 100))
       : 0;
-  const indexStepLabel = (() => {
-    const p = ragStatus?.ragIndexPhase || '';
-    if (p === 'downloading') return 'Step 1/4';
-    if (p === 'extracting') return 'Step 2/4';
-    if (p === 'chunking') return 'Step 3/4';
-    if (p === 'embedding' || p === 'writing') return 'Step 4/4';
-    return '';
-  })();
 
   useEffect(() => {
     const prefill = location.state?.prefill;
@@ -583,9 +564,30 @@ function LiquAiChatPanel({
 
   useEffect(() => {
     if (!isGemini || !followStream) return;
+    const onLanding =
+      !loading && messages.length === 1 && messages[0]?.id === 'welcome';
+    if (onLanding) return;
     const id = window.requestAnimationFrame(() => scrollGeminiMessagesToBottom());
     return () => window.cancelAnimationFrame(id);
-  }, [messages, streamingContent, isGemini, followStream, scrollGeminiMessagesToBottom]);
+  }, [
+    messages,
+    streamingContent,
+    isGemini,
+    followStream,
+    loading,
+    scrollGeminiMessagesToBottom,
+  ]);
+
+  useEffect(() => {
+    if (!isGemini) return;
+    const onLanding =
+      !loading && messages.length === 1 && messages[0]?.id === 'welcome';
+    if (!onLanding) return;
+    const id = window.requestAnimationFrame(() => {
+      if (messagesScrollRef.current) messagesScrollRef.current.scrollTop = 0;
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [isGemini, loading, messages]);
 
   function startNewChat() {
     const next = new URLSearchParams(searchParams);
@@ -601,8 +603,10 @@ function LiquAiChatPanel({
     setSidebarOpen(false);
     setAttachmentChipNames([]);
     setAttachMenuOpen(false);
-    if (isGemini) setFollowStream(true);
-    setTimeout(() => inputRef.current?.focus(), 50);
+    if (isGemini) setFollowStream(false);
+    window.requestAnimationFrame(() => {
+      if (messagesScrollRef.current) messagesScrollRef.current.scrollTop = 0;
+    });
   }
 
   async function deleteSession(sessionId) {
@@ -622,6 +626,7 @@ function LiquAiChatPanel({
         );
         setActiveSessionId(null);
         setMessages([makeWelcome(bookTitle, contextBlurb, contextScope)]);
+        if (isGemini) setFollowStream(false);
       }
     } catch (_) {
       toast.error('Failed to delete session');
@@ -802,12 +807,38 @@ function LiquAiChatPanel({
   const isStarterState =
     !loading && messages.length === 1 && messages[0]?.id === 'welcome';
 
+  const studyFirstName = String(name).trim().split(/\s+/)[0] || '';
+
+  const showPrepHero =
+    isStudyWorkspace && bookId && (ragIsIndexing || ragIsFailed);
+
+  const hideRagBannerForPrepHero =
+    isStudyWorkspace && isStarterState && showPrepHero;
+
   const studyRagSubtitle = bookId
     ? ragStatusSubtitle(ragStatus, ragStatus?.chunkCount)
     : '';
 
   const showJumpToBottomFab =
     isGemini && loading && Boolean(streamingContent) && !followStream;
+
+  const showInlineRagAction =
+    isStudyWorkspace && bookId && !hideRagBannerForPrepHero;
+
+  const inlineRagActionLabel = ragIsFailed
+    ? 'Try again'
+    : ragIsIndexing
+      ? 'Reading…'
+      : (ragStatus?.chunkCount ?? 0) > 0
+        ? 'Read again'
+        : 'Get book ready';
+
+  const inlineRagActionTitle =
+    ragError ||
+    (ragIsFailed && ragStatus?.ragIndexError) ||
+    (ragIsIndexing
+      ? `Getting ${(bookTitle || ragStatus?.title || 'your book').trim()} ready…`
+      : ragBannerMessage(ragStatus, ragStatus?.chunkCount));
 
   return (
     <div
@@ -945,7 +976,7 @@ function LiquAiChatPanel({
               : 'flex min-h-[20rem] w-full min-w-0 flex-1 flex-col p-3 md:p-4'
           }
         >
-          {useRailSidebar ? (
+          {useRailSidebar && !isStudyWorkspace ? (
             <>
               <button
                 type="button"
@@ -1013,126 +1044,137 @@ function LiquAiChatPanel({
               ) : null}
             </>
           ) : null}
-          {isGemini && isStudyWorkspace && !isLgUp && !useRailSidebar ? (
-            <div className="mb-1.5 flex items-center justify-between gap-2 px-1 py-0.5">
+          {useRailSidebar && isStudyWorkspace && sidebarOpen ? (
+            <>
               <button
                 type="button"
-                onClick={() => setSidebarOpen(true)}
-                className="rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-                aria-label="Chat history"
+                className="absolute inset-0 z-[110] cursor-default bg-slate-950/[0.08] backdrop-blur-[2px] dark:bg-black/15"
+                aria-label="Close chat history"
+                onClick={() => setSidebarOpen(false)}
+              />
+              <aside
+                id="liqu-ai-rail-slide"
+                aria-labelledby="liqu-ai-rail-trigger"
+                className="absolute left-0 top-0 z-[111] flex h-full w-[min(19rem,calc(100%-2.5rem))] max-w-[21rem] flex-col overflow-hidden border-r border-white/12 bg-slate-950/25 shadow-[16px_0_60px_-12px_rgba(0,0,0,0.35)] backdrop-blur-3xl dark:border-white/10 dark:bg-slate-950/35 dark:shadow-black/50"
               >
-                <Menu className="h-[1.15rem] w-[1.15rem]" strokeWidth={2} />
-              </button>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-500">
-                Liqu AI
-              </span>
-              <button
-                type="button"
-                onClick={startNewChat}
-                className="inline-flex shrink-0 items-center gap-1 rounded-xl px-2 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
-                aria-label="New chat"
-              >
-                <SquarePen className="h-3.5 w-3.5" strokeWidth={2} />
-              </button>
-            </div>
-          ) : null}
-          {!(isGemini && useRailSidebar) &&
-          !(isGemini && isStudyWorkspace && !isLgUp) ? (
-            <div
-              className={
-                isGemini
-                  ? `flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
-                      studyDense ? 'mb-1 py-1' : 'mb-2 py-1.5'
-                    }`
-                  : 'mb-3 flex items-center justify-between gap-2 rounded-2xl border border-slate-200/70 bg-slate-100/55 px-2 py-1.5 dark:border-slate-600/80 dark:bg-slate-800/60'
-              }
-            >
-              <div className="flex min-w-0 items-center gap-1.5">
-                {!useInlineSidebar && !useRailSidebar ? (
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(true)}
-                    className={
-                      isGemini
-                        ? 'rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
-                        : 'rounded-xl border border-transparent p-2 text-slate-600 transition hover:border-slate-200/80 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700/80'
-                    }
-                    aria-label="Chat history"
-                  >
-                    <Menu className="h-4 w-4" strokeWidth={2} />
-                  </button>
-                ) : null}
-                <p
-                  className={
-                    isGemini
-                      ? 'truncate text-xs font-medium text-slate-600 dark:text-slate-400'
-                      : 'truncate text-xs font-medium text-slate-600 dark:text-slate-300'
-                  }
-                >
-                  Liqu AI · {name}
-                </p>
-              </div>
-              {!useRailSidebar ? (
-                <button
-                  type="button"
-                  onClick={startNewChat}
-                  className={
-                    isGemini
-                      ? 'inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
-                      : 'inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white dark:text-slate-200 dark:hover:bg-slate-700/90'
-                  }
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                  New chat
-                </button>
-              ) : null}
-            </div>
+                <div className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+                  <div className="shrink-0 border-b border-white/10 px-3 pb-2 pt-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="font-display text-[15px] font-semibold tracking-tight text-slate-50">
+                          Conversations
+                        </h3>
+                        <p className="mt-0.5 text-[11px] text-slate-400">
+                          {sessions.length}{' '}
+                          {sessions.length === 1 ? 'chat' : 'chats'} saved
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSidebarOpen(false)}
+                        className="rounded-full p-2 text-slate-400 transition hover:bg-white/10 hover:text-slate-100"
+                        aria-label="Close"
+                      >
+                        <X className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    </div>
+                  </div>
+                  <SessionSidebar
+                    sessions={sessions}
+                    activeSessionId={activeSessionId}
+                    onNew={() => {
+                      startNewChat();
+                      setSidebarOpen(false);
+                    }}
+                    onLoad={loadSession}
+                    onDelete={deleteSession}
+                    variant={variant}
+                    layout="railOverlay"
+                  />
+                </div>
+              </aside>
+            </>
           ) : null}
           {isStudyWorkspace ? (
-            <div
-              className={`flex flex-wrap items-center gap-2 ${
-                studyDense ? 'mb-1' : 'mb-2'
-              }`}
-            >
-              <label htmlFor="study-mode-select" className="sr-only">
-                Study mode
-              </label>
-              <select
-                id="study-mode-select"
-                value={studyMode}
-                onChange={(e) => onStudyModeChange?.(e.target.value)}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-              >
-                {STUDY_MODES.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              {Array.isArray(ragStatus?.ragChapterMap) &&
-              ragStatus.ragChapterMap.length > 0 ? (
-                <>
-                  <label htmlFor="chapter-filter" className="sr-only">
-                    Limit to chapter
-                  </label>
-                  <select
-                    id="chapter-filter"
-                    value={chapterFilter}
-                    onChange={(e) => onChapterFilterChange?.(e.target.value)}
-                    className="min-w-0 max-w-[12rem] truncate rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                  >
-                    <option value="">Whole book</option>
-                    {ragStatus.ragChapterMap.map((ch) => (
-                      <option key={ch.title} value={ch.title}>
-                        {ch.title}
-                      </option>
-                    ))}
-                  </select>
-                </>
+            <StudyBuddyToolbar
+              historyButtonId="liqu-ai-rail-trigger"
+              onOpenHistory={() => {
+                if (useRailSidebar) toggleRailSidebar();
+                else setSidebarOpen(true);
+              }}
+              studyMode={studyMode}
+              onStudyModeChange={onStudyModeChange}
+              chapterFilter={chapterFilter}
+              onChapterFilterChange={onChapterFilterChange}
+              ragChapterMap={ragStatus?.ragChapterMap}
+              onNewChat={startNewChat}
+              dense={studyDense}
+              historyLabel={
+                sidebarOpen && useRailSidebar
+                  ? 'Close chat history'
+                  : 'Open chat history'
+              }
+              ragActionLabel={showInlineRagAction ? inlineRagActionLabel : undefined}
+              onRagAction={showInlineRagAction ? indexBookForRag : undefined}
+              ragActionDisabled={showInlineRagAction && ragIsIndexing}
+              ragActionTitle={showInlineRagAction ? inlineRagActionTitle : undefined}
+            />
+          ) : (
+            <>
+              {!(isGemini && useRailSidebar) ? (
+                <div
+                  className={
+                    isGemini
+                      ? `flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-2 shadow-sm dark:border-slate-700 dark:bg-slate-900 ${
+                          studyDense ? 'mb-1 py-1' : 'mb-2 py-1.5'
+                        }`
+                      : 'mb-3 flex items-center justify-between gap-2 rounded-2xl border border-slate-200/70 bg-slate-100/55 px-2 py-1.5 dark:border-slate-600/80 dark:bg-slate-800/60'
+                  }
+                >
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {!useInlineSidebar && !useRailSidebar ? (
+                      <button
+                        type="button"
+                        onClick={() => setSidebarOpen(true)}
+                        className={
+                          isGemini
+                            ? 'rounded-xl p-2 text-slate-600 transition hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                            : 'rounded-xl border border-transparent p-2 text-slate-600 transition hover:border-slate-200/80 hover:bg-white dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700/80'
+                        }
+                        aria-label="Chat history"
+                      >
+                        <Menu className="h-4 w-4" strokeWidth={2} />
+                      </button>
+                    ) : null}
+                    <p
+                      className={
+                        isGemini
+                          ? 'truncate text-xs font-medium text-slate-600 dark:text-slate-400'
+                          : 'truncate text-xs font-medium text-slate-600 dark:text-slate-300'
+                      }
+                    >
+                      Liqu AI · {name}
+                    </p>
+                  </div>
+                  {!useRailSidebar ? (
+                    <button
+                      type="button"
+                      onClick={startNewChat}
+                      className={
+                        isGemini
+                          ? 'inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-800 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800'
+                          : 'inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-white dark:text-slate-200 dark:hover:bg-slate-700/90'
+                      }
+                    >
+                      <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      New chat
+                    </button>
+                  ) : null}
+                </div>
               ) : null}
-            </div>
-          ) : null}
-          {bookId ? (
+            </>
+          )}
+          {bookId && !hideRagBannerForPrepHero && !isStudyWorkspace ? (
             <div
               className={
                 isGemini
@@ -1144,76 +1186,27 @@ function LiquAiChatPanel({
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  {ragBannerMessage(ragStatus, ragStatus?.chunkCount)}
+                  {ragIsIndexing && isStudyWorkspace
+                    ? `Getting ${(bookTitle || ragStatus?.title || 'your book').trim()} ready…`
+                    : ragBannerMessage(ragStatus, ragStatus?.chunkCount)}
                 </span>
-                <button
-                  type="button"
-                  onClick={indexBookForRag}
-                  disabled={ragIsIndexing}
-                  className={
-                    isGemini
-                      ? 'shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700'
-                      : 'shrink-0 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-800 shadow-sm transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200 dark:hover:bg-cyan-900/50'
-                  }
-                >
-                  {ragIsIndexing
-                    ? 'Reading…'
-                    : (ragStatus?.chunkCount ?? 0) > 0
+                {!ragIsIndexing ? (
+                  <button
+                    type="button"
+                    onClick={indexBookForRag}
+                    className={
+                      isGemini
+                        ? 'shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 font-semibold text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700'
+                        : 'shrink-0 rounded-lg border border-cyan-200 bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-800 shadow-sm transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-cyan-800 dark:bg-cyan-950/50 dark:text-cyan-200 dark:hover:bg-cyan-900/50'
+                    }
+                  >
+                    {(ragStatus?.chunkCount ?? 0) > 0
                       ? 'Read again'
                       : 'Get book ready'}
-                </button>
+                  </button>
+                ) : null}
               </div>
-              {ragIsIndexing && phaseLabel ? (
-                <div className="space-y-1">
-                  <div
-                    className={
-                      isGemini
-                        ? 'flex flex-wrap items-center justify-between gap-2 text-[0.7rem] text-slate-600 dark:text-slate-300'
-                        : 'flex flex-wrap items-center justify-between gap-2 text-[0.7rem] text-cyan-900 dark:text-cyan-200'
-                    }
-                  >
-                    <p className="min-w-0 flex-1">{phaseLabel}</p>
-                    {indexStepLabel ? (
-                      <span
-                        className={
-                          isGemini
-                            ? 'shrink-0 text-slate-500'
-                            : 'shrink-0 text-slate-500'
-                        }
-                      >
-                        {indexStepLabel} · {ragIndexOverallPct}%
-                      </span>
-                    ) : (
-                      <span className="shrink-0 text-slate-500">
-                        {ragIndexOverallPct}%
-                      </span>
-                    )}
-                  </div>
-                  <div
-                    className={
-                      isGemini
-                        ? 'h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700'
-                        : 'h-1.5 w-full overflow-hidden rounded-full bg-slate-200/90 dark:bg-slate-700/80'
-                    }
-                    role="progressbar"
-                    aria-valuenow={ragIndexOverallPct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                    aria-label="Book preparation progress"
-                  >
-                    <div
-                      className={
-                        isGemini
-                          ? 'h-full rounded-full bg-blue-500 transition-[width] duration-300'
-                          : 'h-full rounded-full bg-gradient-to-r from-cyan-500 to-indigo-600 transition-[width] duration-300'
-                      }
-                      style={{ width: `${ragIndexOverallPct}%` }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-              {ragStatus?.ragIndexStatus === 'failed' &&
-              ragStatus?.ragIndexError ? (
+              {ragIsFailed && ragStatus?.ragIndexError ? (
                 <p
                   className={
                     isGemini
@@ -1250,46 +1243,54 @@ function LiquAiChatPanel({
             onScroll={isGemini ? handleGeminiMessagesScroll : undefined}
             className={
               isGemini
-                ? `min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
-                    studyDense
-                      ? 'p-1.5 pb-28 md:p-1 md:pb-28'
-                      : `${
-                          isStudyWorkspace && !isLgUp
-                            ? 'p-2 pb-[calc(10rem+env(safe-area-inset-bottom))] md:p-1 md:pb-28'
-                            : 'p-2 pb-28 md:p-1 md:pb-28'
+                ? `min-h-0 flex-1 overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+                    isStarterState && isStudyWorkspace
+                      ? 'flex flex-col overflow-hidden p-2'
+                      : `overflow-y-auto ${
+                          studyDense
+                            ? 'p-1.5 pb-28 md:p-1 md:pb-28'
+                            : `${
+                                isStudyWorkspace && !isLgUp
+                                  ? 'p-2 pb-[calc(10rem+env(safe-area-inset-bottom))] md:p-1 md:pb-28'
+                                  : 'p-2 pb-28 md:p-1 md:pb-28'
+                              }`
                         }`
-                  }${useRailSidebar ? ' pt-11' : ''}`
+                  }`
                 : 'min-h-0 flex-1 overflow-y-auto rounded-2xl border border-slate-200/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(248,250,252,0.85)_100%)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden dark:border-slate-600 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.65)_0%,rgba(15,23,42,0.45)_100%)]'
             }
           >
-            <div className={isGemini ? 'space-y-5' : 'space-y-3'}>
-              {isStarterState && hasQuickPrompts ? (
+            <div
+              className={
+                isGemini
+                  ? isStarterState && isStudyWorkspace
+                    ? 'flex flex-1 flex-col items-center justify-center'
+                    : 'space-y-5'
+                  : 'space-y-3'
+              }
+            >
+              {isStarterState && (hasQuickPrompts || showPrepHero) ? (
                 <>
                   {isStudyWorkspace ? (
-                    <div
-                      className={`mx-auto w-full max-w-lg space-y-4 px-2 sm:px-0.5 ${
-                        !isLgUp && isStarterState
-                          ? 'flex min-h-[min(58dvh,30rem)] flex-col justify-center py-6 sm:py-10 lg:min-h-0 lg:justify-start lg:py-0'
-                          : ''
-                      }`}
-                    >
-                      <div className="flex flex-wrap items-end justify-between gap-3">
-                        <div className="min-w-0 space-y-1">
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500 dark:text-slate-500">
-                            Liqu AI
-                          </p>
-                          <h2 className="font-display text-xl font-semibold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-                            {(() => {
-                              const first = String(name).trim().split(/\s+/)[0];
-                              return first
-                                ? `Hey ${first} — what should we tackle?`
-                                : 'What should we tackle?';
-                            })()}
-                          </h2>
-                        </div>
-                        <span className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-slate-200/70 bg-white/50 px-2.5 py-1 text-[10px] font-semibold text-slate-600 shadow-sm backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.06] dark:text-slate-300">
+                    <div className="mx-auto w-full max-w-2xl px-4 text-center">
+                      <div className="w-full space-y-3">
+                        <h2 className="font-display text-3xl font-normal leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl">
+                          {studyFirstName ? (
+                            <>
+                              Hey{' '}
+                              <span className="bg-gradient-to-r from-cyan-500 to-violet-500 bg-clip-text text-transparent dark:from-cyan-400 dark:to-violet-400">
+                                {studyFirstName}
+                              </span>
+                            </>
+                          ) : (
+                            'Hey there'
+                          )}
+                        </h2>
+                        <p className="text-base text-slate-500 dark:text-slate-400">
+                          What should we tackle?
+                        </p>
+                        <p className="mx-auto flex max-w-md items-center justify-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                           <BookOpen
-                            className="h-3 w-3 shrink-0 opacity-80"
+                            className="h-3.5 w-3.5 shrink-0 opacity-70"
                             strokeWidth={2}
                             aria-hidden
                           />
@@ -1299,41 +1300,38 @@ function LiquAiChatPanel({
                               ? ` · ${studyRagSubtitle}`
                               : ''}
                           </span>
-                        </span>
+                        </p>
                       </div>
 
-                      {messages[0] ? (
-                        <MessageBubble
-                          key={messages[0].id}
-                          message={messages[0]}
-                          variant={variant}
-                          compactWelcome
-                        />
-                      ) : null}
-
-                      <div className="rounded-2xl border border-slate-200/60 bg-white/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
-                        <p className="mb-3 flex items-center gap-1.5 pl-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
-                          <Sparkles
-                            className="h-3 w-3 shrink-0 text-amber-500/90 dark:text-amber-400/90"
-                            strokeWidth={2}
-                            aria-hidden
+                      {showPrepHero ? (
+                        <div className="mt-8 w-full text-left">
+                          <BookPrepProgressCard
+                            variant="hero"
+                            bookTitle={bookTitle || ragStatus?.title || ''}
+                            phase={ragStatus?.ragIndexPhase || ''}
+                            progressPercent={ragIndexOverallPct}
+                            doneChunks={embDone}
+                            totalChunks={embTotal}
+                            failed={ragIsFailed}
+                            errorMessage={ragStatus?.ragIndexError || ''}
+                            onRetry={ragIsFailed ? indexBookForRag : undefined}
                           />
-                          Quick start
-                        </p>
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                          {starterPrompts.map((prompt, i) => (
+                        </div>
+                      ) : (
+                        <div className="mx-auto mt-8 grid w-full max-w-lg grid-cols-1 gap-2 sm:grid-cols-2">
+                          {starterPrompts.map((prompt) => (
                             <button
                               key={prompt}
                               type="button"
                               disabled={loading}
                               onClick={() => void sendMessage(undefined, prompt)}
-                              className={`w-full rounded-xl border px-3.5 py-2.5 text-left text-xs font-medium leading-snug transition hover:brightness-[1.03] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-50 dark:focus-visible:ring-slate-500/50 dark:focus-visible:ring-offset-transparent ${STUDY_QUICK_PILL_ACCENTS[i % STUDY_QUICK_PILL_ACCENTS.length]}`}
+                              className="rounded-full border border-slate-200/80 bg-transparent px-4 py-2.5 text-left text-sm font-medium text-slate-700 transition hover:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400/40 disabled:pointer-events-none disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800/60 dark:focus-visible:ring-slate-500/50"
                             >
                               {prompt}
                             </button>
                           ))}
                         </div>
-                      </div>
+                      )}
                     </div>
                   ) : null}
                   {!isStudyWorkspace ? (
@@ -1454,7 +1452,9 @@ function LiquAiChatPanel({
                 </div>
               )}
 
-              <div ref={bottomRef} />
+              {!isStarterState || !isStudyWorkspace ? (
+                <div ref={bottomRef} />
+              ) : null}
             </div>
           </div>
 
@@ -1470,19 +1470,13 @@ function LiquAiChatPanel({
           <form onSubmit={sendMessage} className={isGemini ? 'mt-0 w-full' : 'mt-3'}>
             {isGemini ? (
               <div
-                className={
-                  isStudyWorkspace && !isLgUp
-                    ? 'mx-auto w-full max-w-none px-2 sm:px-3'
-                    : 'mx-auto w-full max-w-md px-2 sm:px-3'
-                }
+                className={`mx-auto w-full px-3 sm:px-4 ${
+                  isStudyWorkspace ? 'max-w-3xl' : 'max-w-2xl'
+                }`}
               >
                 <div
                   ref={attachMenuContainerRef}
-                  className={
-                    isStudyWorkspace && !isLgUp
-                      ? 'relative rounded-2xl border border-slate-200/55 bg-white/70 px-2 py-2 shadow-lg shadow-slate-900/[0.08] ring-1 ring-slate-900/[0.05] backdrop-blur-md dark:border-slate-600/35 dark:bg-slate-950/50 dark:shadow-black/25 dark:ring-white/[0.06]'
-                      : 'relative rounded-full border border-slate-200/50 bg-white/55 px-2 py-1.5 shadow-md shadow-slate-900/[0.07] ring-1 ring-slate-900/[0.04] backdrop-blur-md dark:border-slate-600/30 dark:bg-slate-950/40 dark:shadow-black/20 dark:ring-white/[0.05]'
-                  }
+                  className="relative rounded-3xl border border-slate-200/60 bg-slate-50/80 px-1 py-1 dark:border-slate-600/50 dark:bg-slate-900/70"
                 >
                   {String(selectedText || '').trim() ? (
                     <div className="mb-1.5 flex items-start justify-between gap-2 rounded-xl border border-cyan-200/60 bg-cyan-50/80 px-2 py-1.5 dark:border-cyan-800/40 dark:bg-cyan-950/30">
@@ -1535,16 +1529,16 @@ function LiquAiChatPanel({
                     accept="*/*"
                     onChange={handleGeminiFiles}
                   />
-                  <div className="flex items-center gap-0.5 sm:gap-1">
+                  <div className="flex items-end gap-2 px-3 py-2.5">
                     <button
                       type="button"
                       onClick={() => setAttachMenuOpen((o) => !o)}
-                      className="shrink-0 rounded-full p-1.5 text-slate-600 transition hover:bg-slate-900/[0.07] dark:text-slate-300 dark:hover:bg-white/[0.08]"
+                      className="mb-0.5 shrink-0 rounded-full p-2 text-slate-600 transition hover:bg-slate-900/[0.06] dark:text-slate-300 dark:hover:bg-white/[0.08]"
                       aria-expanded={attachMenuOpen}
                       aria-haspopup="menu"
                       aria-label="Add to prompt"
                     >
-                      <Plus className="h-[14px] w-[14px]" strokeWidth={2} />
+                      <Plus className="h-[18px] w-[18px]" strokeWidth={2} />
                     </button>
                     {attachMenuOpen ? (
                       <div
@@ -1625,42 +1619,18 @@ function LiquAiChatPanel({
                       rows={1}
                       disabled={loading}
                       style={{ maxHeight: '140px' }}
-                      className="input-field min-h-[34px] min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-1 py-1 text-[13px] leading-snug text-slate-900 placeholder:text-slate-500 focus:border-0 focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-400 sm:min-w-[120px]"
+                      className="min-h-[24px] min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent py-2 text-[15px] leading-relaxed text-slate-900 placeholder:text-slate-500 focus:border-0 focus:outline-none focus:ring-0 dark:text-slate-100 dark:placeholder:text-slate-400"
                     />
-                    {!loading && !error ? (
-                      <span
-                        className="h-1.5 w-1.5 shrink-0 rounded-full bg-teal-500 dark:bg-emerald-400"
-                        title="Ready"
-                        aria-hidden
-                      />
+                    {draft.trim() ? (
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="mb-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-600 dark:hover:bg-blue-500"
+                        aria-label="Send"
+                      >
+                        <Send className="h-4 w-4" strokeWidth={2} />
+                      </button>
                     ) : null}
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming soon"
-                      className="hidden shrink-0 cursor-not-allowed items-center gap-0.5 rounded-full px-1.5 py-1 text-[10px] text-slate-400 opacity-70 md:inline-flex dark:text-slate-500"
-                      aria-label="Model speed (coming soon)"
-                    >
-                      Fast
-                      <ChevronDown className="h-3 w-3" strokeWidth={2} />
-                    </button>
-                    <button
-                      type="button"
-                      disabled
-                      title="Coming soon"
-                      aria-label="Voice input"
-                      className="shrink-0 cursor-not-allowed rounded-full p-1.5 text-slate-400 opacity-70 dark:text-slate-500"
-                    >
-                      <Mic className="h-[14px] w-[14px]" strokeWidth={2} />
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={!draft.trim() || loading}
-                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-900/25 transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-blue-600 dark:hover:bg-blue-500"
-                      aria-label="Send"
-                    >
-                      <Send className="h-3.5 w-3.5" strokeWidth={2} />
-                    </button>
                   </div>
                 </div>
               </div>

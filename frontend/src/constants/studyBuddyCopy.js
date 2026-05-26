@@ -15,6 +15,38 @@ export const RAG_PHASE_LABELS = {
   writing: 'Learning the content',
 };
 
+/** Stepper steps for book prep UI — phases map to backend ragIndexPhase values. */
+export const PREP_STEPS = [
+  { id: 1, label: 'Opening your book', phases: ['downloading'] },
+  { id: 2, label: 'Reading the pages', phases: ['extracting'] },
+  { id: 3, label: 'Finding chapters', phases: ['chunking'] },
+  { id: 4, label: 'Learning the content', phases: ['writing', 'embedding'] },
+];
+
+export function prepStepIndex(phase) {
+  const p = String(phase || '').toLowerCase();
+  const idx = PREP_STEPS.findIndex((s) => s.phases.includes(p));
+  return idx >= 0 ? idx : 0;
+}
+
+export function prepWritingSubtitle(done, total) {
+  const d = Number(done) || 0;
+  const t = Number(total) || 0;
+  if (t <= 0) return '';
+  return `Learning section ${Math.min(d, t)} of ${t}`;
+}
+
+export function prepReadyToast(title) {
+  const t = String(title || '').trim();
+  return t
+    ? `I've read "${t}" — ask me anything from it.`
+    : "I've read this book — ask me anything from it.";
+}
+
+export function prepFooterNote() {
+  return 'You can still chat — answers from this book will get sharper as I finish reading.';
+}
+
 export function ragPhaseLabel(phase) {
   return RAG_PHASE_LABELS[String(phase || '').toLowerCase()] || 'Getting your book ready';
 }

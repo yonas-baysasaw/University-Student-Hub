@@ -37,6 +37,36 @@ import {
   visibilityTone,
 } from '../utils/formatLabels';
 
+function RagPrepBadge({ item }) {
+  const status = item?.ragIndexStatus;
+  if (status === 'ready') {
+    return (
+      <span className="text-emerald-600 dark:text-emerald-400">
+        · Ready for chat
+      </span>
+    );
+  }
+  if (status === 'indexing') {
+    const pct = Math.min(
+      100,
+      Math.max(0, Math.round(Number(item.ragIndexProgressPercent) || 0)),
+    );
+    return (
+      <span className="text-cyan-600 dark:text-cyan-400">
+        · Reading… {pct}%
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span className="text-rose-500 dark:text-rose-400">
+        · Couldn&apos;t read
+      </span>
+    );
+  }
+  return null;
+}
+
 const GUEST_SAVED_KEY = 'library.guestSavedIds';
 
 /** Visible below title — department, course, year, field — one line while browsing. */
@@ -375,11 +405,7 @@ function LibraryBookListRow({
                 <span>{dateShort}</span>
               </>
             ) : null}
-            {item.ragIndexStatus === 'ready' ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                · Ready for chat
-              </span>
-            ) : null}
+            <RagPrepBadge item={item} />
           </p>
         </div>
 
@@ -723,12 +749,7 @@ function LibraryBookGridCard({
           {item.publishYear != null && Number.isFinite(Number(item.publishYear))
             ? ` · ${item.publishYear}`
             : ''}
-          {item.ragIndexStatus === 'ready' ? (
-            <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-300">
-              {' '}
-              · Ready for chat
-            </span>
-          ) : null}
+          <RagPrepBadge item={item} />
         </p>
 
         {item.academicTrack ||
