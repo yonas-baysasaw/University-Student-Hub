@@ -152,52 +152,52 @@ function Exams() {
   const [tab, setTab] = useState('vault');
 
   return (
-    <div className="liqu-ai-ambient page-surface px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
+    <div className="liqu-ai-ambient page-surface px-3 pb-6 pt-3 md:px-6 md:pb-8 md:pt-5">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-4">
+        <div className="mb-2">
           <Link
             to="/liqu-ai"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-cyan-700/50 dark:hover:text-cyan-100"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-cyan-700/50 dark:hover:text-cyan-100"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             Back to Liqu AI
           </Link>
         </div>
-        <header className="panel-card fade-in-up relative mb-6 overflow-hidden rounded-3xl p-6 md:p-8">
+        <header className="panel-card fade-in-up relative mb-4 overflow-hidden rounded-2xl p-4 md:p-5">
           <div
-            className="workspace-hero-mesh pointer-events-none absolute inset-0 rounded-3xl opacity-70"
+            className="workspace-hero-mesh pointer-events-none absolute inset-0 rounded-2xl opacity-70"
             aria-hidden
           />
           <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
               Liqu AI · Exam studio
             </p>
-            <h1 className="mt-2 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50 md:text-4xl">
+            <h1 className="mt-1 font-display text-2xl tracking-tight text-slate-900 dark:text-slate-50 md:text-3xl">
               Welcome to the exam collections
             </h1>
           </div>
         </header>
 
-        <div className="mb-5 grid gap-2 sm:grid-cols-3">
+        <div className="mb-3 grid gap-2 sm:grid-cols-3">
           {TABS.map(({ key, label, sub, icon: Icon }) => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={`panel-card flex items-start gap-3 rounded-2xl p-4 text-left transition md:p-5 ${
+              className={`panel-card flex items-center gap-2.5 rounded-2xl p-3 text-left transition md:p-3.5 ${
                 tab === key
                   ? 'ring-2 ring-cyan-500/50 shadow-md dark:ring-cyan-400/40'
                   : 'opacity-95 hover:border-cyan-200/70 dark:hover:border-cyan-800/50'
               }`}
             >
               <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
                   tab === key
                     ? 'from-cyan-500/25 to-indigo-500/20 ring-1 ring-cyan-500/30 dark:from-cyan-600/25 dark:to-indigo-900/30'
                     : 'from-slate-300/35 to-slate-400/20 dark:from-slate-600/30 dark:to-slate-700/25'
                 }`}
               >
-                <Icon className="h-5 w-5 text-slate-800 dark:text-slate-100" />
+                <Icon className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <span className="min-w-0">
                 <span className="block font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -583,17 +583,17 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
   }
 
   return (
-    <div className="space-y-12">
-      <section className="space-y-4" aria-labelledby="vault-papers-heading">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-8">
+      <section className="space-y-3" aria-labelledby="vault-papers-heading">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 ring-1 ring-cyan-500/25 dark:from-cyan-600/25 dark:to-indigo-900/30">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 ring-1 ring-cyan-500/25 dark:from-cyan-600/25 dark:to-indigo-900/30">
                 <FileStack className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <h2
                 id="vault-papers-heading"
-                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+                className="font-display text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50"
               >
                 Your papers
               </h2>
@@ -632,12 +632,12 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
         </div>
 
         {myPapersLoading ? (
-          <div className="flex items-center justify-center py-14 text-slate-500">
+          <div className="flex items-center justify-center py-10 text-slate-500">
             <span className="loading loading-spinner" />
             <span className="ml-2 text-sm">Loading your papers…</span>
           </div>
         ) : myPapers.length === 0 ? (
-          <div className="panel-card rounded-2xl border border-dashed border-slate-200/90 px-6 py-10 text-center dark:border-slate-700/90">
+          <div className="panel-card rounded-2xl border border-dashed border-slate-200/90 px-6 py-8 text-center dark:border-slate-700/90">
             <FileStack className="mx-auto h-9 w-9 text-slate-400 dark:text-slate-500" />
             <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">
               No papers in this lens
@@ -707,21 +707,21 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
         )}
       </section>
 
-      <section className="space-y-4" aria-labelledby="vault-drafts-heading">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200/80 pt-10 dark:border-slate-700/80">
+      <section className="space-y-3" aria-labelledby="vault-drafts-heading">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200/80 pt-6 dark:border-slate-700/80">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-slate-300/25 ring-1 ring-slate-200/70 dark:from-indigo-900/35 dark:to-slate-700/35 dark:ring-slate-600/60">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-slate-300/25 ring-1 ring-slate-200/70 dark:from-indigo-900/35 dark:to-slate-700/35 dark:ring-slate-600/60">
                 <GraduationCap className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <h2
                 id="vault-drafts-heading"
-                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+                className="font-display text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50"
               >
                 Question drafts
               </h2>
             </div>
-            <p className="mt-2 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
               Stem-and-option work in progress — stays on-device until you batch
               publish as a curated paper above.
             </p>
@@ -758,12 +758,12 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-500">
+          <div className="flex items-center justify-center py-10 text-slate-500">
             <span className="loading loading-spinner" />
           </div>
         ) : rows.length === 0 ? (
-          <div className="panel-card rounded-2xl border border-slate-200/70 px-6 py-10 text-center dark:border-slate-700/70">
-            <GraduationCap className="mx-auto h-10 w-10 text-cyan-600/70" />
+          <div className="panel-card rounded-2xl border border-slate-200/70 px-6 py-8 text-center dark:border-slate-700/70">
+            <GraduationCap className="mx-auto h-9 w-9 text-cyan-600/70" />
             <p className="mt-3 font-display text-base font-semibold text-slate-900 dark:text-slate-50">
               No drafts yet — only MCQs missing
             </p>
@@ -1444,7 +1444,7 @@ function BankTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-nowrap items-center gap-2">
         <input
           type="text"
           placeholder="Search papers…"
@@ -1453,7 +1453,7 @@ function BankTab() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 max-w-none flex-1 min-w-[10rem] sm:max-w-md sm:min-w-[14rem]"
+          className="input-field h-9 min-w-0 w-auto flex-1 text-sm"
         />
         <select
           value={statusFilter}
@@ -1461,15 +1461,16 @@ function BankTab() {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 shrink-0 text-sm"
+          aria-label="Filter by status"
+          className="input-field h-9 w-[7.5rem] max-w-[7.5rem] shrink-0 px-2 text-xs"
         >
-          <option value="">All statuses</option>
+          <option value="">All</option>
           <option value="complete">Ready</option>
           <option value="processing">Processing</option>
           <option value="pending">Queued</option>
           <option value="failed">Failed</option>
         </select>
-        <span className="ml-auto whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+        <span className="shrink-0 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
           {total} paper{total !== 1 ? 's' : ''}
         </span>
       </div>
