@@ -91,6 +91,7 @@ export function groundingChip(references, grounding) {
   if (grounding !== 'book' && grounding !== 'library') return '';
   const first = Array.isArray(references) ? references[0] : null;
   if (!first) return grounding === 'library' ? 'From your library' : 'From your book';
+  if (first.section === 'Chapter outline') return "From your book's chapter outline";
   if (first.chapter) return `Based on ${first.chapter}`;
   if (Number.isFinite(first.pageStart)) return `Based on page ${first.pageStart}`;
   return 'From your book';

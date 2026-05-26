@@ -12,7 +12,10 @@ import {
 import { parsePublishYear, validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
 import { RAG_PREP_VERSION } from '../constants/studyBuddyPrompts.js';
-import { scheduleRagIndexForBook } from '../services/bookRagService.js';
+import {
+  fetchBookBytes,
+  scheduleRagIndexForBook,
+} from '../services/bookRagService.js';
 
 const ensureValidBookId = (bookId) => mongoose.Types.ObjectId.isValid(bookId);
 
@@ -751,4 +754,57 @@ export const incrementBookDownload = asyncHandler(async (req, res) => {
     success: true,
     views: book?.views || 0,
   });
+});
+
+/** Stream book file bytes through the API (avoids browser CORS on S3 URLs). */
+export const getBookFile = asyncHandler(async (req, res) => {
+  const { bookId } = req.params;
+
+  if (!ensureValidBookId(bookId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid book id',
+    });
+  }
+
+  const book = await Book.findById(bookId).lean();
+  const access = directAccessOutcome(book, req);
+  if (!access.ok) {
+    return sendBookAccessDenied(res, access);
+  }
+
+  const bookUrl = String(book?.bookUrl || '').trim();
+  if (!bookUrl) {
+    return res.status(404).json({
+      success: false,
+      message: 'This book has no file attached.',
+    });
+  }
+
+  try {
+    const bytes = await fetchBookBytes(bookUrl, undefined, bookId);
+    const buf = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes);
+    const isPdf =
+      buf.length > 4 && buf[0] === 0x25 && buf[1] === 0x50;
+    const safeName = String(book.title || 'book')
+      .replace(/[^\w\s.-]+/g, '')
+      .trim()
+      .slice(0, 80) || 'book';
+
+    res.setHeader(
+      'Content-Type',
+      isPdf ? 'application/pdf' : 'application/octet-stream',
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${safeName}${isPdf ? '.pdf' : ''}"`,
+    );
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    return res.send(buf);
+  } catch (err) {
+    return res.status(502).json({
+      success: false,
+      message: err?.message || 'Could not load book file.',
+    });
+  }
 });

@@ -9,6 +9,9 @@ import {
   MODE_RULES,
   buildContextPrefix,
   mapRagErrorToUserMessage,
+  isChapterOutlineQuery,
+  formatChapterOutlineReply,
+  sortChapterMap,
 } from '../constants/studyBuddyPrompts.js';
 import {
   buildChapterMapFromChunks,
@@ -1093,6 +1096,55 @@ export async function scheduleRagIndexForBook(bookId, userId) {
   return { started: true, bookId: String(bookId) };
 }
 
+function buildChapterOutlineFromMap(bookTitle, chapterMap, bookId, bookUrl) {
+  const chapters = sortChapterMap(chapterMap).filter((ch) =>
+    String(ch?.title || '').trim(),
+  );
+  if (!chapters.length) return null;
+
+  const lines = chapters.map((ch, i) => {
+    const title = String(ch.title).trim();
+    const ps = ch.pageStart;
+    const pe = ch.pageEnd;
+    let pageSuffix = '';
+    if (ps != null && Number.isFinite(Number(ps))) {
+      if (pe != null && Number.isFinite(Number(pe)) && pe !== ps) {
+        pageSuffix = ` (pages ${ps}–${pe})`;
+      } else {
+        pageSuffix = ` (page ${ps})`;
+      }
+    }
+    return `${i + 1}. ${title}${pageSuffix}`;
+  });
+
+  const heading = bookTitle?.trim()
+    ? `Chapter outline for **${bookTitle.trim()}**`
+    : 'Chapter outline for this book';
+
+  const firstPage = chapters.find((ch) => ch.pageStart != null)?.pageStart ?? null;
+  const lastPage =
+    [...chapters].reverse().find((ch) => ch.pageEnd != null)?.pageEnd ?? firstPage;
+
+  return {
+    context: `${heading}:\n\n${lines.join('\n')}`,
+    directResponse: formatChapterOutlineReply(bookTitle, chapters),
+    references: [
+      {
+        bookId: String(bookId),
+        bookTitle: bookTitle || 'Untitled',
+        bookUrl: String(bookUrl || ''),
+        chunkIndex: 0,
+        excerptNumber: 1,
+        score: 1,
+        chapter: '',
+        section: 'Chapter outline',
+        pageStart: firstPage,
+        pageEnd: lastPage,
+      },
+    ],
+  };
+}
+
 /**
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
@@ -1124,6 +1176,31 @@ export async function buildRagContextForQuery(bookId, userId, query, opts = {}) 
       reason: 'not_indexed',
       references: [],
     };
+  }
+
+  if (
+    isChapterOutlineQuery(query) &&
+    Array.isArray(book.ragChapterMap) &&
+    book.ragChapterMap.length > 0
+  ) {
+    const outline = buildChapterOutlineFromMap(
+      book.title,
+      book.ragChapterMap,
+      bookId,
+      book.bookUrl,
+    );
+    if (outline) {
+      console.log(
+        `[bookRag] chapter outline from ragChapterMap (${book.ragChapterMap.length} chapters) query="${previewText(query, 120)}"`,
+      );
+      return {
+        context: outline.context,
+        bookTitle: book.title,
+        reason: 'chapter_outline',
+        references: outline.references,
+        directResponse: outline.directResponse,
+      };
+    }
   }
 
   const credentials = userLikeFromCredentials(
@@ -1224,7 +1301,7 @@ export async function augmentMessagesWithBookRag(
     };
   }
 
-  const { context, bookTitle, reason, references } =
+  const { context, bookTitle, reason, references, directResponse } =
     await buildRagContextForQuery(String(bookId), userId, last.content, {
       messages,
       pageNumber: opts.pageNumber,
@@ -1239,8 +1316,21 @@ export async function augmentMessagesWithBookRag(
       ragNote: 'index_required',
       references: [],
       grounding: 'none',
+      directResponse: null,
     };
   }
+
+  if (directResponse) {
+    return {
+      messages: [...messages],
+      ragUsed: true,
+      ragNote: 'chapter_outline',
+      references: references || [],
+      grounding: 'book',
+      directResponse,
+    };
+  }
+
   if (!context) {
     return {
       messages: [...messages],
@@ -1248,14 +1338,16 @@ export async function augmentMessagesWithBookRag(
       ragNote: reason,
       references: [],
       grounding: 'none',
+      directResponse: null,
     };
   }
 
   const modeKey = String(mode || 'chat').toLowerCase();
   const modeRule = MODE_RULES[modeKey] || MODE_RULES.chat;
+  const effectiveMode = reason === 'chapter_outline' ? 'chapter_outline' : modeKey;
   const prefix = buildContextPrefix({
     bookTitle,
-    mode: modeKey,
+    mode: effectiveMode,
     modeRule,
     context,
     indexRequired: false,
@@ -1269,6 +1361,7 @@ export async function augmentMessagesWithBookRag(
     ragNote: reason === 'low_confidence' ? 'low_confidence' : 'ok',
     references,
     grounding: 'book',
+    directResponse: null,
   };
 }
 

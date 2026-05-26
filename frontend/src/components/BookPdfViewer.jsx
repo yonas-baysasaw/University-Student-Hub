@@ -9,7 +9,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 function isPdfUrl(url) {
   const u = String(url || '').toLowerCase();
-  return u.includes('.pdf') || u.includes('application/pdf');
+  return (
+    u.includes('.pdf') ||
+    u.includes('application/pdf') ||
+    u.includes('/file')
+  );
 }
 
 /**

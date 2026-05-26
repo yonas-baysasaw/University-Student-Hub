@@ -89,6 +89,7 @@ async function generateLiquAiReply({
   let ragUsed = false;
   let ragNote = null;
   let grounding = 'none';
+  let directResponse = null;
 
   const lastUserMsg = messages.at(-1);
   const classroomContextHint =
@@ -120,6 +121,7 @@ async function generateLiquAiReply({
     ragUsed = Boolean(aug.ragUsed);
     ragNote = aug.ragNote ?? null;
     grounding = aug.grounding || (ragUsed ? 'book' : 'none');
+    directResponse = aug.directResponse || null;
   }
 
   if ((!bookId || !String(bookId).trim()) && !isClassroomScope) {
@@ -154,7 +156,7 @@ async function generateLiquAiReply({
   const credentials = resolveGeminiCredentialsForUser(
     userLikeFromCredentials(await loadUserGeminiCredentials(userId)),
   );
-  let responseText = await askGemini(messagesForLlm, credentials);
+  let responseText = directResponse || (await askGemini(messagesForLlm, credentials));
   if (isClassroomScope) {
     responseText = responseText
       .replace(/The information was not found in the available books\./gi, '')

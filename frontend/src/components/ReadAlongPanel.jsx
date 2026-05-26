@@ -3,6 +3,12 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import BookPdfViewer from './BookPdfViewer';
 
+function bookFileProxyUrl(book) {
+  const id = book?.bookId || book?.id;
+  if (!id || !book?.bookUrl) return '';
+  return `/api/books/${encodeURIComponent(String(id))}/file`;
+}
+
 /** Library book selector + inline reader for Study buddy. */
 function ReadAlongPanel({
   books,
@@ -232,7 +238,7 @@ function ReadAlongPanel({
                 className={`flex shrink-0 items-center justify-between gap-2 ${isWorkspace ? 'py-0.5' : 'flex-wrap'}`}
               >
                 <a
-                  href={selectedBook.bookUrl}
+                  href={bookFileProxyUrl(selectedBook) || selectedBook.bookUrl}
                   target="_blank"
                   rel="noreferrer"
                   className={`inline-flex items-center gap-1 font-semibold text-cyan-700 transition hover:underline dark:text-cyan-400 ${isWorkspace ? 'text-[10px]' : 'gap-1.5 text-xs'}`}
@@ -275,7 +281,7 @@ function ReadAlongPanel({
                 </div>
               ) : null}
               <BookPdfViewer
-                url={selectedBook.bookUrl}
+                url={bookFileProxyUrl(selectedBook) || selectedBook.bookUrl}
                 title={selectedBook.title}
                 page={currentPage}
                 onPageChange={onPageChange}

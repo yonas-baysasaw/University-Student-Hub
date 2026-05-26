@@ -54,6 +54,68 @@ export function mapRagErrorToUserMessage(raw) {
   return raw || 'Something went wrong while reading this book. You can try again.';
 }
 
+/** True when the student wants a book outline / chapter list, not passage search. */
+export function isChapterOutlineQuery(query) {
+  const q = String(query || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!q) return false;
+  const patterns = [
+    /\b(list|show|give|tell|name|what are|what're|what is)\b.*\b(chapters?|sections?|parts?)\b/,
+    /\b(all|every|complete|full|entire)\b.*\b(chapters?|sections?|parts?)\b/,
+    /\btable of contents\b/,
+    /\bcontents of (the )?book\b/,
+    /\bchapter list\b/,
+    /\bhow many chapters\b/,
+    /\boutline of (the )?book\b/,
+    /\bchapters in (this|the) book\b/,
+  ];
+  return patterns.some((re) => re.test(q));
+}
+
+/**
+ * @param {Array<{ title?: string, pageStart?: number | null, pageEnd?: number | null }>} chapterMap
+ */
+export function sortChapterMap(chapterMap) {
+  if (!Array.isArray(chapterMap)) return [];
+  return [...chapterMap].sort(
+    (a, b) => (Number(a.pageStart) || 0) - (Number(b.pageStart) || 0),
+  );
+}
+
+/**
+ * @param {string} bookTitle
+ * @param {Array<{ title?: string, pageStart?: number | null, pageEnd?: number | null }>} chapterMap
+ */
+export function formatChapterOutlineReply(bookTitle, chapterMap) {
+  const chapters = sortChapterMap(chapterMap).filter((ch) =>
+    String(ch?.title || '').trim(),
+  );
+  if (!chapters.length) return '';
+
+  const lines = chapters.map((ch, i) => {
+    const title = String(ch.title).trim();
+    const ps = ch.pageStart;
+    const pe = ch.pageEnd;
+    let pageSuffix = '';
+    if (ps != null && Number.isFinite(Number(ps))) {
+      if (pe != null && Number.isFinite(Number(pe)) && pe !== ps) {
+        pageSuffix = ` (pages ${ps}–${pe})`;
+      } else {
+        pageSuffix = ` (page ${ps})`;
+      }
+    }
+    return `${i + 1}. ${title}${pageSuffix}`;
+  });
+
+  const heading = bookTitle?.trim()
+    ? `Here are the chapters in **${bookTitle.trim()}**:`
+    : 'Here are the chapters in this book:';
+
+  return `${heading}\n\n${lines.join('\n')}\n\nWant a summary or study notes for any chapter?`;
+}
+
 export function buildContextPrefix({
   bookTitle,
   mode,
@@ -71,6 +133,9 @@ export function buildContextPrefix({
   prefix += `- Response style: ${modeKey}\n- Style guide: ${rule}\n`;
   if (indexRequired) prefix += `- ${INDEX_REQUIRED_HINT}\n`;
   if (lowConfidence) prefix += `- ${LOW_CONFIDENCE_HINT}\n`;
+  if (modeKey === 'chapter_outline') {
+    prefix += `- List every chapter from the outline below exactly as given. Do not say you could not find chapters.\n`;
+  }
   prefix += `\nProvided context:\n\n${context}\n\n---\n\nStudent question:\n`;
   return prefix;
 }

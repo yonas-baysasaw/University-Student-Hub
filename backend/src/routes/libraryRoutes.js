@@ -15,6 +15,7 @@ import {
   deleteBook,
   getAllBooks,
   getBookById,
+  getBookFile,
   incrementBookDownload,
   reactToBook,
   reindexMyBooks,
@@ -33,6 +34,7 @@ router.post('/search/books', searchBooksByChunkContent);
 router.post('/rag/reindex-mine', isAuthenticated, reindexMyBooks);
 router.get('/:bookId/rag/status', isAuthenticated, getBookRagStatus);
 router.post('/:bookId/rag/index', isAuthenticated, postIndexBookRag);
+router.get('/:bookId/file', getBookFile);
 router.get('/:bookId/reviews', listBookReviews);
 router.get('/:bookId/comments', listBookComments);
 router.get('/:bookId', getBookById);
