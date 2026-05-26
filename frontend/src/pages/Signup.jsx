@@ -154,106 +154,11 @@ function Signup() {
   }
 
   return (
-<<<<<<< HEAD
-    <AuthShell title="Create account" subtitle="Set up your student workspace">
-
-  <div className="flex justify-center mt-2 mb-2">
-    <button
-      type="button"
-      className="btn-primary px-4 py-1.5 text-xs"
-    >
-      Change account type
-    </button>
-  </div>
-      <form className="space-y-3.5" onSubmit={handleSubmit}>
-        {(error || success) && (
-          <div
-            className={`rounded-xl px-3 py-2 text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
-          >
-            {error || success}
-          </div>
-        )}
-
-        <input
-          type="text"
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          className="input-field text-sm"
-        />
-        <input
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="input-field text-sm"
-        />
-
-        <div className="relative">
-          <input
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="input-field pr-16 text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((prev) => !prev)}
-            aria-label={showPassword ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-slate-700"
-          >
-            {showPassword ? 'Hide' : 'Show'}
-          </button>
-        </div>
-
-        <div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
-            <div
-              className={`h-full rounded-full transition-all ${strength.color}`}
-              style={{ width: `${Math.max(8, strength.score * 20)}%` }}
-            />
-          </div>
-          <p className={`mt-1 text-xs font-semibold ${strength.text}`}>
-            Password strength: {strength.label}
-          </p>
-        </div>
-
-        <div className="relative">
-          <input
-            type={showConfirmPassword ? 'text' : 'password'}
-            placeholder="Confirm password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="input-field pr-16 text-sm"
-          />
-          <button
-            type="button"
-            onClick={() => setShowConfirmPassword((prev) => !prev)}
-            aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-500 hover:text-slate-700"
-          >
-            {showConfirmPassword ? 'Hide' : 'Show'}
-          </button>
-        </div>
-
-        <button type="submit" className="btn-primary h-11 w-full text-sm">
-          Sign up
-        </button>
-      </form>
-
-      <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
-        <span>Already have an account?</span>
-        <Link
-          to="/login"
-          className="font-medium transition hover:text-slate-700 hover:underline"
-=======
     <>
       {accountType === null ? (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 px-4 py-8 backdrop-blur-sm"
           aria-hidden={false}
->>>>>>> ai-2-sol
         >
           <div
             className="panel-card w-full max-w-md rounded-3xl p-6 shadow-xl md:p-8"

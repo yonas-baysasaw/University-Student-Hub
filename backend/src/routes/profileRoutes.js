@@ -417,9 +417,6 @@ router.put(
   ensureAuth,
   blockReadOnlyUser,
   asyncHandler(async (req, res) => {
-<<<<<<< HEAD
-    const { username, name, displayName, avatar } = req.body || {};
-=======
     const { username, displayName, department, schoolYear } = req.body;
 
     const showEmailPublic = readOptionalBoolean(req.body, 'showEmailPublic');
@@ -468,7 +465,6 @@ router.put(
       }
       if (v !== undefined) req.user[docKey] = v;
     }
->>>>>>> ai-2-sol
 
     if (username !== undefined) {
       const nextUsername = String(username).trim();
@@ -548,24 +544,7 @@ router.put(
 
     res.json({
       message: 'Profile updated',
-<<<<<<< HEAD
-      profile: {
-        id: req.user._id,
-        username: req.user.username,
-        name: req.user.name,
-        email: req.user.email,
-        displayName: req.user.name || req.user.username || '',
-        provider: req.user.provider,
-        photo: req.user.avatar || null,
-        avatar: req.user.avatar || null,
-        lastSeen: req.user.lastSeen || null,
-        geminiConfigured: !!String(req.user.geminiApiKey || '').trim(),
-        geminiModelId: req.user.geminiModelId || '',
-        hasLocalPassword: !!req.user.password,
-      },
-=======
       user: serializeCurrentUser(req.user),
->>>>>>> ai-2-sol
     });
   }),
 );

@@ -21,16 +21,6 @@ router.post(
   "/",
   forgotPasswordLimiter,
   asyncHandler(async (req, res) => {
-<<<<<<< HEAD
-    const email = String(req.body?.email || '')
-      .trim()
-      .toLowerCase();
-    const user = await User.findOne({ email });
-    if (!user) {
-      const error = new Error('User not found');
-      error.status = 404;
-      throw error;
-=======
     const rawEmail = req.body?.email;
     const email =
       typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
@@ -40,7 +30,6 @@ router.post(
 
     if (!email || !email.includes("@")) {
       return res.status(400).json({ message: "Please provide a valid email." });
->>>>>>> ai-2-sol
     }
 
     const user = await User.findOne({ email });
