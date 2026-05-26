@@ -12,12 +12,18 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  AssignmentsDueCard,
+  UpcomingExamsCard,
+} from '../components/DashboardDueCards.jsx';
 import TodayClassesCard from '../components/TodayClassesCard.jsx';
 import {
+  CALENDAR_INVALIDATE_EVENT,
   CLASSROOM_LIST_CHANGED_EVENT,
   SCHEDULE_SAVED_EVENT,
 } from '../constants/dashboardEvents.js';
 import { useAuth } from '../contexts/AuthContext';
+import { useSocket } from '../contexts/SocketContext';
 import { readJsonOrThrow } from '../utils/http';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -71,6 +77,7 @@ function rowStatusKey(row) {
 
 function Home() {
   const { user } = useAuth();
+  const socket = useSocket();
   const name = user?.displayName ?? user?.username ?? 'Student';
 
   const [dashLoading, setDashLoading] = useState(true);
@@ -98,11 +105,11 @@ function Home() {
       const data = await readJsonOrThrow(res, 'Could not load dashboard');
       setSummary(data);
       setDashError('');
-      } catch (err) {
-        setDashError(err?.message || 'Could not load dashboard');
-      } finally {
-        if (!silent) setDashLoading(false);
-      }
+    } catch (err) {
+      setDashError(err?.message || 'Could not load dashboard');
+    } finally {
+      if (!silent) setDashLoading(false);
+    }
   }, []);
 
   const handleManualRefresh = useCallback(async () => {
@@ -140,6 +147,29 @@ function Home() {
   }, [loadDashboard]);
 
   useEffect(() => {
+    const onCalendarInvalidate = () => {
+      loadDashboard({ silent: true });
+    };
+    window.addEventListener(CALENDAR_INVALIDATE_EVENT, onCalendarInvalidate);
+    return () =>
+      window.removeEventListener(
+        CALENDAR_INVALIDATE_EVENT,
+        onCalendarInvalidate,
+      );
+  }, [loadDashboard]);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onCalendarInvalidate = () => {
+      loadDashboard({ silent: true });
+    };
+    socket.on('calendar:invalidate', onCalendarInvalidate);
+    return () => {
+      socket.off('calendar:invalidate', onCalendarInvalidate);
+    };
+  }, [loadDashboard, socket]);
+
+  useEffect(() => {
     const id = window.setInterval(() => setNow(new Date()), 30000);
     return () => window.clearInterval(id);
   }, []);
@@ -157,6 +187,8 @@ function Home() {
   }).format(now);
 
   const announcements = summary?.recentAnnouncements ?? [];
+  const upcomingAssignments = summary?.upcomingAssignments ?? [];
+  const upcomingExams = summary?.upcomingExams ?? [];
   const stats = summary?.stats ?? {};
 
   const todayMeetingRows = useMemo(() => {
@@ -599,6 +631,21 @@ function Home() {
               </ul>
             )}
           </article>
+        </section>
+
+        <section className="grid gap-4 lg:grid-cols-2">
+          <AssignmentsDueCard
+            assignments={upcomingAssignments}
+            dashLoading={dashLoading}
+            dashError={dashError}
+            now={now}
+          />
+          <UpcomingExamsCard
+            exams={upcomingExams}
+            dashLoading={dashLoading}
+            dashError={dashError}
+            now={now}
+          />
         </section>
 
         <section>

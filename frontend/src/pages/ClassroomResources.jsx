@@ -22,7 +22,13 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { toast } from 'sonner';
 import ClassroomHero from '../components/ClassroomHero';
 import ClassroomParticipantsDrawer from '../components/ClassroomParticipantsDrawer';
@@ -153,6 +159,7 @@ function ClassroomResourcesContent({ chatId }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [chatName, setChatName] = useState('Class Resources');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceDescription, setResourceDescription] = useState('');
@@ -170,6 +177,12 @@ function ClassroomResourcesContent({ chatId }) {
   const [query, setQuery] = useState('');
 
   const [workspaceTab, setWorkspaceTab] = useState('materials');
+
+  useEffect(() => {
+    if (searchParams.get('tab') === 'assignments') {
+      setWorkspaceTab('assignments');
+    }
+  }, [searchParams]);
 
   const [assignments, setAssignments] = useState([]);
   const [assignmentsMeta, setAssignmentsMeta] = useState({

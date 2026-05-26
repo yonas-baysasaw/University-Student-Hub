@@ -3,6 +3,7 @@ import Book from '../models/Books.js';
 import {
   getAllScheduledClassesForUser,
   getClassroomCountForUser,
+  getDashboardDueItemsForUser,
   getRecentAnnouncementsForUser,
 } from '../services/dashboardService.js';
 
@@ -35,13 +36,19 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
       ? req.query.localDate
       : null;
 
-  const [recentAnnouncements, scheduleCalendar, classroomCount, bookTotal] =
-    await Promise.all([
-      getRecentAnnouncementsForUser(req.user._id, announcementsLimit),
-      getAllScheduledClassesForUser(req.user._id),
-      getClassroomCountForUser(req.user._id),
-      Book.countDocuments({ userId: req.user._id }),
-    ]);
+  const [
+    recentAnnouncements,
+    scheduleCalendar,
+    classroomCount,
+    bookTotal,
+    dueItems,
+  ] = await Promise.all([
+    getRecentAnnouncementsForUser(req.user._id, announcementsLimit),
+    getAllScheduledClassesForUser(req.user._id),
+    getClassroomCountForUser(req.user._id),
+    Book.countDocuments({ userId: req.user._id }),
+    getDashboardDueItemsForUser(req.user._id),
+  ]);
 
   const todayClasses = scheduleCalendar
     .map((room) => ({
@@ -54,6 +61,8 @@ export const getDashboardSummary = asyncHandler(async (req, res) => {
     localDate,
     weekday,
     recentAnnouncements,
+    upcomingAssignments: dueItems.upcomingAssignments,
+    upcomingExams: dueItems.upcomingExams,
     todayClasses,
     scheduleCalendar,
     stats: {
