@@ -15,6 +15,7 @@ import {
   reactToEvent,
   removeEventAttendee,
   reserveEventSeat,
+  updateEvent,
 } from '../controllers/eventController.js';
 import {
   deleteEventReview,
@@ -43,6 +44,7 @@ router.post('/:eventId/reviews', upsertEventReview);
 router.delete('/:eventId/reviews/:reviewId', deleteEventReview);
 router.post('/:eventId/comments', createEventComment);
 router.delete('/:eventId/comments/:commentId', deleteEventComment);
+router.patch('/:eventId', updateEvent);
 router.delete('/:eventId', deleteEvent);
 
 export default router;

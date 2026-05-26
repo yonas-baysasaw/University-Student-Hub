@@ -11,6 +11,7 @@ import {
 } from '../utils/bookAccess.js';
 import { parsePublishYear, validateBookCatalogMeta } from '../utils/bookCatalogMeta.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
+import { RAG_PREP_VERSION } from '../constants/studyBuddyPrompts.js';
 import { scheduleRagIndexForBook } from '../services/bookRagService.js';
 
 const ensureValidBookId = (bookId) => mongoose.Types.ObjectId.isValid(bookId);
@@ -388,7 +389,7 @@ export const reindexMyBooks = asyncHandler(async (req, res) => {
   const userId = req.user._id;
 
   const books = await Book.find({ userId })
-    .select('_id ragIndexStatus title')
+    .select('_id ragIndexStatus title ragPrepVersion')
     .lean();
 
   if (books.length === 0) {
@@ -430,7 +431,7 @@ export const reindexMyBooks = asyncHandler(async (req, res) => {
       continue;
     }
 
-    if (status === 'ready' && chunkCount > 0) {
+    if (status === 'ready' && chunkCount > 0 && (book.ragPrepVersion ?? 0) >= RAG_PREP_VERSION) {
       skipped += 1;
       details.push({
         bookId: bid,

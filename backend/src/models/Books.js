@@ -132,6 +132,24 @@ const bookSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    /** Total pages extracted during last successful index. */
+    ragPageCount: {
+      type: Number,
+      default: 0,
+    },
+    /** Chapter outline for Study Buddy navigation and retrieval boosts. */
+    ragChapterMap: [
+      {
+        title: { type: String, default: '' },
+        pageStart: { type: Number, default: null },
+        pageEnd: { type: Number, default: null },
+      },
+    ],
+    /** Increment when index pipeline changes; triggers optional re-index. */
+    ragPrepVersion: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true },
 );

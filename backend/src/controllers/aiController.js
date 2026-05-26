@@ -1,5 +1,9 @@
 import ChatSession from '../models/ChatSession.js';
 import {
+  buildContextPrefix,
+  MODE_RULES,
+} from '../constants/studyBuddyPrompts.js';
+import {
   augmentMessagesWithBookRag,
   buildGeneralRagContextForQuery,
 } from '../services/bookRagService.js';
@@ -10,28 +14,6 @@ import {
   userLikeFromCredentials,
 } from '../utils/geminiUserCredentials.js';
 import { assertCanWrite } from '../utils/userWriteAccess.js';
-
-const CONTEXT_ONLY_RULES = `Answer the user's question using ONLY the provided context.
-
-Rules:
-- Give concise answers
-- Understand grammar mistakes and typos in the question
-- Mention chapter names if available
-- Do not include copyright or publisher text
-- Recommend related books if relevant
-- If answer is not found, say exactly:
-"The information was not found in the available books."`;
-
-const MODE_RULES = {
-  chat: 'Provide a direct helpful answer in 3-6 sentences.',
-  study_notes:
-    'Create structured study notes with headings: Topic, Explanation, Key Points, Example, Important Notes.',
-  summary: 'Give a short summary in 4-6 bullet points.',
-  exam_prep:
-    'Provide exam-prep notes: key concepts and 3 short practice questions with answers.',
-  beginner:
-    'Explain in simple language with short sentences and one easy example.',
-};
 
 function toGeminiRole(role) {
   return role === 'assistant' ? 'model' : 'user';
@@ -96,12 +78,18 @@ async function generateLiquAiReply({
   mode,
   contextScope,
   userId,
+  pageNumber,
+  selectedText,
+  chapterFilter,
 }) {
   validateChatMessages(messages);
 
   let messagesForLlm = messages;
   let ragReferences = [];
-  let hasRagContext = false;
+  let ragUsed = false;
+  let ragNote = null;
+  let grounding = 'none';
+
   const lastUserMsg = messages.at(-1);
   const classroomContextHint =
     lastUserMsg?.role === 'user' &&
@@ -113,34 +101,51 @@ async function generateLiquAiReply({
     String(contextScope || '').toLowerCase() === 'classroom' ||
     classroomContextHint;
 
+  const ragOpts = {
+    pageNumber,
+    selectedText,
+    chapterFilter,
+  };
+
   if (bookId && String(bookId).trim()) {
     const aug = await augmentMessagesWithBookRag(
       messages,
       String(bookId).trim(),
       userId,
       mode,
+      ragOpts,
     );
     messagesForLlm = aug.messages;
     ragReferences = Array.isArray(aug.references) ? aug.references : [];
-    hasRagContext = Boolean(aug.ragUsed);
+    ragUsed = Boolean(aug.ragUsed);
+    ragNote = aug.ragNote ?? null;
+    grounding = aug.grounding || (ragUsed ? 'book' : 'none');
   }
 
   if ((!bookId || !String(bookId).trim()) && !isClassroomScope) {
     if (lastUserMsg?.role === 'user' && typeof lastUserMsg.content === 'string') {
-      const modeRule = MODE_RULES[String(mode || 'chat').toLowerCase()] || MODE_RULES.chat;
+      const modeKey = String(mode || 'chat').toLowerCase();
+      const modeRule = MODE_RULES[modeKey] || MODE_RULES.chat;
       const rag = await buildGeneralRagContextForQuery(
         userId,
         lastUserMsg.content,
+        { messages },
       );
       if (rag.context) {
-        const prefix =
-          `${CONTEXT_ONLY_RULES}\n- Output mode: ${String(mode || 'chat')}\n- Mode behavior: ${modeRule}\n\nProvided context:\n\n` +
-          rag.context +
-          '\n\n---\n\nStudent question:\n';
+        const prefix = buildContextPrefix({
+          bookTitle: '',
+          mode: modeKey,
+          modeRule,
+          context: rag.context,
+          indexRequired: false,
+          lowConfidence: rag.reason === 'low_confidence',
+        });
         const out = messages.slice(0, -1).map((m) => ({ ...m }));
         out.push({ role: 'user', content: `${prefix}${lastUserMsg.content}` });
         messagesForLlm = out;
-        hasRagContext = true;
+        ragUsed = true;
+        ragNote = rag.reason === 'low_confidence' ? 'low_confidence' : 'ok';
+        grounding = 'library';
       }
       ragReferences = Array.isArray(rag.references) ? rag.references : [];
     }
@@ -158,7 +163,6 @@ async function generateLiquAiReply({
       .trim();
   }
 
-  // Persist to session (Liqu AI only, not support widget sessions)
   let session = sessionId
     ? await ChatSession.findOne({
         _id: sessionId,
@@ -177,25 +181,37 @@ async function generateLiquAiReply({
   }
 
   const userMsg = messages[messages.length - 1];
-  session.messages.push(
-    { role: userMsg.role, content: userMsg.content },
-    { role: 'assistant', content: responseText },
-  );
+  session.messages.push({ role: userMsg.role, content: userMsg.content });
+  session.messages.push({
+    role: 'assistant',
+    content: responseText,
+    references: ragReferences,
+    grounding,
+  });
   await session.save();
 
   return {
     response: responseText,
     sessionId: session._id.toString(),
     references: ragReferences,
+    ragUsed,
+    ragNote,
+    grounding,
   };
 }
-
-// ── Chat (REST, non-streaming) ─────────────────────────────────────────────────
 
 async function chatController(req, res, next) {
   try {
     assertCanWrite(req.user);
-    const { messages, sessionId, bookId, mode } = req.body;
+    const {
+      messages,
+      sessionId,
+      bookId,
+      mode,
+      pageNumber,
+      selectedText,
+      chapterFilter,
+    } = req.body;
     const userId = req.user._id;
     const result = await generateLiquAiReply({
       messages,
@@ -204,6 +220,9 @@ async function chatController(req, res, next) {
       mode,
       contextScope: req.body?.contextScope,
       userId,
+      pageNumber,
+      selectedText,
+      chapterFilter,
     });
     return res.json(result);
   } catch (error) {
@@ -219,8 +238,6 @@ async function chatController(req, res, next) {
     return next(error);
   }
 }
-
-// ── Chat sessions CRUD ────────────────────────────────────────────────────────
 
 async function listSessionsController(req, res, next) {
   try {

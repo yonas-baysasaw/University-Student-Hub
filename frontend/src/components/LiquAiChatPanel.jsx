@@ -29,6 +29,14 @@ import { toast } from 'sonner';
 import { useAuth } from '../contexts/AuthContext';
 import { useSocket } from '../contexts/SocketContext';
 import { readJsonOrThrow } from '../utils/http';
+import {
+  formatSourceLabel,
+  groundingChip,
+  ragBannerMessage,
+  ragPhaseLabel,
+  ragStatusSubtitle,
+  STUDY_MODES,
+} from '../constants/studyBuddyCopy.js';
 
 const GEMINI_TXT_ATTACH_MAX = 12000;
 /** Distance from scroll bottom below which we keep "follow stream" on for Gemini. */
@@ -59,7 +67,7 @@ function useIsMinWidth(px) {
 }
 
 const BASE_WELCOME =
-  "Hi! I'm Liqu AI. I can help you study, explain concepts, answer questions, and pull relevant excerpts from your books. How can I help you today?";
+  "Hi! I'm Liqu AI — your study partner. Ask me to explain ideas, summarize a chapter, or quiz you on what you're reading.";
 
 function normalizeReferences(references) {
   if (!Array.isArray(references)) return [];
@@ -148,6 +156,16 @@ function LiquAiChatPanel({
   sessionSidebarMode = 'overlay',
   /** When true with study workspace, tightens toolbars (e.g. reader focus mode). */
   denseStudyChrome = false,
+  studyMode = 'chat',
+  onStudyModeChange,
+  pageNumber = null,
+  selectedText = '',
+  onClearSelectedText,
+  chapterFilter = '',
+  onChapterFilterChange,
+  onOpenInReader,
+  onPracticeFromMessage,
+  autoPrepareBook = false,
 }) {
   const isGemini = variant === 'gemini';
   const isStudyWorkspace =
@@ -190,6 +208,7 @@ function LiquAiChatPanel({
   const [ragStatus, setRagStatus] = useState(null);
   const [ragPoll, setRagPoll] = useState(false);
   const [ragError, setRagError] = useState('');
+  const autoPrepareAttemptedRef = useRef(false);
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [attachmentChipNames, setAttachmentChipNames] = useState([]);
   const attachMenuContainerRef = useRef(null);
@@ -340,7 +359,8 @@ function LiquAiChatPanel({
           id: `${data._id}-${i}`,
           role: m.role,
           content: m.content,
-          references: [],
+          references: normalizeReferences(m.references),
+          grounding: m.grounding || 'none',
         }));
         setMessages(
           msgs.length ? msgs : [makeWelcome(bookTitle, contextBlurb, contextScope)],
@@ -420,6 +440,28 @@ function LiquAiChatPanel({
   }, [bookId, fetchRagStatus]);
 
   useEffect(() => {
+    autoPrepareAttemptedRef.current = false;
+  }, [bookId]);
+
+  useEffect(() => {
+    if (!autoPrepareBook || !bookId || !isStudyWorkspace) return;
+    if (autoPrepareAttemptedRef.current) return;
+    if (!ragStatus) return;
+    const ready =
+      ragStatus.ragIndexStatus === 'ready' ||
+      (ragStatus.chunkCount ?? 0) > 0;
+    const busy = ragStatus.ragIndexStatus === 'indexing';
+    if (ready || busy || ragStatus.ragIndexStatus === 'failed') return;
+    autoPrepareAttemptedRef.current = true;
+    toast.info(
+      bookTitle
+        ? `Getting "${bookTitle}" ready so I can help you study`
+        : 'Getting this book ready so I can help you study',
+    );
+    void indexBookForRag();
+  }, [autoPrepareBook, bookId, isStudyWorkspace, ragStatus, bookTitle]);
+
+  useEffect(() => {
     if (!bookId || !ragPoll) return;
     const tick = async () => {
       try {
@@ -483,7 +525,7 @@ function LiquAiChatPanel({
           ragIndexProgressPercent: 0,
         }));
         setRagPoll(true);
-        toast.info('Indexing started — you can keep using the app');
+        toast.info('Getting your book ready — you can keep chatting');
       }
     } catch (e) {
       setRagError(e?.message || 'Index failed');
@@ -492,20 +534,9 @@ function LiquAiChatPanel({
   }
 
   const ragIsIndexing = ragStatus?.ragIndexStatus === 'indexing';
-  const phaseLabel = (() => {
-    const p = ragStatus?.ragIndexPhase || '';
-    if (p === 'downloading') return 'Downloading file…';
-    if (p === 'extracting') return 'Extracting text from the document…';
-    if (p === 'chunking') return 'Splitting into passages for search…';
-    if (p === 'embedding' || p === 'writing') {
-      const t = Number(ragStatus.ragIndexTotalChunks) || 0;
-      const d = Number(ragStatus.ragIndexDoneChunks) || 0;
-      if (t > 0) return `Embedding passages (${d} / ${t})…`;
-      return 'Embedding passages…';
-    }
-    if (ragIsIndexing) return 'Working…';
-    return '';
-  })();
+  const phaseLabel = ragIsIndexing
+    ? ragPhaseLabel(ragStatus?.ragIndexPhase)
+    : '';
   const embTotal = Number(ragStatus?.ragIndexTotalChunks) || 0;
   const embDone = Number(ragStatus?.ragIndexDoneChunks) || 0;
   const serverPct = Number(ragStatus?.ragIndexProgressPercent);
@@ -643,6 +674,16 @@ function LiquAiChatPanel({
     const requestPayload = {
       ...(bookId ? { bookId: String(bookId) } : {}),
       ...(contextScope ? { contextScope: String(contextScope) } : {}),
+      mode: studyMode || 'chat',
+      ...(pageNumber != null && Number(pageNumber) > 0
+        ? { pageNumber: Number(pageNumber) }
+        : {}),
+      ...(String(selectedText || '').trim()
+        ? { selectedText: String(selectedText).trim() }
+        : {}),
+      ...(String(chapterFilter || '').trim()
+        ? { chapterFilter: String(chapterFilter).trim() }
+        : {}),
     };
 
     try {
@@ -678,13 +719,14 @@ function LiquAiChatPanel({
         setStreamingContent(streamingRef.current);
       };
 
-      const onDone = ({ fullResponse, sessionId, references }) => {
+      const onDone = ({ fullResponse, sessionId, references, grounding }) => {
         cleanup();
         const aiMsg = {
           id: `ai-${Date.now()}`,
           role: 'assistant',
           content: fullResponse,
           references: normalizeReferences(references),
+          grounding: grounding || 'none',
         };
         setMessages((prev) => [...prev, aiMsg]);
         setStreamingContent('');
@@ -734,6 +776,7 @@ function LiquAiChatPanel({
       role: 'assistant',
       content: data.response,
       references: normalizeReferences(data.references),
+      grounding: data.grounding || 'none',
     };
     setMessages((prev) => [...prev, aiMsg]);
     if (data.sessionId) {
@@ -760,13 +803,7 @@ function LiquAiChatPanel({
     !loading && messages.length === 1 && messages[0]?.id === 'welcome';
 
   const studyRagSubtitle = bookId
-    ? ragIsIndexing
-      ? 'Preparing…'
-      : ragStatus?.ragIndexStatus === 'failed'
-        ? 'Prep failed'
-        : (ragStatus?.chunkCount ?? 0) > 0
-          ? `Ready (${ragStatus.chunkCount} snippets)`
-          : 'Prepare recommended'
+    ? ragStatusSubtitle(ragStatus, ragStatus?.chunkCount)
     : '';
 
   const showJumpToBottomFab =
@@ -1051,6 +1088,50 @@ function LiquAiChatPanel({
               ) : null}
             </div>
           ) : null}
+          {isStudyWorkspace ? (
+            <div
+              className={`flex flex-wrap items-center gap-2 ${
+                studyDense ? 'mb-1' : 'mb-2'
+              }`}
+            >
+              <label htmlFor="study-mode-select" className="sr-only">
+                Study mode
+              </label>
+              <select
+                id="study-mode-select"
+                value={studyMode}
+                onChange={(e) => onStudyModeChange?.(e.target.value)}
+                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+              >
+                {STUDY_MODES.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))}
+              </select>
+              {Array.isArray(ragStatus?.ragChapterMap) &&
+              ragStatus.ragChapterMap.length > 0 ? (
+                <>
+                  <label htmlFor="chapter-filter" className="sr-only">
+                    Limit to chapter
+                  </label>
+                  <select
+                    id="chapter-filter"
+                    value={chapterFilter}
+                    onChange={(e) => onChapterFilterChange?.(e.target.value)}
+                    className="min-w-0 max-w-[12rem] truncate rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-700 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
+                  >
+                    <option value="">Whole book</option>
+                    {ragStatus.ragChapterMap.map((ch) => (
+                      <option key={ch.title} value={ch.title}>
+                        {ch.title}
+                      </option>
+                    ))}
+                  </select>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {bookId ? (
             <div
               className={
@@ -1063,13 +1144,7 @@ function LiquAiChatPanel({
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span>
-                  {ragIsIndexing
-                    ? 'Preparing your book so answers can use it…'
-                    : ragStatus?.ragIndexStatus === 'failed'
-                      ? "We couldn't finish preparing this book. You can try again below."
-                      : ragStatus && (ragStatus.chunkCount ?? 0) > 0
-                        ? `Ready — Liqu AI can use about ${ragStatus.chunkCount} snippets from this book when you ask.`
-                        : 'Prepare this book once so answers can reference the text (works best with text-based PDFs or .txt).'}
+                  {ragBannerMessage(ragStatus, ragStatus?.chunkCount)}
                 </span>
                 <button
                   type="button"
@@ -1082,10 +1157,10 @@ function LiquAiChatPanel({
                   }
                 >
                   {ragIsIndexing
-                    ? 'Preparing…'
+                    ? 'Reading…'
                     : (ragStatus?.chunkCount ?? 0) > 0
-                      ? 'Prepare again'
-                      : 'Prepare book'}
+                      ? 'Read again'
+                      : 'Get book ready'}
                 </button>
               </div>
               {ragIsIndexing && phaseLabel ? (
@@ -1309,7 +1384,13 @@ function LiquAiChatPanel({
                 </>
               ) : (
                 messages.map((msg) => (
-                  <MessageBubble key={msg.id} message={msg} variant={variant} />
+                  <MessageBubble
+                    key={msg.id}
+                    message={msg}
+                    variant={variant}
+                    onOpenInReader={onOpenInReader}
+                    onPracticeFromMessage={onPracticeFromMessage}
+                  />
                 ))
               )}
 
@@ -1403,6 +1484,36 @@ function LiquAiChatPanel({
                       : 'relative rounded-full border border-slate-200/50 bg-white/55 px-2 py-1.5 shadow-md shadow-slate-900/[0.07] ring-1 ring-slate-900/[0.04] backdrop-blur-md dark:border-slate-600/30 dark:bg-slate-950/40 dark:shadow-black/20 dark:ring-white/[0.05]'
                   }
                 >
+                  {String(selectedText || '').trim() ? (
+                    <div className="mb-1.5 flex items-start justify-between gap-2 rounded-xl border border-cyan-200/60 bg-cyan-50/80 px-2 py-1.5 dark:border-cyan-800/40 dark:bg-cyan-950/30">
+                      <p className="min-w-0 flex-1 text-[10px] leading-snug text-slate-700 dark:text-slate-300">
+                        From your page: &ldquo;{String(selectedText).slice(0, 100)}
+                        {String(selectedText).length > 100 ? '…' : ''}&rdquo;
+                      </p>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          className="rounded-md bg-blue-600 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-blue-500"
+                          onClick={() =>
+                            void sendMessage(
+                              undefined,
+                              `Explain this from the book:\n\n"${String(selectedText).trim()}"`,
+                            )
+                          }
+                        >
+                          Ask about this
+                        </button>
+                        <button
+                          type="button"
+                          className="rounded-md px-1 py-0.5 text-[10px] text-slate-500 hover:bg-slate-200/80 dark:hover:bg-slate-800"
+                          onClick={() => onClearSelectedText?.()}
+                          aria-label="Clear selection"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   {attachmentChipNames.length > 0 ? (
                     <div className="mb-1 flex flex-wrap gap-1 border-b border-slate-200/40 pb-1.5 dark:border-white/[0.06]">
                       {attachmentChipNames.map((n) => (
@@ -1879,11 +1990,14 @@ function MessageBubble({
   message,
   variant = 'default',
   compactWelcome = false,
+  onOpenInReader,
+  onPracticeFromMessage,
 }) {
   const isUser = message.role === 'user';
   const isGemini = variant === 'gemini';
   const showActions =
     isGemini && message.role === 'assistant' && message.id !== 'welcome';
+  const chip = groundingChip(message.references, message.grounding);
 
   if (
     isGemini &&
@@ -1921,6 +2035,11 @@ function MessageBubble({
       <div className="flex items-start gap-2">
         <AiAvatar gemini />
         <div className="min-w-0 flex-1">
+          {chip ? (
+            <p className="mb-1 text-[10px] font-medium text-slate-500 dark:text-slate-400">
+              {chip}
+            </p>
+          ) : null}
           <MessageContent
             content={message.content}
             isUser={false}
@@ -1929,9 +2048,21 @@ function MessageBubble({
           <MessageSources
             references={message.references}
             variant={variant}
+            onOpenInReader={onOpenInReader}
           />
           {showActions ? (
-            <AssistantMessageActions content={message.content} />
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <AssistantMessageActions content={message.content} />
+              {message.grounding === 'book' && onPracticeFromMessage ? (
+                <button
+                  type="button"
+                  onClick={() => onPracticeFromMessage(message)}
+                  className="rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-semibold text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800"
+                >
+                  Turn into practice questions
+                </button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
@@ -1965,7 +2096,7 @@ function MessageBubble({
   );
 }
 
-function MessageSources({ references, variant = 'default' }) {
+function MessageSources({ references, variant = 'default', onOpenInReader }) {
   const sources = normalizeReferences(references);
   if (!sources.length) return null;
   const isGemini = variant === 'gemini';
@@ -1978,34 +2109,41 @@ function MessageSources({ references, variant = 'default' }) {
       }
     >
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-400">
-        Sources
+        In your book
       </p>
       <ul className="mt-1.5 space-y-1">
-        {sources.map((source) => {
-          const pageLabel =
-            Number.isFinite(source.pageStart) && Number.isFinite(source.pageEnd)
-              ? source.pageStart === source.pageEnd
-                ? `Page ${source.pageStart}`
-                : `Pages ${source.pageStart}-${source.pageEnd}`
-              : '';
-          const chapterLabel = source.chapter ? `Chapter: ${source.chapter}` : '';
-          const meta = [chapterLabel, pageLabel].filter(Boolean).join(' · ');
-          return (
-            <li key={`${source.bookId}-${source.excerptNumber}`}>
-              <Link
-                to={`/library/${source.bookId}`}
-                className="text-xs text-blue-700 hover:underline dark:text-blue-400"
-              >
-                {source.bookTitle} · Excerpt #{source.excerptNumber}
-              </Link>
-              {meta ? (
-                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
-                  {meta}
-                </p>
-              ) : null}
-            </li>
-          );
-        })}
+        {sources.map((source) => (
+          <li key={`${source.bookId}-${source.excerptNumber}`}>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs text-blue-700 dark:text-blue-400">
+                {formatSourceLabel(source)}
+              </span>
+              {onOpenInReader &&
+              Number.isFinite(source.pageStart) &&
+              source.pageStart > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onOpenInReader({
+                      bookId: source.bookId,
+                      page: source.pageStart,
+                    })
+                  }
+                  className="text-[10px] font-semibold text-cyan-700 hover:underline dark:text-cyan-400"
+                >
+                  Open in reader
+                </button>
+              ) : (
+                <Link
+                  to={`/library/${source.bookId}`}
+                  className="text-[10px] font-semibold text-slate-500 hover:underline dark:text-slate-400"
+                >
+                  Book details
+                </Link>
+              )}
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );

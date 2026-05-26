@@ -4,37 +4,37 @@ import { ENV } from '../config/env.js';
 import { s3Client } from '../config/s3Client.js';
 import BookChunk from '../models/BookChunk.js';
 import Book from '../models/Books.js';
-import { splitTextForRagWithMetadata } from '../utils/bookRagChunker.js';
+import {
+  RAG_PREP_VERSION,
+  MODE_RULES,
+  buildContextPrefix,
+  mapRagErrorToUserMessage,
+} from '../constants/studyBuddyPrompts.js';
+import {
+  buildChapterMapFromChunks,
+  buildChapterSummaryChunks,
+  splitPagesForRagWithMetadata,
+  splitTextForRagWithMetadata,
+} from '../utils/bookRagChunker.js';
+import {
+  loadUserGeminiCredentials,
+  userLikeFromCredentials,
+} from '../utils/geminiUserCredentials.js';
+import { ocrPdfToPages } from './bookOcrService.js';
 import { extractTextFromPDF, extractTextPagesFromPDF } from './pdfService.js';
 import {
   cosineSimilarity,
   embedText,
+  embedTexts,
   rewriteQueryForSearch,
 } from './embeddingService.js';
 
-const TOP_K = 5;
+const CANDIDATE_K = 15;
+const TOP_K_FINAL = 7;
+const MIN_FUSED_SCORE = 0.25;
 const MAX_CONTEXT_CHARS = 10000;
 const MIN_TEXT_TO_INDEX = 200;
-const CONTEXT_ONLY_RULES = `Answer the user's question using ONLY the provided context.
-
-Rules:
-- Give concise answers
-- Understand grammar mistakes and typos in the question
-- Mention chapter names if available
-- Do not include copyright or publisher text
-- Recommend related books if relevant
-- If answer is not found, say exactly:
-"The information was not found in the available books."`;
-const MODE_RULES = {
-  chat: 'Provide a direct helpful answer in 3-6 sentences.',
-  study_notes:
-    'Create structured study notes with headings: Topic, Explanation, Key Points, Example, Important Notes.',
-  summary: 'Give a short summary in 4-6 bullet points.',
-  exam_prep:
-    'Provide exam-prep notes: key concepts and 3 short practice questions with answers.',
-  beginner:
-    'Explain in simple language with short sentences and one easy example.',
-};
+const INSERT_BATCH = 50;
 /** Large PDFs over slow links can look “stuck” without a timeout. */
 const BOOK_DOWNLOAD_TIMEOUT_MS = 120_000;
 /** Log every N ms while a download (HTTP + body) is in flight — helps see “stuck on Step 1”. */
@@ -205,10 +205,318 @@ function normalizeScoredChunkRow(row) {
   };
 }
 
+function normalizeFusedScore(score) {
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(1, score));
+}
+
+function selectedTextOverlapScore(selectedText, chunkText) {
+  const sel = String(selectedText || '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 400);
+  if (sel.length < 12) return 0;
+  const hay = String(chunkText || '').toLowerCase();
+  if (hay.includes(sel)) return 1;
+  const words = sel.split(' ').filter((w) => w.length >= 4);
+  if (!words.length) return 0;
+  let hits = 0;
+  for (const w of words) {
+    if (hay.includes(w)) hits += 1;
+  }
+  return hits / words.length;
+}
+
+function applyContextBoosts(row, { pageNumber, selectedText, chapterFilter }) {
+  let boost = 0;
+  const chFilter = String(chapterFilter || '').trim().toLowerCase();
+  if (chFilter && String(row.chapter || '').toLowerCase().includes(chFilter)) {
+    boost += 0.15;
+  }
+  const pn = Number(pageNumber);
+  if (Number.isFinite(pn) && pn > 0) {
+    const ps = row.pageStart ?? null;
+    const pe = row.pageEnd ?? ps;
+    if (ps != null && pe != null && pn >= ps - 2 && pn <= pe + 2) {
+      boost += 0.2;
+    }
+  }
+  boost += 0.25 * selectedTextOverlapScore(selectedText, row.text);
+  return boost;
+}
+
+/**
+ * @param {Record<string, unknown>} filter
+ * @param {string} query
+ * @param {number} limit
+ */
+async function searchChunksByText(filter, query, limit = CANDIDATE_K) {
+  const q = String(query || '').trim();
+  if (!q) return [];
+  try {
+    const rows = await BookChunk.find(
+      { ...filter, $text: { $search: q } },
+      { score: { $meta: 'textScore' } },
+    )
+      .select('text chunkIndex book chapter section pageStart pageEnd embedding')
+      .sort({ score: { $meta: 'textScore' } })
+      .limit(limit)
+      .lean();
+    const maxText = Math.max(
+      1,
+      ...rows.map((r) => Number(r.score) || 0),
+    );
+    return rows.map((r) => ({
+      book: r.book ? String(r.book) : undefined,
+      text: r.text,
+      chunkIndex: r.chunkIndex,
+      chapter: r.chapter || '',
+      section: r.section || '',
+      pageStart: r.pageStart ?? null,
+      pageEnd: r.pageEnd ?? null,
+      embedding: r.embedding,
+      textScore: normalizeFusedScore((Number(r.score) || 0) / maxText),
+      vectorScore: 0,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function fuseCandidateRows(vectorRows, textRows) {
+  const byKey = new Map();
+  const add = (row, source) => {
+    const bookPart = row.book ? String(row.book) : '';
+    const key = `${bookPart}::${row.chunkIndex ?? 0}`;
+    const existing = byKey.get(key) || {
+      ...row,
+      vectorScore: 0,
+      textScore: 0,
+    };
+    if (source === 'vector') {
+      existing.vectorScore = Math.max(
+        existing.vectorScore,
+        normalizeFusedScore(row.score ?? row.vectorScore ?? 0),
+      );
+    } else {
+      existing.textScore = Math.max(existing.textScore, row.textScore ?? 0);
+    }
+    existing.text = row.text;
+    existing.chapter = row.chapter || existing.chapter || '';
+    existing.section = row.section || existing.section || '';
+    existing.pageStart = row.pageStart ?? existing.pageStart ?? null;
+    existing.pageEnd = row.pageEnd ?? existing.pageEnd ?? null;
+    existing.embedding = row.embedding ?? existing.embedding;
+    byKey.set(key, existing);
+  };
+  for (const r of vectorRows || []) add(r, 'vector');
+  for (const r of textRows || []) add(r, 'text');
+  return [...byKey.values()].map((r) => ({
+    ...r,
+    score: normalizeFusedScore(0.6 * r.vectorScore + 0.4 * r.textScore),
+  }));
+}
+
+function selectWithMMR(candidates, limit, lambda = 0.7) {
+  const pool = [...candidates].sort((a, b) => b.score - a.score);
+  if (pool.length <= limit) return pool;
+  const selected = [];
+  const used = new Set();
+  while (selected.length < limit && selected.length < pool.length) {
+    let best = null;
+    let bestVal = -Infinity;
+    for (const c of pool) {
+      const key = `${c.book || ''}::${c.chunkIndex}`;
+      if (used.has(key)) continue;
+      let simToSelected = 0;
+      for (const s of selected) {
+        simToSelected = Math.max(
+          simToSelected,
+          keywordScore(c.text, s.text),
+        );
+      }
+      const val = lambda * c.score - (1 - lambda) * simToSelected;
+      if (val > bestVal) {
+        bestVal = val;
+        best = c;
+      }
+    }
+    if (!best) break;
+    used.add(`${best.book || ''}::${best.chunkIndex}`);
+    selected.push(best);
+  }
+  return selected;
+}
+
+function formatContextBlock(s, bookTitle) {
+  const pageLabel =
+    s.pageStart && s.pageEnd
+      ? s.pageStart === s.pageEnd
+        ? ` | Page ${s.pageStart}`
+        : ` | Pages ${s.pageStart}-${s.pageEnd}`
+      : '';
+  const chapterLabel = s.chapter ? ` | Chapter: ${s.chapter}` : '';
+  const sectionLabel = s.section ? ` | Section: ${s.section}` : '';
+  const bookLabel = bookTitle ? `Book: ${bookTitle} | ` : '';
+  return `[${bookLabel}Excerpt #${(s.chunkIndex ?? 0) + 1}${pageLabel}${chapterLabel}${sectionLabel}]\n${s.text}`;
+}
+
+function buildContextFromSelected(selected, bookTitle) {
+  let combined = '';
+  const included = [];
+  for (const s of selected) {
+    const block = formatContextBlock(s, bookTitle);
+    if (combined.length + block.length + 2 > MAX_CONTEXT_CHARS) break;
+    combined = combined ? `${combined}\n\n${block}` : block;
+    included.push(s);
+  }
+  return { combined, included };
+}
+
+/**
+ * @param {object} opts
+ */
+async function hybridRetrieveChunks(opts) {
+  const {
+    filter,
+    query,
+    messages = [],
+    embedCredentials = null,
+    pageNumber = null,
+    selectedText = '',
+    chapterFilter = '',
+    bookTitle = '',
+    bookId = '',
+    bookUrl = '',
+    titleById = null,
+    urlById = null,
+  } = opts;
+
+  const rewrittenQuery = await rewriteQueryForSearch(query, messages);
+  let queryEmbedding = null;
+  try {
+    queryEmbedding = await embedText(rewrittenQuery, embedCredentials);
+  } catch {
+    queryEmbedding = null;
+  }
+
+  const vectorRows = await searchChunksByVector({
+    filter,
+    queryEmbedding,
+    limit: CANDIDATE_K,
+  });
+
+  let fallbackRows = [];
+  if (!Array.isArray(vectorRows)) {
+    const mongoFilter = { ...filter };
+    fallbackRows = await BookChunk.find(mongoFilter)
+      .select('text chunkIndex book chapter section pageStart pageEnd embedding')
+      .lean();
+    fallbackRows = fallbackRows
+      .map((r) => ({
+        book: r.book ? String(r.book) : undefined,
+        text: r.text,
+        score: semanticOrKeywordScore(
+          queryEmbedding,
+          rewrittenQuery,
+          r.text,
+          r.embedding,
+        ),
+        chunkIndex: r.chunkIndex,
+        chapter: r.chapter || '',
+        section: r.section || '',
+        pageStart: r.pageStart ?? null,
+        pageEnd: r.pageEnd ?? null,
+        embedding: r.embedding,
+        vectorScore: semanticOrKeywordScore(
+          queryEmbedding,
+          rewrittenQuery,
+          r.text,
+          r.embedding,
+        ),
+        textScore: 0,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, CANDIDATE_K);
+  }
+
+  const textRows = await searchChunksByText(filter, rewrittenQuery, CANDIDATE_K);
+  const fused = fuseCandidateRows(
+    Array.isArray(vectorRows) ? vectorRows : fallbackRows,
+    textRows,
+  );
+
+  const boosted = fused.map((r) => ({
+    ...r,
+    score: normalizeFusedScore(
+      r.score + applyContextBoosts(r, { pageNumber, selectedText, chapterFilter }),
+    ),
+  }));
+
+  const chFilter = String(chapterFilter || '').trim().toLowerCase();
+  const filtered = chFilter
+    ? boosted.filter(
+        (r) =>
+          String(r.chapter || '').toLowerCase().includes(chFilter) ||
+          String(r.section || '').toLowerCase().includes(chFilter) ||
+          String(r.text || '').toLowerCase().includes(chFilter.slice(0, 24)),
+      )
+    : boosted;
+
+  filtered.sort((a, b) => b.score - a.score);
+  const pool = filtered.length ? filtered : boosted;
+  if (pool.length && pool[0].score < MIN_FUSED_SCORE) {
+    return {
+      context: null,
+      reason: 'low_confidence',
+      references: [],
+      bookTitle,
+    };
+  }
+
+  const selected = selectWithMMR(pool, TOP_K_FINAL);
+  const { combined, included } = buildContextFromSelected(
+    selected,
+    titleById ? null : bookTitle,
+  );
+
+  if (!combined) {
+    return { context: null, reason: 'empty', references: [], bookTitle };
+  }
+
+  console.log(
+    `[bookRag] hybrid top=${included.length} best=${included[0]?.score?.toFixed(3) ?? '0'} query="${previewText(query, 120)}"`,
+  );
+
+  const references = included.map((s) => {
+    const bid = s.book || bookId;
+    return {
+      bookId: String(bid),
+      bookTitle: titleById?.get(String(bid)) || bookTitle || 'Untitled',
+      bookUrl: urlById?.get(String(bid)) || bookUrl || '',
+      chunkIndex: s.chunkIndex ?? 0,
+      excerptNumber: (s.chunkIndex ?? 0) + 1,
+      score: s.score,
+      chapter: s.chapter || '',
+      section: s.section || '',
+      pageStart: s.pageStart ?? null,
+      pageEnd: s.pageEnd ?? null,
+    };
+  });
+
+  return {
+    context: combined,
+    reason: 'ok',
+    references,
+    bookTitle,
+  };
+}
+
 async function searchChunksByVector({
   filter = {},
   queryEmbedding,
-  limit = TOP_K,
+  limit = CANDIDATE_K,
 }) {
   if (!Array.isArray(queryEmbedding) || queryEmbedding.length === 0) return null;
   const indexName = String(ENV.RAG_VECTOR_INDEX_NAME || '').trim();
@@ -488,6 +796,10 @@ export async function runRagIndexPipeline(bookId, userId) {
   const bid = new mongoose.Types.ObjectId(String(bookId));
   ragLog(String(bookId), 'pipeline', 'runRagIndexPipeline entered');
 
+  const credentials = userLikeFromCredentials(
+    await loadUserGeminiCredentials(userId),
+  );
+
   const bookDoc = await findAccessibleBookDocument(bookId, userId);
   if (!bookDoc) {
     ragLog(
@@ -535,11 +847,33 @@ export async function runRagIndexPipeline(bookId, userId) {
     });
 
     const tExtract = Date.now();
-    const extracted = await textFromBuffer(bytes, bookDoc.bookUrl);
-    const text = extracted?.text || '';
+    let extracted = await textFromBuffer(bytes, bookDoc.bookUrl);
+    let text = extracted?.text || '';
+    let pages = Array.isArray(extracted?.pages) ? extracted.pages : [];
+
+    if (!text || text.trim().length < MIN_TEXT_TO_INDEX) {
+      ragLog(String(bookId), 'extracting', 'text thin — trying OCR');
+      try {
+        const ocr = await ocrPdfToPages(bytes, credentials);
+        if (ocr?.pages?.length) {
+          pages = ocr.pages.map((p) => ({
+            pageNumber: p.pageNumber,
+            text: cleanPageTextForRag(p.text),
+          }));
+          text = pages.map((p) => p.text).join('\n\n');
+          extracted = { text, pages };
+        }
+      } catch (ocrErr) {
+        ragLog(String(bookId), 'extracting', 'OCR failed', {
+          message: ocrErr?.message,
+        });
+      }
+    }
+
     ragLog(String(bookId), 'extracting', 'textFromBuffer finished', {
       ms: Date.now() - tExtract,
       textChars: text?.length ?? 0,
+      pageCount: pages.length,
     });
     if (!text || text.trim().length < MIN_TEXT_TO_INDEX) {
       ragLog(
@@ -554,8 +888,9 @@ export async function runRagIndexPipeline(bookId, userId) {
       await patchBookRagFields(bid, {
         ragIndexStatus: 'failed',
         ragIndexPhase: '',
-        ragIndexError:
+        ragIndexError: mapRagErrorToUserMessage(
           'Not enough extractable text (scanned PDFs or unsupported format).',
+        ),
         ragIndexTotalChunks: 0,
         ragIndexDoneChunks: 0,
         ragIndexProgressPercent: 0,
@@ -568,10 +903,25 @@ export async function runRagIndexPipeline(bookId, userId) {
       ragIndexProgressPercent: computeRagProgressPercent('chunking'),
     });
     const tChunk = Date.now();
-    const pieces = splitTextForRagWithMetadata(text);
-    ragLog(String(bookId), 'chunking', 'splitTextForRagEmbedding done', {
+    let pieces =
+      pages.length > 0
+        ? splitPagesForRagWithMetadata(pages)
+        : splitTextForRagWithMetadata(text);
+
+    let chapterMap = buildChapterMapFromChunks(pieces);
+    if (pieces.length >= 800 && pages.length > 0) {
+      const summaries = buildChapterSummaryChunks(
+        chapterMap,
+        pages,
+        pieces.length,
+      );
+      pieces = [...pieces.slice(0, 780), ...summaries];
+    }
+
+    ragLog(String(bookId), 'chunking', 'chunking done', {
       pieces: pieces.length,
       ms: Date.now() - tChunk,
+      chapters: chapterMap.length,
     });
     if (pieces.length === 0) {
       await patchBookRagFields(bid, {
@@ -597,49 +947,47 @@ export async function runRagIndexPipeline(bookId, userId) {
     ragLog(
       String(bookId),
       'writing',
-      'loop start (DB insert per chunk)',
+      'batch embed + insert start',
       {
         totalChunks: pieces.length,
         logEachApprox: logEvery,
       },
     );
 
-    for (let i = 0; i < pieces.length; i += 1) {
-      if (i === 0 || (i + 1) % logEvery === 0 || i + 1 === pieces.length) {
-        ragLog(String(bookId), 'writing', 'writing chunk', {
-          at: i + 1,
+    const embeddings = await embedTexts(
+      pieces.map((p) => p.text),
+      credentials,
+      5,
+    );
+
+    for (let batchStart = 0; batchStart < pieces.length; batchStart += INSERT_BATCH) {
+      const batch = pieces.slice(batchStart, batchStart + INSERT_BATCH);
+      const docs = batch.map((piece, j) => {
+        const i = batchStart + j;
+        return {
+          book: bid,
+          chunkIndex: piece.chunkIndex ?? i,
+          text: piece.text.slice(0, 20000),
+          chapter: piece.chapter || '',
+          section: piece.section || '',
+          pageStart: piece.pageStart ?? null,
+          pageEnd: piece.pageEnd ?? null,
+          embedding: embeddings[i] || [],
+        };
+      });
+      await BookChunk.insertMany(docs, { ordered: false });
+      const done = Math.min(batchStart + batch.length, pieces.length);
+      if (done === 1 || done % logEvery === 0 || done === pieces.length) {
+        ragLog(String(bookId), 'writing', 'batch written', {
+          at: done,
           of: pieces.length,
           elapsedSec: Math.round((Date.now() - tEmb) / 1000),
         });
       }
-      const piece = pieces[i];
-      let embedding = [];
-      try {
-        embedding = (await embedText(piece.text)) || [];
-      } catch (e) {
-        if (i === 0) {
-          console.warn('[bookRag] embedding disabled/fallback during indexing:', e?.message || e);
-        }
-      }
-      const pageHits = Array.isArray(extracted?.pages)
-        ? extracted.pages
-            .filter((p) => piece.text.includes(String(p.text || '').slice(0, 120)))
-            .map((p) => p.pageNumber)
-        : [];
-      await BookChunk.create({
-        book: bid,
-        chunkIndex: i,
-        text: piece.text.slice(0, 20000),
-        chapter: piece.chapter || '',
-        section: piece.section || '',
-        pageStart: pageHits.length ? Math.min(...pageHits) : null,
-        pageEnd: pageHits.length ? Math.max(...pageHits) : null,
-        embedding,
-      });
       await patchBookRagFields(bid, {
-        ragIndexDoneChunks: i + 1,
+        ragIndexDoneChunks: done,
         ragIndexProgressPercent: computeRagProgressPercent('writing', {
-          done: i + 1,
+          done,
           total: pieces.length,
         }),
       });
@@ -654,6 +1002,9 @@ export async function runRagIndexPipeline(bookId, userId) {
       ragIndexError: '',
       ragIndexedAt: new Date(),
       ragIndexProgressPercent: 100,
+      ragPageCount: pages.length || null,
+      ragChapterMap: chapterMap,
+      ragPrepVersion: RAG_PREP_VERSION,
     });
     ragLog(String(bookId), 'ready', 'ragIndexStatus=ready');
   } catch (e) {
@@ -666,7 +1017,7 @@ export async function runRagIndexPipeline(bookId, userId) {
     await patchBookRagFields(bid, {
       ragIndexStatus: 'failed',
       ragIndexPhase: '',
-      ragIndexError: msg,
+      ragIndexError: mapRagErrorToUserMessage(msg),
       ragIndexProgressPercent: 0,
     });
   }
@@ -746,17 +1097,16 @@ export async function scheduleRagIndexForBook(bookId, userId) {
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
  * @param {string} query
+ * @param {object} [opts]
  */
-export async function buildRagContextForQuery(bookId, userId, query) {
-  const rewrittenQuery = await rewriteQueryForSearch(query);
-  let queryEmbedding = null;
-  try {
-    queryEmbedding = await embedText(rewrittenQuery);
-  } catch {
-    queryEmbedding = null;
-  }
+export async function buildRagContextForQuery(bookId, userId, query, opts = {}) {
+  const book = await Book.findOne({
+    _id: bookId,
+    ...canReadBookFilter(userId),
+  })
+    .select('title bookUrl ragChapterMap')
+    .lean();
 
-  const book = await findAccessibleBookLean(bookId, userId);
   if (!book) {
     return {
       context: null,
@@ -766,16 +1116,8 @@ export async function buildRagContextForQuery(bookId, userId, query) {
     };
   }
 
-  const vectorRows = await searchChunksByVector({
-    filter: { book: new mongoose.Types.ObjectId(String(bookId)) },
-    queryEmbedding,
-    limit: TOP_K,
-  });
-
-  const rows = await BookChunk.find({ book: bookId })
-    .select('text chunkIndex chapter section pageStart pageEnd embedding')
-    .lean();
-  if (rows.length === 0) {
+  const chunkCount = await BookChunk.countDocuments({ book: bookId });
+  if (chunkCount === 0) {
     return {
       context: null,
       bookTitle: book.title,
@@ -784,123 +1126,30 @@ export async function buildRagContextForQuery(bookId, userId, query) {
     };
   }
 
-  const scoredBase = Array.isArray(vectorRows)
-    ? vectorRows
-    : rows
-        .map((r) => ({
-          text: r.text,
-          score: semanticOrKeywordScore(
-            queryEmbedding,
-            rewrittenQuery,
-            r.text,
-            r.embedding,
-          ),
-          chunkIndex: r.chunkIndex,
-          chapter: r.chapter || '',
-          section: r.section || '',
-          pageStart: r.pageStart ?? null,
-          pageEnd: r.pageEnd ?? null,
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, TOP_K);
+  const credentials = userLikeFromCredentials(
+    await loadUserGeminiCredentials(userId),
+  );
 
-  const picked = new Set(scoredBase.map((s) => s.chunkIndex));
-  const scored = [...scoredBase];
-  for (const base of scoredBase) {
-    const near = rows.filter(
-      (r) =>
-        !picked.has(r.chunkIndex) &&
-        Math.abs((r.chunkIndex ?? 0) - (base.chunkIndex ?? 0)) <= 1,
-    );
-    for (const n of near) {
-      picked.add(n.chunkIndex);
-      scored.push({
-        text: n.text,
-        score: Math.max(
-          0.01,
-          semanticOrKeywordScore(queryEmbedding, rewrittenQuery, n.text, n.embedding) * 0.8,
-        ),
-        chunkIndex: n.chunkIndex,
-        chapter: n.chapter || '',
-        section: n.section || '',
-        pageStart: n.pageStart ?? null,
-        pageEnd: n.pageEnd ?? null,
-      });
-    }
-  }
-  scored.sort((a, b) => b.score - a.score);
-
-  const selectedForLog = scored.filter((s) => s.score > 0);
-  if (selectedForLog.length > 0) {
-    console.log(
-      `[bookRag] retrieval bookId=${String(bookId)} top=${selectedForLog.length} query="${previewText(query, 120)}"`,
-    );
-    for (const s of selectedForLog) {
-      console.log(
-        `[bookRag] chunk #${(s.chunkIndex ?? 0) + 1} score=${s.score.toFixed(3)} text="${previewText(s.text)}"`,
-      );
-    }
-  } else {
-    console.log(
-      `[bookRag] retrieval bookId=${String(bookId)} no keyword-matched chunks query="${previewText(query, 120)}"`,
-    );
-  }
-
-  let combined = '';
-  for (const s of scored) {
-    const pageLabel =
-      s.pageStart && s.pageEnd
-        ? s.pageStart === s.pageEnd
-          ? ` | Page ${s.pageStart}`
-          : ` | Pages ${s.pageStart}-${s.pageEnd}`
-        : '';
-    const chapterLabel = s.chapter ? ` | Chapter: ${s.chapter}` : '';
-    const sectionLabel = s.section ? ` | Section: ${s.section}` : '';
-    const block = `[Excerpt #${(s.chunkIndex ?? 0) + 1}${pageLabel}${chapterLabel}${sectionLabel}]\n${s.text}`;
-    if (combined.length + block.length + 2 > MAX_CONTEXT_CHARS) break;
-    combined = combined ? `${combined}\n\n${block}` : block;
-  }
-  if (!combined) {
-    return {
-      context: null,
-      bookTitle: book.title,
-      reason: 'empty',
-      references: [],
-    };
-  }
-  const references = scored.map((s) => ({
-    bookId: String(bookId),
-    bookTitle: book.title || 'Untitled',
-    bookUrl: String(book.bookUrl || ''),
-    chunkIndex: s.chunkIndex ?? 0,
-    excerptNumber: (s.chunkIndex ?? 0) + 1,
-    score: s.score,
-    chapter: s.chapter || '',
-    section: s.section || '',
-    pageStart: s.pageStart ?? null,
-    pageEnd: s.pageEnd ?? null,
-  }));
-  return {
-    context: combined,
+  return hybridRetrieveChunks({
+    filter: { book: new mongoose.Types.ObjectId(String(bookId)) },
+    query,
+    messages: opts.messages || [],
+    embedCredentials: credentials,
+    pageNumber: opts.pageNumber,
+    selectedText: opts.selectedText,
+    chapterFilter: opts.chapterFilter,
     bookTitle: book.title,
-    reason: 'ok',
-    references,
-  };
+    bookId: String(bookId),
+    bookUrl: String(book.bookUrl || ''),
+  });
 }
 
 /**
  * @param {import('mongoose').Types.ObjectId} userId
  * @param {string} query
+ * @param {object} [opts]
  */
-export async function buildGeneralRagContextForQuery(userId, query) {
-  const rewrittenQuery = await rewriteQueryForSearch(query);
-  let queryEmbedding = null;
-  try {
-    queryEmbedding = await embedText(rewrittenQuery);
-  } catch {
-    queryEmbedding = null;
-  }
-
+export async function buildGeneralRagContextForQuery(userId, query, opts = {}) {
   const books = await Book.find(canReadBookFilter(userId))
     .select('_id title bookUrl')
     .lean();
@@ -909,104 +1158,45 @@ export async function buildGeneralRagContextForQuery(userId, query) {
   }
 
   const bookIds = books.map((b) => b._id);
-  const titleById = new Map(books.map((b) => [String(b._id), b.title || 'Untitled']));
-  const urlById = new Map(books.map((b) => [String(b._id), String(b.bookUrl || '')]));
+  const titleById = new Map(
+    books.map((b) => [String(b._id), b.title || 'Untitled']),
+  );
+  const urlById = new Map(
+    books.map((b) => [String(b._id), String(b.bookUrl || '')]),
+  );
 
-  const vectorRows = await searchChunksByVector({
-    filter: { book: { $in: bookIds } },
-    queryEmbedding,
-    limit: TOP_K,
-  });
-
-  const rows = await BookChunk.find({ book: { $in: bookIds } })
-    .select('text chunkIndex book chapter section pageStart pageEnd embedding')
-    .lean();
-  if (rows.length === 0) {
+  const chunkCount = await BookChunk.countDocuments({ book: { $in: bookIds } });
+  if (chunkCount === 0) {
     return { context: null, reason: 'not_indexed', references: [] };
   }
 
-  const scoredBase = Array.isArray(vectorRows)
-    ? vectorRows
-    : rows
-        .map((r) => ({
-          book: String(r.book),
-          text: r.text,
-          score: semanticOrKeywordScore(
-            queryEmbedding,
-            rewrittenQuery,
-            r.text,
-            r.embedding,
-          ),
-          chunkIndex: r.chunkIndex,
-          chapter: r.chapter || '',
-          section: r.section || '',
-          pageStart: r.pageStart ?? null,
-          pageEnd: r.pageEnd ?? null,
-        }))
-        .sort((a, b) => b.score - a.score)
-        .slice(0, TOP_K);
+  const credentials = userLikeFromCredentials(
+    await loadUserGeminiCredentials(userId),
+  );
 
-  const scored = [...scoredBase];
-
-  const selectedForLog = scored.filter((s) => s.score > 0);
-  if (selectedForLog.length > 0) {
-    console.log(
-      `[bookRag] retrieval-general top=${selectedForLog.length} query="${previewText(query, 120)}"`,
-    );
-    for (const s of selectedForLog) {
-      console.log(
-        `[bookRag] book="${titleById.get(s.book) || s.book}" chunk #${(s.chunkIndex ?? 0) + 1} score=${s.score.toFixed(3)} text="${previewText(s.text)}"`,
-      );
-    }
-  } else {
-    console.log(
-      `[bookRag] retrieval-general no keyword-matched chunks query="${previewText(query, 120)}"`,
-    );
-  }
-
-  let combined = '';
-  for (const s of scored) {
-    const bookTitle = titleById.get(s.book) || 'Untitled';
-    const pageLabel =
-      s.pageStart && s.pageEnd
-        ? s.pageStart === s.pageEnd
-          ? ` | Page ${s.pageStart}`
-          : ` | Pages ${s.pageStart}-${s.pageEnd}`
-        : '';
-    const chapterLabel = s.chapter ? ` | Chapter: ${s.chapter}` : '';
-    const sectionLabel = s.section ? ` | Section: ${s.section}` : '';
-    const block = `[Book: ${bookTitle} | Excerpt #${(s.chunkIndex ?? 0) + 1}${pageLabel}${chapterLabel}${sectionLabel}]\n${s.text}`;
-    if (combined.length + block.length + 2 > MAX_CONTEXT_CHARS) break;
-    combined = combined ? `${combined}\n\n${block}` : block;
-  }
-  if (!combined) {
-    return { context: null, reason: 'empty', references: [] };
-  }
-  const references = scored.map((s) => ({
-    bookId: s.book,
-    bookTitle: titleById.get(s.book) || 'Untitled',
-    bookUrl: urlById.get(s.book) || '',
-    chunkIndex: s.chunkIndex ?? 0,
-    excerptNumber: (s.chunkIndex ?? 0) + 1,
-    score: s.score,
-    chapter: s.chapter || '',
-    section: s.section || '',
-    pageStart: s.pageStart ?? null,
-    pageEnd: s.pageEnd ?? null,
-  }));
-  return { context: combined, reason: 'ok', references };
+  return hybridRetrieveChunks({
+    filter: { book: { $in: bookIds } },
+    query,
+    messages: opts.messages || [],
+    embedCredentials: credentials,
+    titleById,
+    urlById,
+  });
 }
 
 /**
  * @param { Array<{ role: string, content: string }> } messages
  * @param {string} [bookId]
  * @param {import('mongoose').Types.ObjectId} userId
+ * @param {string} [mode]
+ * @param {object} [opts]
  */
 export async function augmentMessagesWithBookRag(
   messages,
   bookId,
   userId,
   mode = 'chat',
+  opts = {},
 ) {
   if (
     !bookId ||
@@ -1014,19 +1204,33 @@ export async function augmentMessagesWithBookRag(
     !Array.isArray(messages) ||
     messages.length === 0
   ) {
-    return { messages, ragUsed: false, ragNote: null, references: [] };
+    return {
+      messages,
+      ragUsed: false,
+      ragNote: null,
+      references: [],
+      grounding: 'none',
+    };
   }
 
   const last = messages.at(-1);
   if (!last || last.role !== 'user' || typeof last.content !== 'string') {
-    return { messages, ragUsed: false, ragNote: null, references: [] };
+    return {
+      messages,
+      ragUsed: false,
+      ragNote: null,
+      references: [],
+      grounding: 'none',
+    };
   }
 
-  const { context, bookTitle, reason, references } = await buildRagContextForQuery(
-    String(bookId),
-    userId,
-    last.content,
-  );
+  const { context, bookTitle, reason, references } =
+    await buildRagContextForQuery(String(bookId), userId, last.content, {
+      messages,
+      pageNumber: opts.pageNumber,
+      selectedText: opts.selectedText,
+      chapterFilter: opts.chapterFilter,
+    });
 
   if (reason === 'not_indexed') {
     return {
@@ -1034,6 +1238,7 @@ export async function augmentMessagesWithBookRag(
       ragUsed: false,
       ragNote: 'index_required',
       references: [],
+      grounding: 'none',
     };
   }
   if (!context) {
@@ -1042,19 +1247,28 @@ export async function augmentMessagesWithBookRag(
       ragUsed: false,
       ragNote: reason,
       references: [],
+      grounding: 'none',
     };
   }
 
   const modeKey = String(mode || 'chat').toLowerCase();
   const modeRule = MODE_RULES[modeKey] || MODE_RULES.chat;
-  const prefix = `The student is asking about the book **${bookTitle || 'this book'}**.\n${CONTEXT_ONLY_RULES}\n- Output mode: ${modeKey}\n- Mode behavior: ${modeRule}\n\nProvided context:\n\n${context}\n\n---\n\nStudent question:\n`;
+  const prefix = buildContextPrefix({
+    bookTitle,
+    mode: modeKey,
+    modeRule,
+    context,
+    indexRequired: false,
+    lowConfidence: reason === 'low_confidence',
+  });
   const out = messages.slice(0, -1).map((m) => ({ ...m }));
   out.push({ role: 'user', content: `${prefix}${last.content}` });
   return {
     messages: out,
     ragUsed: true,
-    ragNote: 'ok',
+    ragNote: reason === 'low_confidence' ? 'low_confidence' : 'ok',
     references,
+    grounding: 'book',
   };
 }
 
@@ -1091,7 +1305,7 @@ export async function getRagIndexStatus(bookId, userId) {
     ...canReadBookFilter(userId),
   })
     .select(
-      'title ragIndexStatus ragIndexPhase ragIndexTotalChunks ragIndexDoneChunks ragIndexError ragIndexedAt ragIndexProgressPercent',
+      'title ragIndexStatus ragIndexPhase ragIndexTotalChunks ragIndexDoneChunks ragIndexError ragIndexedAt ragIndexProgressPercent ragPageCount ragChapterMap ragPrepVersion',
     )
     .lean();
   if (!book) {
@@ -1111,9 +1325,13 @@ export async function getRagIndexStatus(bookId, userId) {
     ragIndexTotalChunks: book.ragIndexTotalChunks ?? 0,
     ragIndexDoneChunks: book.ragIndexDoneChunks ?? 0,
     ragIndexProgressPercent: legacyRagIndexPercentEstimate(book),
-    ragIndexError: book.ragIndexError || '',
+    ragIndexError: mapRagErrorToUserMessage(book.ragIndexError || ''),
     ragIndexedAt: book.ragIndexedAt
       ? new Date(book.ragIndexedAt).toISOString()
       : null,
+    ragPageCount: book.ragPageCount ?? 0,
+    ragChapterMap: Array.isArray(book.ragChapterMap) ? book.ragChapterMap : [],
+    ragPrepVersion: book.ragPrepVersion ?? 0,
+    needsReindex: (book.ragPrepVersion ?? 0) < RAG_PREP_VERSION,
   };
 }

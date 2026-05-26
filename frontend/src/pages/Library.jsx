@@ -377,7 +377,7 @@ function LibraryBookListRow({
             ) : null}
             {item.ragIndexStatus === 'ready' ? (
               <span className="text-emerald-600 dark:text-emerald-400">
-                · Liqu-ready
+                · Ready for chat
               </span>
             ) : null}
           </p>
@@ -726,7 +726,7 @@ function LibraryBookGridCard({
           {item.ragIndexStatus === 'ready' ? (
             <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-300">
               {' '}
-              · Liqu-ready
+              · Ready for chat
             </span>
           ) : null}
         </p>

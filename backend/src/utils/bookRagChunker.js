@@ -11,7 +11,7 @@
 
 const DEFAULT_MAX = 1800;
 const DEFAULT_OVERLAP = 200;
-const DEFAULT_MAX_CHUNKS = 350;
+const DEFAULT_MAX_CHUNKS = 800;
 
 function cleanRagText(raw) {
   return String(raw || '')
@@ -154,6 +154,121 @@ export function splitTextForRagWithMetadata(rawText, options = {}) {
       });
       chunkIndex += 1;
     }
+  }
+  return out;
+}
+
+/**
+ * Build chapter outline from indexed chunks.
+ * @param {Array<{ chapter?: string, pageStart?: number | null, pageEnd?: number | null }>} pieces
+ */
+export function buildChapterMapFromChunks(pieces) {
+  const byChapter = new Map();
+  for (const p of pieces) {
+    const title = String(p.chapter || '').trim();
+    if (!title || !/^(chapter|unit|part)\s+\d+/i.test(title)) continue;
+    const ps = p.pageStart ?? null;
+    const pe = p.pageEnd ?? ps;
+    if (ps == null) continue;
+    const cur = byChapter.get(title) || {
+      title,
+      pageStart: ps,
+      pageEnd: pe ?? ps,
+    };
+    cur.pageStart = Math.min(cur.pageStart, ps);
+    if (pe != null) cur.pageEnd = Math.max(cur.pageEnd, pe);
+    byChapter.set(title, cur);
+  }
+  return [...byChapter.values()].sort(
+    (a, b) => (a.pageStart ?? 0) - (b.pageStart ?? 0),
+  );
+}
+
+/**
+ * Page-aligned chunking: each chunk stays within page boundaries when possible.
+ * @param {Array<{ pageNumber: number, text: string }>} pages
+ * @param {RagChunkerOptions} [options]
+ */
+export function splitPagesForRagWithMetadata(pages, options = {}) {
+  if (!Array.isArray(pages) || pages.length === 0) return [];
+
+  const maxChunks = options.maxChunks ?? DEFAULT_MAX_CHUNKS;
+  const out = [];
+  let chunkIndex = 0;
+  let activeChapter = '';
+  let activeSection = '';
+
+  for (const page of pages) {
+    if (chunkIndex >= maxChunks) break;
+    const pageNum = Number(page.pageNumber) || 0;
+    const raw = normalizeText(String(page.text || ''));
+    if (!raw) continue;
+
+    const lines = raw.split('\n');
+    let bodyLines = lines;
+    if (lines.length && isLikelyHeading(lines[0])) {
+      const heading = String(lines[0]).trim();
+      if (/^(chapter|unit|part)\s+\d+/i.test(heading)) activeChapter = heading;
+      activeSection = heading;
+      bodyLines = lines.slice(1);
+    }
+
+    const pageText = bodyLines.join('\n').trim();
+    if (!pageText) continue;
+
+    const remaining = maxChunks - chunkIndex;
+    const pieces = splitTextForRagEmbedding(pageText, {
+      ...options,
+      maxChunks: remaining,
+    });
+
+    for (const piece of pieces) {
+      if (chunkIndex >= maxChunks) break;
+      out.push({
+        chunkIndex,
+        text: piece,
+        chapter: activeChapter,
+        section: activeSection,
+        pageStart: pageNum || null,
+        pageEnd: pageNum || null,
+      });
+      chunkIndex += 1;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * When chunk cap is hit, add one short summary chunk per chapter.
+ * @param {Array<{ title: string, pageStart: number, pageEnd: number }>} chapterMap
+ * @param {Array<{ pageNumber: number, text: string }>} pages
+ * @param {number} startIndex
+ */
+export function buildChapterSummaryChunks(chapterMap, pages, startIndex = 0) {
+  if (!chapterMap.length || !pages.length) return [];
+  const out = [];
+  let idx = startIndex;
+  for (const ch of chapterMap) {
+    const ps = ch.pageStart ?? 0;
+    const pe = ch.pageEnd ?? ps;
+    const slice = pages
+      .filter((p) => p.pageNumber >= ps && p.pageNumber <= pe)
+      .map((p) => p.text)
+      .join('\n')
+      .trim()
+      .slice(0, 1200);
+    if (!slice) continue;
+    out.push({
+      chunkIndex: idx,
+      text: `${ch.title}\n\n${slice}`,
+      chapter: ch.title,
+      section: `${ch.title} (overview)`,
+      pageStart: ps,
+      pageEnd: pe,
+      isSummary: true,
+    });
+    idx += 1;
   }
   return out;
 }

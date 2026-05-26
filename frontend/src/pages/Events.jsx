@@ -5,30 +5,22 @@ import {
   Clock,
   Grid3x3,
   Heart,
+  ImagePlus,
   List,
   Loader2,
   MapPin,
-  ImagePlus,
   Plus,
   ThumbsDown,
   Trash2,
   X,
 } from 'lucide-react';
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useSearchParams } from 'react-router-dom';
 import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
 import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import { useAuth } from '../contexts/AuthContext';
-import { readJsonOrThrow } from '../utils/http';
-import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import {
   ACADEMIC_TRACKS,
   academicTrackLabel,
@@ -36,7 +28,9 @@ import {
   resolveDepartmentForSubmit,
   validateEventCatalogFields,
 } from '../utils/bookUploadMeta';
+import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { visibilityLabel, visibilityTone } from '../utils/formatLabels';
+import { readJsonOrThrow } from '../utils/http';
 
 const LS_EVENTS_VIEW = 'ush.events.view';
 const LS_EVENTS_COLS = 'ush.events.gridCols';
@@ -125,16 +119,12 @@ function EventListRow({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
   return (
     <article
       style={{ animationDelay: `${Math.min(index * 45, 400)}ms` }}
-      className="fade-in-up panel-card relative flex flex-row gap-3 overflow-hidden rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-br from-white via-white to-fuchsia-50/30 p-3 shadow-sm dark:border-slate-700/90 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/40 sm:gap-4 sm:p-4"
+      className="fade-in-up panel-card relative flex flex-row gap-3 overflow-hidden rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-br from-white via-white to-fuchsia-50/30 p-3 shadow-sm dark:border-slate-700/90 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/40 sm:p-3.5"
     >
       <div className="relative w-[5.75rem] shrink-0 sm:w-32">
         <div className="relative aspect-[3/4] w-full overflow-hidden rounded-xl bg-slate-200/90 ring-1 ring-cyan-500/10 dark:bg-slate-800">
           {hero ? (
-            <img
-              src={hero}
-              alt=""
-              className="h-full w-full object-cover"
-            />
+            <img src={hero} alt="" className="h-full w-full object-cover" />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-fuchsia-100/80 to-cyan-100/60 dark:from-slate-800 dark:to-slate-900">
               <CalendarPlus
@@ -179,7 +169,10 @@ function EventListRow({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
             <span>Event</span>
             {dateShort ? (
               <>
-                <span className="text-slate-300 dark:text-slate-600" aria-hidden>
+                <span
+                  className="text-slate-300 dark:text-slate-600"
+                  aria-hidden
+                >
                   ·
                 </span>
                 <span>{dateShort}</span>
@@ -190,12 +183,20 @@ function EventListRow({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
           <span className="inline-flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
-            <span className="line-clamp-1">{formatEventWhen(ev.startsAt, ev.endsAt)}</span>
+            <Clock
+              className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400"
+              aria-hidden
+            />
+            <span className="line-clamp-1">
+              {formatEventWhen(ev.startsAt, ev.endsAt)}
+            </span>
           </span>
           {ev.location ? (
             <span className="inline-flex max-w-full items-center gap-1">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+              <MapPin
+                className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400"
+                aria-hidden
+              />
               <span className="truncate">{ev.location}</span>
             </span>
           ) : null}
@@ -364,11 +365,7 @@ function EventGridCard({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
         <div className="relative overflow-hidden rounded-2xl bg-slate-200/90 ring-1 ring-cyan-500/15 dark:bg-slate-800 dark:ring-cyan-500/10">
           <div className="aspect-[4/5] w-full overflow-hidden sm:aspect-[3/4]">
             {hero ? (
-              <img
-                src={hero}
-                alt=""
-                className="h-full w-full object-cover"
-              />
+              <img src={hero} alt="" className="h-full w-full object-cover" />
             ) : (
               <div className="flex h-full min-h-[11rem] w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-fuchsia-100/90 via-white to-cyan-100/80 px-4 text-center dark:from-slate-800 dark:via-slate-900 dark:to-slate-900">
                 <CalendarPlus
@@ -458,12 +455,20 @@ function EventGridCard({ ev, index, user, mergeEvent, onDelete, deleteBusy }) {
         </p>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] font-medium text-slate-600 dark:text-slate-400">
           <span className="inline-flex items-center gap-1">
-            <Clock className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
-            <span className="line-clamp-1">{formatEventWhen(ev.startsAt, ev.endsAt)}</span>
+            <Clock
+              className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400"
+              aria-hidden
+            />
+            <span className="line-clamp-1">
+              {formatEventWhen(ev.startsAt, ev.endsAt)}
+            </span>
           </span>
           {ev.location ? (
             <span className="inline-flex max-w-full items-center gap-1">
-              <MapPin className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+              <MapPin
+                className="h-3.5 w-3.5 shrink-0 text-cyan-600 dark:text-cyan-400"
+                aria-hidden
+              />
               <span className="truncate">{ev.location}</span>
             </span>
           ) : null}
@@ -539,9 +544,7 @@ export default function Events() {
   const [eventsView, setEventsView] = useState(
     () => readEventsViewPrefs().view,
   );
-  const [gridCols, setGridCols] = useState(
-    () => readEventsViewPrefs().cols,
-  );
+  const [gridCols, setGridCols] = useState(() => readEventsViewPrefs().cols);
 
   useEffect(() => {
     try {
@@ -640,9 +643,7 @@ export default function Events() {
         }),
       );
     } else if (sortBy === 'likes') {
-      list.sort(
-        (a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0),
-      );
+      list.sort((a, b) => (b.likesCount ?? 0) - (a.likesCount ?? 0));
     } else {
       list.sort((a, b) => {
         const tb = new Date(b.createdAt || b.updatedAt || 0).getTime();
@@ -654,12 +655,11 @@ export default function Events() {
   }, [events, sortBy]);
 
   const resultsContainerClass = useMemo(() => {
-    if (eventsView === 'list') return 'flex flex-col gap-5';
-    if (gridCols === '2')
-      return 'grid gap-5 grid-cols-1 sm:grid-cols-2';
+    if (eventsView === 'list') return 'flex flex-col gap-3';
+    if (gridCols === '2') return 'grid gap-3 grid-cols-1 sm:grid-cols-2';
     if (gridCols === '4')
-      return 'grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
-    return 'grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
+      return 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
+    return 'grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3';
   }, [eventsView, gridCols]);
 
   const rollbackDeleteEvent = async (id) => {
@@ -686,7 +686,7 @@ export default function Events() {
     }
 
     const cover = coverInputRef.current?.files?.[0];
-    if (!cover || !cover.type.startsWith('image/')) {
+    if (!cover?.type.startsWith('image/')) {
       toast.error('Cover photo is required.');
       return;
     }
@@ -793,9 +793,9 @@ export default function Events() {
   };
 
   return (
-    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
-      <div className="mx-auto max-w-6xl space-y-8">
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-3 md:px-6 md:pb-10 md:pt-5">
+      <div className="mx-auto max-w-6xl space-y-5">
+        <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
               Campus life
@@ -803,11 +803,10 @@ export default function Events() {
             <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-slate-900 dark:text-white">
               Events
             </h1>
-            
+
             {!loading && !error ? (
-              <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
-                {events.length}{' '}
-                {events.length === 1 ? 'event' : 'events'}
+              <p className="mt-1 text-xs font-medium text-slate-500 dark:text-slate-400">
+                {events.length} {events.length === 1 ? 'event' : 'events'}
               </p>
             ) : null}
           </div>
@@ -842,14 +841,17 @@ export default function Events() {
           </div>
         ) : null}
 
-        <div className="panel-card rounded-[1.35rem] border border-slate-200/85 p-4 shadow-sm dark:border-slate-700 md:p-5">
+        <div className="panel-card rounded-[1.35rem] border border-slate-200/85 p-3 shadow-sm dark:border-slate-700 md:p-4">
           <div
-            className="flex flex-wrap items-end gap-3 border-b border-slate-200/90 pb-4 dark:border-slate-700/80"
+            className="flex flex-wrap items-end gap-3 border-b border-slate-200/90 pb-3 dark:border-slate-700/80"
             role="toolbar"
             aria-label="Event list controls"
           >
             <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
-              <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-cyan-600 opacity-80 dark:text-cyan-400" aria-hidden />
+              <ArrowUpDown
+                className="h-3.5 w-3.5 shrink-0 text-cyan-600 opacity-80 dark:text-cyan-400"
+                aria-hidden
+              />
               <label htmlFor="events-sort" className="sr-only">
                 Sort list
               </label>
@@ -873,9 +875,8 @@ export default function Events() {
               <span className="sr-only" id="events-layout-label">
                 Layout
               </span>
-              <div
+              <fieldset
                 className="inline-flex rounded-xl bg-slate-100/95 p-0.5 ring-1 ring-slate-200/90 dark:bg-slate-800/95 dark:ring-slate-600/80"
-                role="group"
                 aria-labelledby="events-layout-label"
               >
                 <button
@@ -904,12 +905,11 @@ export default function Events() {
                 >
                   <Grid3x3 className="h-4 w-4" aria-hidden />
                 </button>
-              </div>
+              </fieldset>
 
               {eventsView === 'grid' ? (
-                <div
+                <fieldset
                   className="inline-flex rounded-xl bg-slate-100/95 p-0.5 ring-1 ring-slate-200/90 dark:bg-slate-800/95 dark:ring-slate-600/80"
-                  role="group"
                   aria-label="Columns per row"
                 >
                   {['2', '3', '4'].map((c) => (
@@ -927,12 +927,12 @@ export default function Events() {
                       {c}
                     </button>
                   ))}
-                </div>
+                </fieldset>
               ) : null}
             </div>
           </div>
 
-          <div className={`mt-5 ${resultsContainerClass}`}>
+          <div className={`mt-3 ${resultsContainerClass}`}>
             {loading ? (
               <div className="flex w-full items-center justify-center gap-2 py-16 text-slate-500">
                 <Loader2 className="h-6 w-6 animate-spin" aria-hidden />
@@ -1023,7 +1023,8 @@ export default function Events() {
                       New event
                     </h2>
                     <p className="mt-0.5 max-w-[280px] text-[11px] leading-snug text-slate-500 dark:text-slate-400">
-                      Cover and basics up front; link and capacity stay optional.
+                      Cover and basics up front; link and capacity stay
+                      optional.
                     </p>
                   </div>
                   <button
@@ -1212,9 +1213,7 @@ export default function Events() {
                           className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950"
                         >
                           <option value="">
-                            {academicTrack
-                              ? 'Select…'
-                              : 'Choose a field first'}
+                            {academicTrack ? 'Select…' : 'Choose a field first'}
                           </option>
                           {deptList.map((d) => (
                             <option key={d} value={d}>
@@ -1231,9 +1230,7 @@ export default function Events() {
                           <input
                             required
                             value={departmentOther}
-                            onChange={(e) =>
-                              setDepartmentOther(e.target.value)
-                            }
+                            onChange={(e) => setDepartmentOther(e.target.value)}
                             maxLength={160}
                             className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
                             placeholder="Your school or unit"
@@ -1252,9 +1249,7 @@ export default function Events() {
                           <option value="public">
                             Public — listed in the app
                           </option>
-                          <option value="unlisted">
-                            Unlisted — link only
-                          </option>
+                          <option value="unlisted">Unlisted — link only</option>
                           <option value="private">Private</option>
                         </select>
                       </label>

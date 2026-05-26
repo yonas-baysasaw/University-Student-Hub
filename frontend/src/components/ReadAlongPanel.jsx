@@ -1,8 +1,9 @@
 import { BookOpen, ChevronDown, ExternalLink, LibraryBig, Maximize2, PanelTop } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BookPdfViewer from './BookPdfViewer';
 
-/** Library book selector + inline reader (iframe) for Study buddy. */
+/** Library book selector + inline reader for Study buddy. */
 function ReadAlongPanel({
   books,
   selectedBookId,
@@ -12,6 +13,9 @@ function ReadAlongPanel({
   layoutVariant = 'default',
   focusRead: focusReadProp,
   onFocusReadChange,
+  currentPage = 1,
+  onPageChange,
+  onTextSelected,
 }) {
   const isWorkspace = layoutVariant === 'workspace';
   const [focusReadInternal, setFocusReadInternal] = useState(false);
@@ -68,7 +72,7 @@ function ReadAlongPanel({
               Books from Library
             </h4>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Choose a book to feed into Study buddy.
+              Pick a book to read while you chat.
             </p>
           </div>
         ) : (
@@ -208,7 +212,7 @@ function ReadAlongPanel({
                 </a>
                 {isWorkspace ? (
                   <p className="text-[10px] leading-snug text-slate-500 dark:text-slate-400">
-                    Copy text in the viewer, then paste into the chat.
+                    Highlight text to ask Liqu AI about it.
                   </p>
                 ) : null}
               </div>
@@ -237,13 +241,16 @@ function ReadAlongPanel({
                   </span>
                 </div>
               ) : null}
-              <iframe
-                src={selectedBook.bookUrl}
-                title={`${selectedBook.title} reader`}
+              <BookPdfViewer
+                url={selectedBook.bookUrl}
+                title={selectedBook.title}
+                page={currentPage}
+                onPageChange={onPageChange}
+                onTextSelected={onTextSelected}
                 className={
                   isWorkspace
-                    ? 'min-h-[12rem] w-full flex-1 border-0 bg-white dark:bg-slate-950 lg:min-h-0'
-                    : 'h-[calc(24rem-2.25rem)] w-full min-h-[10rem] border-0 bg-white dark:bg-slate-950'
+                    ? 'min-h-[12rem] flex-1 lg:min-h-0'
+                    : 'h-[calc(24rem-2.25rem)] min-h-[10rem]'
                 }
               />
             </div>
