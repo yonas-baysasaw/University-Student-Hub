@@ -1,5 +1,6 @@
 import {
   ArrowDown,
+  ArrowLeft,
   ChevronRight,
   Flag,
   Forward,
@@ -1214,9 +1215,11 @@ function ChatRoom() {
   const headerActions = (
     <Link
       to="/classroom"
-      className="btn-secondary px-4 py-2 text-xs font-bold uppercase tracking-wide"
+      className="btn-secondary inline-flex h-9 w-9 items-center justify-center rounded-full p-0"
+      aria-label="All classrooms"
+      title="All classrooms"
     >
-      All classrooms
+      <ArrowLeft className="h-4 w-4" aria-hidden />
     </Link>
   );
 
@@ -1254,7 +1257,13 @@ function ChatRoom() {
             actions={headerActions}
           />
 
-          <ClassroomTabs trailing={tabsTrailingParticipants} />
+          <ClassroomTabs
+            trailing={tabsTrailingParticipants}
+            liquAction={{
+              label: 'Liqu AI',
+              to: `/classroom/${encodeURIComponent(chatId)}/resources?liqu=1`,
+            }}
+          />
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <div className="relative min-w-[min(100%,14rem)] flex-1">
@@ -1268,7 +1277,7 @@ function ChatRoom() {
                 value={messageSearch}
                 onChange={(e) => setMessageSearch(e.target.value)}
                 placeholder="Filter loaded messages… (/ to focus)"
-                className="input-field w-full py-2 pl-9 text-sm"
+                className="input-field w-full !pl-10 pr-3 py-2 text-sm"
               />
             </div>
             {viewerCanManageClassroom ? (
@@ -2057,27 +2066,18 @@ function ChatRoom() {
                   </button>
                 </div>
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                  {discussionMeta.slowModeSeconds > 0 ? (
-                    <span className="mr-2 inline-flex items-center rounded-md bg-amber-500/12 px-1.5 py-px font-semibold text-amber-800 dark:text-amber-200">
-                      Slow {discussionMeta.slowModeSeconds}s
-                    </span>
-                  ) : null}
-                  {draft.trim().length > 0
-                    ? `${draft.trim().length} character${draft.trim().length === 1 ? '' : 's'} · `
-                    : null}
-                  Be respectful and on-topic.
-                </p>
-                <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-                  <strong className="font-semibold text-slate-500 dark:text-slate-400">
-                    **
-                  </strong>
-                  bold
-                  <strong className="font-semibold text-slate-500 dark:text-slate-400">
-                    **
-                  </strong>
-                  , @username mentions, Enter to send, Shift+Enter newline.
-                </p>
+                {discussionMeta.slowModeSeconds > 0 || draft.trim().length > 0 ? (
+                  <p className="mt-2 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                    {discussionMeta.slowModeSeconds > 0 ? (
+                      <span className="mr-2 inline-flex items-center rounded-md bg-amber-500/12 px-1.5 py-px font-semibold text-amber-800 dark:text-amber-200">
+                        Slow {discussionMeta.slowModeSeconds}s
+                      </span>
+                    ) : null}
+                    {draft.trim().length > 0
+                      ? `${draft.trim().length} character${draft.trim().length === 1 ? '' : 's'}`
+                      : null}
+                  </p>
+                ) : null}
               </form>
               {sendError && (
                 <p className="mt-2 text-sm font-medium text-rose-600">{sendError}</p>

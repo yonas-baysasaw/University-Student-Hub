@@ -304,6 +304,8 @@ export const listResources = asyncHandler(async (req, res) => {
     link: r.link || '',
     fileName: r.fileName || '',
     fileUrl: r.fileUrl || '',
+    fileMimeType: r.fileMimeType || '',
+    fileSize: Number(r.fileSize || 0),
     author: r.authorName || 'Instructor',
     authorId: r.createdBy ? String(r.createdBy) : null,
     category: r.category || 'other',
@@ -344,6 +346,7 @@ export const createResource = asyncHandler(async (req, res) => {
   let fileUrl = '';
   let fileName = '';
   let fileMimeType = '';
+  let fileSize = 0;
 
   if (file) {
     const dir = `${req.user._id}/classroom-resources/${chatId}`;
@@ -352,6 +355,7 @@ export const createResource = asyncHandler(async (req, res) => {
     fileUrl = up.location;
     fileName = file.originalname || 'file';
     fileMimeType = file.mimetype || '';
+    fileSize = Number(file.size || 0);
   }
 
   const created = await ClassroomResource.create({
@@ -364,6 +368,7 @@ export const createResource = asyncHandler(async (req, res) => {
     fileUrl,
     fileName,
     fileMimeType,
+    fileSize,
     createdBy: req.user._id,
     authorName: authorLabel(req.user),
   });
@@ -375,6 +380,8 @@ export const createResource = asyncHandler(async (req, res) => {
       link: created.link,
       fileName: created.fileName,
       fileUrl: created.fileUrl,
+      fileMimeType: created.fileMimeType,
+      fileSize: Number(created.fileSize || 0),
       author: created.authorName,
       authorId: String(created.createdBy),
       category: created.category || 'other',

@@ -283,7 +283,7 @@ export const patchChat = asyncHandler(async (req, res) => {
     throw forbidden('Only classroom admins can update this classroom');
   }
 
-  const { name, archived } = req.body ?? {};
+  const { name, archived, classContact } = req.body ?? {};
 
   if (name !== undefined) {
     const trimmed = typeof name === 'string' ? name.trim() : '';
@@ -305,6 +305,62 @@ export const patchChat = asyncHandler(async (req, res) => {
       chat.metadata = {};
     }
     chat.metadata.archived = archived;
+  }
+
+  if (classContact !== undefined) {
+    if (!isClassroomCreator(chat, req.user._id)) {
+      throw forbidden('Only the classroom creator can update contact info');
+    }
+    const meetingUrl =
+      typeof classContact?.meetingUrl === 'string'
+        ? classContact.meetingUrl.trim()
+        : '';
+    const instructorName =
+      typeof classContact?.instructorName === 'string'
+        ? classContact.instructorName.trim()
+        : '';
+    const instructorEmail =
+      typeof classContact?.instructorEmail === 'string'
+        ? classContact.instructorEmail.trim()
+        : '';
+    if (meetingUrl.length > 2000) {
+      const e = new Error('Class contact link is too long');
+      e.status = 400;
+      throw e;
+    }
+    if (instructorName.length > 120) {
+      const e = new Error('Instructor display name is too long');
+      e.status = 400;
+      throw e;
+    }
+    if (instructorEmail.length > 254) {
+      const e = new Error('Instructor email is too long');
+      e.status = 400;
+      throw e;
+    }
+    if (instructorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(instructorEmail)) {
+      const e = new Error('Instructor email must be valid');
+      e.status = 400;
+      throw e;
+    }
+    if (
+      meetingUrl &&
+      !/^https?:\/\/\S+$/i.test(meetingUrl) &&
+      !/^mailto:\S+$/i.test(meetingUrl)
+    ) {
+      const e = new Error('Class contact link must be a valid URL');
+      e.status = 400;
+      throw e;
+    }
+    if (!chat.metadata || typeof chat.metadata !== 'object') {
+      chat.metadata = {};
+    }
+    chat.metadata.classContact = {
+      ...(chat.metadata.classContact ?? {}),
+      instructorName,
+      instructorEmail,
+      meetingUrl,
+    };
   }
 
   const { slowModeSeconds, pinnedMessageIds } = req.body ?? {};

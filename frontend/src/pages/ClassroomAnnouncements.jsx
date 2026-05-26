@@ -806,9 +806,11 @@ function ClassroomAnnouncementsContent({ chatId }) {
   const headerActions = (
     <Link
       to="/classroom"
-      className="btn-secondary px-4 py-2 text-xs font-bold uppercase tracking-wide"
+      className="btn-secondary inline-flex h-9 w-9 items-center justify-center rounded-full p-0"
+      aria-label="All classrooms"
+      title="All classrooms"
     >
-      All classrooms
+      <ChevronLeft className="h-4 w-4" aria-hidden />
     </Link>
   );
 
@@ -991,7 +993,13 @@ function ClassroomAnnouncementsContent({ chatId }) {
             actions={headerActions}
           />
 
-          <ClassroomTabs trailing={tabsTrailingParticipants} />
+          <ClassroomTabs
+            trailing={tabsTrailingParticipants}
+            liquAction={{
+              label: 'Liqu AI',
+              to: `/classroom/${encodeURIComponent(chatId)}/resources?liqu=1`,
+            }}
+          />
 
           {loadError ? (
             <p className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 dark:border-rose-900/40 dark:bg-rose-950/40 dark:text-rose-100" role="alert">

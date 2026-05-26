@@ -91,10 +91,14 @@ function normalizeReferences(references) {
   return out;
 }
 
-function makeWelcome(bookTitle, contextBlurb = '') {
-  let content = bookTitle
-    ? `${BASE_WELCOME}\n\nYou're working with: **${bookTitle}** — ask about this book, your notes, or anything else.`
-    : BASE_WELCOME;
+function makeWelcome(bookTitle, contextBlurb = '', contextScope = '') {
+  let content = BASE_WELCOME;
+  if (bookTitle) {
+    content =
+      contextScope === 'classroom'
+        ? `${BASE_WELCOME}\n\nYou're in: **${bookTitle}** — ask about discussions, announcements, materials, assignments, or anything else from this class.`
+        : `${BASE_WELCOME}\n\nYou're working with: **${bookTitle}** — ask about this book, your notes, or anything else.`;
+  }
   if (contextBlurb?.trim()) {
     content = `${content}\n\n${contextBlurb.trim()}`;
   }
@@ -167,7 +171,9 @@ function LiquAiChatPanel({
 
   const [sessions, setSessions] = useState([]);
   const [activeSessionId, setActiveSessionId] = useState(null);
-  const [messages, setMessages] = useState([makeWelcome(bookTitle, contextBlurb)]);
+  const [messages, setMessages] = useState([
+    makeWelcome(bookTitle, contextBlurb, contextScope),
+  ]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -298,7 +304,7 @@ function LiquAiChatPanel({
     if (prevBookIdRef.current === bookId) return;
     prevBookIdRef.current = bookId;
     setActiveSessionId(null);
-    setMessages([makeWelcome(bookTitle, contextBlurb)]);
+    setMessages([makeWelcome(bookTitle, contextBlurb, contextScope)]);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
@@ -307,17 +313,17 @@ function LiquAiChatPanel({
       },
       { replace: true },
     );
-  }, [bookId, bookTitle, contextBlurb, setSearchParams]);
+  }, [bookId, bookTitle, contextBlurb, contextScope, setSearchParams]);
 
   useEffect(() => {
     setMessages((prev) => {
       if (activeSessionId) return prev;
       if (prev.length === 1 && prev[0]?.id === 'welcome') {
-        return [makeWelcome(bookTitle, contextBlurb)];
+        return [makeWelcome(bookTitle, contextBlurb, contextScope)];
       }
       return prev;
     });
-  }, [bookTitle, contextBlurb, activeSessionId]);
+  }, [bookTitle, contextBlurb, contextScope, activeSessionId]);
 
   const loadSession = useCallback(
     async (sessionId, options = {}) => {
@@ -336,7 +342,9 @@ function LiquAiChatPanel({
           content: m.content,
           references: [],
         }));
-        setMessages(msgs.length ? msgs : [makeWelcome(bookTitle, contextBlurb)]);
+        setMessages(
+          msgs.length ? msgs : [makeWelcome(bookTitle, contextBlurb, contextScope)],
+        );
         if (variant === 'gemini') setFollowStream(true);
         replaceSessionInUrl(String(data._id));
       } catch (err) {
@@ -353,7 +361,14 @@ function LiquAiChatPanel({
       }
       if (closeSidebar && !signal?.aborted) setSidebarOpen(false);
     },
-    [bookTitle, contextBlurb, replaceSessionInUrl, setSearchParams, variant],
+    [
+      bookTitle,
+      contextBlurb,
+      contextScope,
+      replaceSessionInUrl,
+      setSearchParams,
+      variant,
+    ],
   );
 
   useEffect(() => {
@@ -550,7 +565,7 @@ function LiquAiChatPanel({
       { replace: false },
     );
     setActiveSessionId(null);
-    setMessages([makeWelcome(bookTitle, contextBlurb)]);
+    setMessages([makeWelcome(bookTitle, contextBlurb, contextScope)]);
     setError('');
     setSidebarOpen(false);
     setAttachmentChipNames([]);
@@ -575,7 +590,7 @@ function LiquAiChatPanel({
           { replace: true },
         );
         setActiveSessionId(null);
-        setMessages([makeWelcome(bookTitle, contextBlurb)]);
+        setMessages([makeWelcome(bookTitle, contextBlurb, contextScope)]);
       }
     } catch (_) {
       toast.error('Failed to delete session');
@@ -1561,17 +1576,6 @@ function LiquAiChatPanel({
                   </button>
                 </div>
               </div>
-            )}
-            {isGemini ? (
-              <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500 dark:text-zinc-500">
-                Enter to send · Shift+Enter for new line · AI-generated — verify
-                important facts.
-              </p>
-            ) : (
-              <p className="mt-2 pl-1 text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">
-                Enter to send · Shift+Enter for new line · AI-generated — verify
-                important facts.
-              </p>
             )}
           </form>
           {isGemini && showJumpToBottomFab ? (
