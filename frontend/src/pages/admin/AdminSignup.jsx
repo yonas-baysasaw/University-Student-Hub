@@ -4,6 +4,7 @@ import AuthShell from '../../components/AuthShell';
 import {
   getPasswordStrength,
   getPasswordSuggestions,
+  validateCampusPassword,
 } from '../../utils/passwordStrength';
 
 export default function AdminSignup() {
@@ -69,8 +70,9 @@ export default function AdminSignup() {
       setError('Passwords do not match.');
       return;
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
+    const passwordCheck = validateCampusPassword(password);
+    if (!passwordCheck.valid) {
+      setError(passwordCheck.message);
       return;
     }
 

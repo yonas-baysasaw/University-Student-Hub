@@ -38,7 +38,10 @@ import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { getStoredThemePreference, setThemePreference } from '../theme.js';
-import { getPasswordStrength } from '../utils/passwordStrength';
+import {
+  getPasswordStrength,
+  validateCampusPassword,
+} from '../utils/passwordStrength';
 
 const LOCAL_SETTINGS_KEY = 'ush-settings-preferences-v2';
 
@@ -578,8 +581,9 @@ function Settings() {
       toast.error('New passwords do not match.');
       return;
     }
-    if (newPassword.length < 8) {
-      toast.error('New password must be at least 8 characters.');
+    const passwordCheck = validateCampusPassword(newPassword);
+    if (!passwordCheck.valid) {
+      toast.error(passwordCheck.message);
       return;
     }
 

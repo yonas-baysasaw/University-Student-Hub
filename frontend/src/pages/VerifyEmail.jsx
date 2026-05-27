@@ -1,21 +1,25 @@
-import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import AuthShell from "../components/AuthShell";
-import { safeInternalPath } from "../utils/safeRedirect";
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  AuthInlineLink,
+  AuthStatusPanel,
+  CampusAuthLayout,
+} from '../components/auth/campusAuth';
+import { safeInternalPath } from '../utils/safeRedirect';
 
 function VerifyEmail() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
-  const nextParam = searchParams.get("next");
+  const token = searchParams.get('token');
+  const nextParam = searchParams.get('next');
   const navigate = useNavigate();
-  const [status, setStatus] = useState("loading");
-  const [message, setMessage] = useState("");
-  const wantsAdminLogin = safeInternalPath(nextParam)?.startsWith("/admin");
+  const [status, setStatus] = useState('loading');
+  const [message, setMessage] = useState('');
+  const wantsAdminLogin = safeInternalPath(nextParam)?.startsWith('/admin');
 
   useEffect(() => {
     if (!token || !token.trim()) {
-      setStatus("error");
-      setMessage("Missing verification link. Open the link from your email.");
+      setStatus('error');
+      setMessage('Missing verification link. Open the link from your email.');
       return;
     }
 
@@ -23,39 +27,39 @@ function VerifyEmail() {
 
     (async () => {
       try {
-        const res = await fetch("/api/verify-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
+        const res = await fetch('/api/verify-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ token: token.trim() }),
         });
         const data = await res.json().catch(() => ({}));
         if (cancelled) return;
         if (!res.ok) {
-          setStatus("error");
+          setStatus('error');
           setMessage(
             data.message ||
-              "This link is invalid or has expired. Request a new one from sign-in.",
+              'This link is invalid or has expired. Request a new one from sign-in.',
           );
           return;
         }
 
-        setStatus("ok");
+        setStatus('ok');
         setMessage(
           data.message ||
-            "Your email has been verified successfully. You can now use your account.",
+            'Your email is verified. You can sign in with your campus password.',
         );
-        const target = wantsAdminLogin ? "/admin/login" : "/login";
+        const target = wantsAdminLogin ? '/admin/login' : '/login';
 
         if (!cancelled) {
           setTimeout(() => {
             navigate(target, { replace: true });
-          }, 1200);
+          }, 2200);
         }
       } catch {
         if (!cancelled) {
-          setStatus("error");
-          setMessage("Something went wrong. Try again later.");
+          setStatus('error');
+          setMessage('Something went wrong. Try again later.');
         }
       }
     })();
@@ -66,55 +70,41 @@ function VerifyEmail() {
   }, [token, navigate, wantsAdminLogin]);
 
   return (
-    <AuthShell
+    <CampusAuthLayout
+      mode="login"
       title="Verify email"
       subtitle="Confirming your University Student Hub account"
+      showTabs={false}
     >
-      <div aria-live="polite">
-        {status === "loading" ? (
-          <p className="text-center text-sm text-slate-600 dark:text-slate-400">
-            Verifying your email...
+      <AuthStatusPanel
+        status={status}
+        title={
+          status === 'loading'
+            ? 'Verifying your email'
+            : status === 'ok'
+              ? 'Email verified'
+              : 'Verification failed'
+        }
+        message={status === 'loading' ? 'Please wait a moment…' : message}
+      >
+        {status === 'ok' ? (
+          <p className="auth-campus-hint">
+            {wantsAdminLogin
+              ? 'Redirecting to admin sign in…'
+              : 'Redirecting to sign in…'}
           </p>
-        ) : (
-          <div
-            className={`rounded-xl px-3 py-3 text-sm ${
-              status === "ok"
-                ? "bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "bg-rose-50 text-rose-800 dark:bg-rose-950/50 dark:text-rose-200"
-            }`}
-          >
-            {message}
-          </div>
-        )}
-      </div>
-
-      {status === "ok" ? (
-        <p className="mt-4 text-center text-sm text-slate-600 dark:text-slate-400">
-          {wantsAdminLogin
-            ? "Verification complete. Redirecting to admin sign in..."
-            : "Verification complete. Redirecting to sign in..."}
-        </p>
-      ) : (
-        <div className="mt-4 space-y-2 text-center text-sm">
-          <Link
-            to="/login"
-            className="font-medium text-cyan-700 underline hover:text-cyan-600 dark:text-cyan-400"
-          >
-            Back to sign in
-          </Link>
-          {safeInternalPath(nextParam)?.startsWith("/admin") ? (
-            <div>
-              <Link
-                to="/admin/login"
-                className="font-medium text-violet-700 underline hover:text-violet-600 dark:text-violet-400"
-              >
+        ) : status === 'error' ? (
+          <div className="mt-2 flex flex-col items-center gap-2 text-sm">
+            <AuthInlineLink to="/login">Back to sign in</AuthInlineLink>
+            {safeInternalPath(nextParam)?.startsWith('/admin') ? (
+              <Link to="/admin/login" className="auth-campus-link">
                 Admin portal sign-in
               </Link>
-            </div>
-          ) : null}
-        </div>
-      )}
-    </AuthShell>
+            ) : null}
+          </div>
+        ) : null}
+      </AuthStatusPanel>
+    </CampusAuthLayout>
   );
 }
 

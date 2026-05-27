@@ -42,6 +42,7 @@ import Home from './pages/Home';
 import Landing from './pages/Landing';
 import Library from './pages/Library';
 import LiquAI from './pages/LiquAI';
+import CampusAuthRoute from './components/auth/CampusAuthRoute';
 import Login from './pages/login';
 import NotFound from './pages/NotFound';
 import Notifications from './pages/Notifications';
@@ -174,12 +175,26 @@ function AppRoutes() {
     );
   }
 
-  const hideGlobalNavForLanding = location.pathname === '/';
+  const campusAuthPaths = [
+    '/login',
+    '/signup',
+    '/password/reset',
+    '/verify-email',
+  ];
+  const isCampusAuthPage =
+    campusAuthPaths.includes(location.pathname) ||
+    location.pathname.startsWith('/reset-password/');
+  const hideGlobalNav =
+    location.pathname === '/' || isCampusAuthPage;
+  const campusAuthTabPaths = ['/login', '/signup'];
+  const routeFadeKey = campusAuthTabPaths.includes(location.pathname)
+    ? 'campus-auth'
+    : location.pathname;
 
   return (
     <>
-      {!hideGlobalNavForLanding && <Nav />}
-      <div key={location.pathname} className="route-fade">
+      {!hideGlobalNav && <Nav />}
+      <div key={routeFadeKey} className="route-fade">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/admin/signup" element={<AdminSignup />} />
@@ -188,8 +203,10 @@ function AppRoutes() {
             path="/admin"
             element={<Navigate to="/admin/login?next=/admin" replace />}
           />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route element={<CampusAuthRoute />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+          </Route>
           <Route path="/password/reset" element={<PasswordReset />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password/:token" element={<Reset />} />

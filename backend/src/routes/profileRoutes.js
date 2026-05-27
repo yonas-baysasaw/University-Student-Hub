@@ -11,6 +11,7 @@ import {
   encryptGeminiApiKey,
   isValidGeminiKeyFormat,
 } from '../utils/geminiKeyCrypto.js';
+import { validatePasswordPolicy } from '../utils/passwordPolicy.js';
 import { serializeCurrentUser } from '../utils/userSerializer.js';
 import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
@@ -384,10 +385,9 @@ router.put(
         .json({ message: 'Current and new password required' });
     }
 
-    if (newPassword.length < 8) {
-      return res
-        .status(400)
-        .json({ message: 'New password must be at least 8 characters' });
+    const passwordCheck = validatePasswordPolicy(newPassword);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ message: passwordCheck.message });
     }
 
     const match = await bcrypt.compare(currentPassword, req.user.password);
