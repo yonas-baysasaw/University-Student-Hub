@@ -227,7 +227,11 @@ function ProductTourSection() {
       setActive((i) => (i + 1) % TOUR_STEPS.length);
     }, 4500);
     return () => window.clearInterval(id);
-  }, [prefersReduced, inView]);
+  }, [prefersReduced, inView, active]);
+
+  function selectStep(index) {
+    setActive(index);
+  }
 
   const step = TOUR_STEPS[active];
   const Preview = PREVIEWS[step.id];
@@ -271,7 +275,7 @@ function ProductTourSection() {
                   type="button"
                   role="tab"
                   aria-selected={selected}
-                  onClick={() => setActive(index)}
+                  onClick={() => selectStep(index)}
                   className={`group relative overflow-hidden rounded-2xl border px-4 py-4 text-start transition-colors duration-300 ${
                     selected
                       ? 'border-cyan-300/80 bg-white shadow-md shadow-cyan-900/5 dark:border-cyan-700/60 dark:bg-slate-900/90 dark:shadow-black/20'
@@ -331,10 +335,18 @@ function ProductTourSection() {
                 <motion.div
                   key={step.id}
                   role="tabpanel"
-                  initial={prefersReduced ? false : { opacity: 0, x: 16 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={prefersReduced ? undefined : { opacity: 0, x: -16 }}
-                  transition={{ duration: 0.35, ease: EASE_OUT }}
+                  initial={
+                    prefersReduced
+                      ? false
+                      : { opacity: 0, x: 20, filter: 'blur(6px)' }
+                  }
+                  animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+                  exit={
+                    prefersReduced
+                      ? undefined
+                      : { opacity: 0, x: -20, filter: 'blur(6px)' }
+                  }
+                  transition={{ duration: 0.4, ease: EASE_OUT }}
                 >
                   <Preview />
                 </motion.div>

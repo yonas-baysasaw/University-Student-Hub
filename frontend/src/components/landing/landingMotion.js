@@ -94,3 +94,31 @@ export function hoverLift(reduced) {
     whileHover: { y: -5, transition: { duration: 0.22, ease: EASE_OUT } },
   };
 }
+
+export function blurReveal(reduced, delay = 0) {
+  if (reduced) {
+    return {
+      initial: { opacity: 1, y: 0, filter: 'blur(0px)' },
+      animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+      transition: { duration: 0 },
+    };
+  }
+  return {
+    initial: { opacity: 0, y: 20, filter: 'blur(8px)' },
+    animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+    transition: { duration: 0.65, delay, ease: EASE_OUT },
+  };
+}
+
+export function tiltHover(reduced) {
+  if (reduced) return {};
+  return {
+    whileHover: {
+      rotateX: -3,
+      rotateY: 4,
+      scale: 1.02,
+      transition: { duration: 0.25, ease: EASE_OUT },
+    },
+    style: { transformPerspective: 900 },
+  };
+}

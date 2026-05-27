@@ -74,7 +74,7 @@ const mockSessions = [
   {
     id: "current",
     device: "Chrome on Windows",
-    location: "Addis Ababa campus network",
+    location: "University campus network",
     time: "Active now",
     current: true,
   },

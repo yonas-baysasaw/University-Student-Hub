@@ -1,36 +1,61 @@
-import CommunitySection from '../components/landing/CommunitySection';
-import CoreFeaturesSection from '../components/landing/CoreFeaturesSection';
-import CrossPlatformSection from '../components/landing/CrossPlatformSection';
-import FinalCtaSection from '../components/landing/FinalCtaSection';
+import { lazy, Suspense } from 'react';
 import HeroSection from '../components/landing/HeroSection';
-import LandingAmbient from '../components/landing/LandingAmbient';
 import LandingFooter from '../components/landing/LandingFooter';
 import LandingNav from '../components/landing/LandingNav';
-import ProductTourSection from '../components/landing/ProductTourSection';
-import TechSection from '../components/landing/TechSection';
+import LandingPageShell from '../components/landing/LandingPageShell';
+
+const ProductTourSection = lazy(
+  () => import('../components/landing/ProductTourSection'),
+);
+const BentoFeaturesSection = lazy(
+  () => import('../components/landing/BentoFeaturesSection'),
+);
+const CalendarShowcaseSection = lazy(
+  () => import('../components/landing/CalendarShowcaseSection'),
+);
+const CommunitySection = lazy(
+  () => import('../components/landing/CommunitySection'),
+);
+const MobileExperienceSection = lazy(
+  () => import('../components/landing/MobileExperienceSection'),
+);
+const TestimonialsSection = lazy(
+  () => import('../components/landing/TestimonialsSection'),
+);
+const TrustStripSection = lazy(
+  () => import('../components/landing/TrustStripSection'),
+);
+const FinalCtaSection = lazy(
+  () => import('../components/landing/FinalCtaSection'),
+);
+
+function SectionFallback() {
+  return <div className="min-h-[8rem]" aria-hidden />;
+}
 
 /**
- * Public academic-system homepage (guests only). Dashboard-style preview
- * with motion-enhanced product storytelling.
+ * Public academic-system homepage (guests only). Cinematic product storytelling
+ * with Lenis smooth scroll, parallax hero, and modular feature sections.
  */
 function Landing() {
   return (
-    <div className="landing-page relative min-h-screen bg-transparent">
-      <LandingAmbient />
-      <div className="relative z-[1]">
-        <LandingNav />
-        <main>
-          <HeroSection />
+    <LandingPageShell>
+      <LandingNav />
+      <main>
+        <HeroSection />
+        <Suspense fallback={<SectionFallback />}>
           <ProductTourSection />
-          <CoreFeaturesSection />
+          <BentoFeaturesSection />
+          <CalendarShowcaseSection />
           <CommunitySection />
-          <CrossPlatformSection />
-          <TechSection />
+          <MobileExperienceSection />
+          <TestimonialsSection />
+          <TrustStripSection />
           <FinalCtaSection />
-        </main>
-        <LandingFooter />
-      </div>
-    </div>
+        </Suspense>
+      </main>
+      <LandingFooter />
+    </LandingPageShell>
   );
 }
 

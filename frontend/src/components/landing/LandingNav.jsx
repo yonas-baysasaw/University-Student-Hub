@@ -1,13 +1,18 @@
-import { ChevronDown, ExternalLink, Moon, Sun } from 'lucide-react';
+import { ChevronDown, Moon, Sun } from 'lucide-react';
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { setThemePreference } from '../../theme.js';
+import { useLenis } from './LenisContext.jsx';
 
 const navLinks = [
   { href: '#tour', label: 'Tour', sectionId: 'tour' },
   { href: '#features', label: 'Features', sectionId: 'features' },
+  { href: '#calendar', label: 'Calendar', sectionId: 'calendar' },
   { href: '#community', label: 'Community', sectionId: 'community' },
+  { href: '#mobile', label: 'Mobile', sectionId: 'mobile' },
+  { href: '#stories', label: 'Stories', sectionId: 'stories' },
+  { href: '#join', label: 'Join', sectionId: 'join' },
 ];
 
 function LandingNav() {
@@ -18,6 +23,13 @@ function LandingNav() {
   const [activeSection, setActiveSection] = useState('');
   const moreRef = useRef(null);
   const reduced = useReducedMotion();
+  const lenis = useLenis();
+
+  function handleAnchorClick(event, href) {
+    if (!href.startsWith('#')) return;
+    event.preventDefault();
+    lenis?.scrollTo(href, { offset: -72 });
+  }
 
   function toggleTheme() {
     const nextDark = !document.documentElement.classList.contains('dark');
@@ -106,19 +118,23 @@ function LandingNav() {
               USH
             </span>
             <span className="hidden text-[11px] font-medium text-slate-500 dark:text-slate-400 sm:block">
-              Addis Ababa Institute of Technology
+              One hub for campus life
             </span>
           </span>
         </Link>
 
         <nav
-          className="hidden flex-1 justify-center lg:flex"
+          className="hidden flex-1 justify-center xl:flex"
           aria-label="Page sections"
         >
-          <ul className="flex items-center gap-1 xl:gap-2">
+          <ul className="flex items-center gap-0.5 xl:gap-1">
             {navLinks.map(({ href, label, sectionId }) => (
               <li key={href} className="relative">
-                <a href={href} className={linkClass(sectionId)}>
+                <a
+                  href={href}
+                  className={linkClass(sectionId)}
+                  onClick={(e) => handleAnchorClick(e, href)}
+                >
                   {label}
                   {activeSection === sectionId ? (
                     <motion.span
@@ -199,21 +215,6 @@ function LandingNav() {
                 >
                   Admin
                 </Link>
-                <a
-                  href="https://portal.aau.edu.et/login"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  role="menuitem"
-                  className="flex items-center gap-2 rounded-lg border border-dashed border-slate-200/90 px-2.5 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:border-slate-500 dark:hover:bg-slate-800/60 dark:hover:text-slate-100 sm:text-sm"
-                  onClick={() => setMoreOpen(false)}
-                >
-                  <span className="min-w-0 flex-1">Portal</span>
-                  <ExternalLink
-                    className="h-3.5 w-3.5 shrink-0 opacity-70"
-                    strokeWidth={2}
-                    aria-hidden
-                  />
-                </a>
               </motion.div>
             ) : null}
           </div>
@@ -221,7 +222,7 @@ function LandingNav() {
       </div>
 
       <nav
-        className="border-t border-slate-100 px-3 py-2 lg:hidden dark:border-slate-800"
+        className="border-t border-slate-100 px-3 py-2 xl:hidden dark:border-slate-800"
         aria-label="Page sections (mobile)"
       >
         <ul className="flex flex-wrap justify-center gap-1">
@@ -229,11 +230,12 @@ function LandingNav() {
             <li key={href}>
               <a
                 href={href}
-                className={`inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
+                className={`inline-block rounded-full px-2 py-1 text-[10px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 sm:px-2.5 sm:text-[11px] ${
                   activeSection === sectionId
                     ? 'bg-cyan-500/15 text-cyan-800 dark:text-cyan-300'
                     : 'text-slate-600 dark:text-slate-300'
                 }`}
+                onClick={(e) => handleAnchorClick(e, href)}
               >
                 {label}
               </a>

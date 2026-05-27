@@ -1322,7 +1322,13 @@ function Settings() {
                   </div>
                   <div className="mt-4 space-y-3">
                     {[
-                      ['This browser', 'Africa/Addis_Ababa timezone', Monitor],
+                      [
+                        'This browser',
+                        typeof Intl !== 'undefined'
+                          ? `${Intl.DateTimeFormat().resolvedOptions().timeZone} timezone`
+                          : 'Your local timezone',
+                        Monitor,
+                      ],
                       ['Recent login', 'Email or Google sign-in', History],
                     ].map(([title, subtitle, Icon]) => (
                       <div
