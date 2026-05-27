@@ -49,6 +49,7 @@ export const serializeCurrentUser = (user) => {
     socialInstagram: u.socialInstagram || '',
     socialFacebook: u.socialFacebook || '',
     socialUpwork: u.socialUpwork || '',
+    socialGitHub: u.socialGitHub || '',
     emailVerified: !hasLocalPassword || u.email_verified !== false,
     platformReadOnly: !!u.platformReadOnly,
     instructorPostingSuspended: !!u.instructorPostingSuspended,

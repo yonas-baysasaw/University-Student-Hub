@@ -1,4 +1,10 @@
+import { motion, useReducedMotion } from 'framer-motion';
+import { fadeUp, useLandingMotion } from './landingMotion.js';
+
 function CrossPlatformSection() {
+  const { reduced } = useLandingMotion();
+  const prefersReduced = useReducedMotion();
+
   return (
     <section
       className="scroll-mt-24 border-t border-slate-200 bg-slate-50/90 px-4 py-12 dark:border-slate-800 dark:bg-slate-900/45 md:px-6 md:py-16"
@@ -6,7 +12,7 @@ function CrossPlatformSection() {
     >
       <div className="mx-auto max-w-6xl">
         <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
-          <div>
+          <motion.div {...fadeUp(reduced)}>
             <h2
               id="platform-heading"
               className="font-display text-2xl font-bold text-slate-900 dark:text-slate-50 md:text-3xl"
@@ -18,11 +24,17 @@ function CrossPlatformSection() {
               touch-friendly targets, and consistent navigation on phone and
               desktop.
             </p>
-          </div>
+          </motion.div>
           <div className="flex flex-wrap items-end justify-center gap-8 lg:justify-end">
-            <div
-              className="relative w-[7.5rem] rounded-[1.75rem] border-4 border-slate-800 bg-slate-100 shadow-xl dark:border-slate-600 dark:bg-slate-800"
+            <motion.div
+              className={`relative w-[7.5rem] rounded-[1.75rem] border-4 border-slate-800 bg-slate-100 shadow-xl dark:border-slate-600 dark:bg-slate-800 ${
+                prefersReduced ? '' : 'landing-float'
+              }`}
               aria-hidden
+              initial={prefersReduced ? false : { opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.6, delay: 0.1 }}
             >
               <div className="mx-auto mt-2 h-1.5 w-10 rounded-full bg-slate-300 dark:bg-slate-600" />
               <div className="m-2 mt-3 min-h-[11rem] rounded-xl bg-white p-2 shadow-inner dark:bg-slate-900">
@@ -36,10 +48,16 @@ function CrossPlatformSection() {
                   <div className="h-8 rounded bg-slate-100 dark:bg-slate-800" />
                 </div>
               </div>
-            </div>
-            <div
+            </motion.div>
+            <motion.div
               className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-2 shadow-lg dark:border-slate-600 dark:bg-slate-900"
               aria-hidden
+              initial={
+                prefersReduced ? false : { opacity: 0, y: 24, scale: 0.96 }
+              }
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.65, delay: 0.2 }}
             >
               <div className="flex gap-1 rounded-lg bg-slate-100 p-1.5 dark:bg-slate-800">
                 <div className="h-2 flex-1 rounded bg-white dark:bg-slate-700" />
@@ -50,7 +68,7 @@ function CrossPlatformSection() {
                 <div className="min-h-[5rem] rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/80" />
                 <div className="col-span-3 h-10 rounded-lg bg-slate-100 dark:bg-slate-800" />
               </div>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>

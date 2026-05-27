@@ -17,7 +17,7 @@ import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 const router = express.Router();
 
 const PUBLIC_PROFILE_FIELDS =
-  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialTelegram socialLinkedIn socialInstagram socialFacebook socialUpwork';
+  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialGitHub socialUpwork socialTelegram socialLinkedIn socialInstagram socialFacebook';
 
 /** @param {unknown} body @param {string} key @param {number} maxLen */
 function readOptionalTrimmedString(body, key, maxLen) {
@@ -114,6 +114,8 @@ router.get(
           typeof user.socialFacebook === 'string' ? user.socialFacebook : '',
         socialUpwork:
           typeof user.socialUpwork === 'string' ? user.socialUpwork : '',
+        socialGitHub:
+          typeof user.socialGitHub === 'string' ? user.socialGitHub : '',
       },
       stats: {
         sharedBooks: sharedBooks.length,
@@ -441,11 +443,12 @@ router.put(
     if (skills !== undefined) req.user.skills = skills;
 
     const socialKeys = [
+      ['socialGitHub', 'socialGitHub'],
+      ['socialUpwork', 'socialUpwork'],
       ['socialTelegram', 'socialTelegram'],
       ['socialLinkedIn', 'socialLinkedIn'],
       ['socialInstagram', 'socialInstagram'],
       ['socialFacebook', 'socialFacebook'],
-      ['socialUpwork', 'socialUpwork'],
     ];
     for (const [bodyKey, docKey] of socialKeys) {
       const v = readOptionalTrimmedString(req.body, bodyKey, 400);

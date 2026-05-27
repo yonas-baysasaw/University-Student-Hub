@@ -204,6 +204,12 @@ const userSchema = new mongoose.Schema(
       maxlength: 400,
       default: '',
     },
+    socialGitHub: {
+      type: String,
+      trim: true,
+      maxlength: 400,
+      default: '',
+    },
     geminiApiKey: {
       type: String,
       select: false,

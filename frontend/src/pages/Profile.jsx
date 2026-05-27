@@ -40,6 +40,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FaFacebook,
+  FaGithub,
   FaInstagram,
   FaLinkedinIn,
   FaTelegram,
@@ -271,13 +272,28 @@ function hrefUpwork(raw) {
   return `https://www.upwork.com/freelancers/${encodeURIComponent(t)}`;
 }
 
+function hrefGitHub(raw) {
+  const t = trimSocialInput(raw);
+  if (!t) return null;
+  if (/^https?:\/\//i.test(t)) return t;
+  const h = t.replace(/^@/, "").replace(/^github\.com\//i, "");
+  return `https://github.com/${encodeURIComponent(h)}`;
+}
+
 const SOCIAL_LINK_DEFS = [
   {
-    key: "socialTelegram",
-    label: "Telegram",
-    hrefFn: hrefTelegram,
-    Icon: FaTelegram,
-    bg: "bg-sky-500/15 text-sky-700 ring-sky-500/25 dark:text-sky-200",
+    key: "socialGitHub",
+    label: "GitHub",
+    hrefFn: hrefGitHub,
+    Icon: FaGithub,
+    bg: "bg-slate-500/15 text-slate-800 ring-slate-500/25 dark:text-slate-200",
+  },
+  {
+    key: "socialUpwork",
+    label: "Upwork",
+    hrefFn: hrefUpwork,
+    Icon: BriefcaseBusiness,
+    bg: "bg-emerald-500/12 text-emerald-900 ring-emerald-500/25 dark:text-emerald-200",
   },
   {
     key: "socialLinkedIn",
@@ -285,6 +301,13 @@ const SOCIAL_LINK_DEFS = [
     hrefFn: hrefLinkedIn,
     Icon: FaLinkedinIn,
     bg: "bg-blue-600/15 text-blue-800 ring-blue-600/25 dark:text-blue-200",
+  },
+  {
+    key: "socialTelegram",
+    label: "Telegram",
+    hrefFn: hrefTelegram,
+    Icon: FaTelegram,
+    bg: "bg-sky-500/15 text-sky-700 ring-sky-500/25 dark:text-sky-200",
   },
   {
     key: "socialInstagram",
@@ -300,13 +323,6 @@ const SOCIAL_LINK_DEFS = [
     Icon: FaFacebook,
     bg: "bg-blue-500/15 text-blue-900 ring-blue-500/20 dark:text-blue-100",
   },
-  {
-    key: "socialUpwork",
-    label: "Upwork",
-    hrefFn: hrefUpwork,
-    Icon: BriefcaseBusiness,
-    bg: "bg-emerald-500/12 text-emerald-900 ring-emerald-500/25 dark:text-emerald-200",
-  },
 ];
 
 function socialLinksFromRow(row) {
@@ -317,11 +333,14 @@ function socialLinksFromRow(row) {
   })).filter((x) => x.href);
 }
 
-function SocialConnectStrip({ row, className = "" }) {
+function SocialConnectStrip({ row, className = "", size = "default" }) {
   const links = socialLinksFromRow(row);
   if (links.length === 0) return null;
+  const compact = size === "compact";
   return (
-    <div className={`flex flex-wrap gap-2 ${className}`}>
+    <div
+      className={`flex flex-wrap items-center ${compact ? "gap-2.5" : "gap-2"} ${className}`}
+    >
       {links.map(({ key, label, href, Icon, bg }) => (
         <a
           key={key}
@@ -330,9 +349,11 @@ function SocialConnectStrip({ row, className = "" }) {
           rel="noopener noreferrer"
           title={label}
           aria-label={label}
-          className={`inline-flex h-11 w-11 items-center justify-center rounded-2xl ring-1 transition hover:opacity-90 ${bg}`}
+          className={`inline-flex shrink-0 items-center justify-center rounded-2xl ring-1 transition hover:opacity-90 ${
+            compact ? "h-9 w-9" : "h-11 w-11"
+          } ${bg}`}
         >
-          <Icon className="h-5 w-5" aria-hidden />
+          <Icon className={compact ? "h-4 w-4" : "h-5 w-5"} aria-hidden />
         </a>
       ))}
     </div>
@@ -340,13 +361,15 @@ function SocialConnectStrip({ row, className = "" }) {
 }
 
 function SocialConnectPanel({
-  title = "Connect",
+  title = "Social",
   subtitle,
   row,
   emptyHint,
   className = "",
+  hideWhenEmpty = false,
 }) {
   const links = socialLinksFromRow(row);
+  if (hideWhenEmpty && links.length === 0) return null;
   return (
     <section
       className={`rounded-3xl border border-slate-200/90 bg-white/90 p-5 shadow-sm dark:border-slate-700/80 dark:bg-slate-900/60 ${className}`}
@@ -388,11 +411,13 @@ function SocialConnectPanel({
 }
 
 function PeerAboutReadOnly({ profile: p }) {
+  const socialLinks = socialLinksFromRow(p);
   const hasAny =
     (p.bio && p.bio.trim()) ||
     (p.interests && p.interests.trim()) ||
     (p.careerGoals && p.careerGoals.trim()) ||
-    (p.skills && p.skills.trim());
+    (p.skills && p.skills.trim()) ||
+    socialLinks.length > 0;
   return (
     <div className="panel-card rounded-3xl p-6 shadow-xl shadow-slate-900/[0.06] md:p-8 dark:shadow-black/35">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-5 dark:border-slate-700/80">
@@ -416,30 +441,45 @@ function PeerAboutReadOnly({ profile: p }) {
               </p>
             </div>
           ) : null}
-          <FieldRow
-            label="Interests"
-            name="interests"
-            value={p.interests}
-            editing={false}
-            icon={Sparkles}
-            readOnly
-          />
-          <FieldRow
-            label="Career goals"
-            name="careerGoals"
-            value={p.careerGoals}
-            editing={false}
-            icon={Target}
-            readOnly
-          />
-          <FieldRow
-            label="Skills"
-            name="skills"
-            value={p.skills}
-            editing={false}
-            icon={Check}
-            readOnly
-          />
+          {p.interests?.trim() ? (
+            <FieldRow
+              label="Interests"
+              name="interests"
+              value={p.interests}
+              editing={false}
+              icon={Sparkles}
+              readOnly
+            />
+          ) : null}
+          {p.careerGoals?.trim() ? (
+            <FieldRow
+              label="Career goals"
+              name="careerGoals"
+              value={p.careerGoals}
+              editing={false}
+              icon={Target}
+              readOnly
+            />
+          ) : null}
+          {p.skills?.trim() ? (
+            <FieldRow
+              label="Skills"
+              name="skills"
+              value={p.skills}
+              editing={false}
+              icon={Check}
+              readOnly
+            />
+          ) : null}
+          {socialLinks.length > 0 ? (
+            <div className="lg:col-span-2">
+              <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+                <Users className="h-4 w-4" aria-hidden />
+                Social
+              </span>
+              <SocialConnectStrip row={p} className="mt-3" />
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="mt-10 rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-14 text-center dark:border-slate-600 dark:bg-slate-900/40">
@@ -454,6 +494,21 @@ function PeerAboutReadOnly({ profile: p }) {
       )}
     </div>
   );
+}
+
+function contactFieldsFromUser(u) {
+  return {
+    showEmailPublic: Boolean(u?.showEmailPublic),
+    phone: u?.phone || "",
+    location: u?.campus || "",
+    emergencyContact: u?.emergencyContact || "",
+    socialGitHub: trimSocialInput(u?.socialGitHub),
+    socialUpwork: trimSocialInput(u?.socialUpwork),
+    socialTelegram: trimSocialInput(u?.socialTelegram),
+    socialLinkedIn: trimSocialInput(u?.socialLinkedIn),
+    socialInstagram: trimSocialInput(u?.socialInstagram),
+    socialFacebook: trimSocialInput(u?.socialFacebook),
+  };
 }
 
 /** Maps GET /api/profile/public payload → Profile.jsx row shape (peer view). */
@@ -498,6 +553,8 @@ function mapPeerApiToProfileRow(peer) {
       typeof peer.socialFacebook === "string" ? peer.socialFacebook : "",
     socialUpwork:
       typeof peer.socialUpwork === "string" ? peer.socialUpwork : "",
+    socialGitHub:
+      typeof peer.socialGitHub === "string" ? peer.socialGitHub : "",
   };
 }
 
@@ -1075,6 +1132,8 @@ function Profile({ viewMode = "owner" }) {
         typeof user?.socialFacebook === "string" ? user.socialFacebook : "",
       socialUpwork:
         typeof user?.socialUpwork === "string" ? user.socialUpwork : "",
+      socialGitHub:
+        typeof user?.socialGitHub === "string" ? user.socialGitHub : "",
     }),
     [displayName, ownerIdentity, user],
   );
@@ -1095,9 +1154,11 @@ function Profile({ viewMode = "owner" }) {
   useEffect(() => {
     if (isPeerView) return;
     setProfile(initialProfile);
-    setDraft(initialProfile);
+    if (!editingContact && !editingBio) {
+      setDraft(initialProfile);
+    }
     setAvatarPreview(user?.photo || defaultProfile);
-  }, [initialProfile, user?.photo, isPeerView]);
+  }, [initialProfile, user?.photo, isPeerView, editingContact, editingBio]);
 
   useEffect(() => {
     if (isPeerView) return;
@@ -1215,11 +1276,12 @@ function Profile({ viewMode = "owner" }) {
           body.phone = draft.phone.trim();
           body.campus = draft.location.trim();
           body.emergencyContact = draft.emergencyContact.trim();
-          body.socialTelegram = draft.socialTelegram;
-          body.socialLinkedIn = draft.socialLinkedIn;
-          body.socialInstagram = draft.socialInstagram;
-          body.socialFacebook = draft.socialFacebook;
-          body.socialUpwork = draft.socialUpwork;
+          body.socialGitHub = trimSocialInput(draft.socialGitHub);
+          body.socialUpwork = trimSocialInput(draft.socialUpwork);
+          body.socialTelegram = trimSocialInput(draft.socialTelegram);
+          body.socialLinkedIn = trimSocialInput(draft.socialLinkedIn);
+          body.socialInstagram = trimSocialInput(draft.socialInstagram);
+          body.socialFacebook = trimSocialInput(draft.socialFacebook);
         } else {
           return;
         }
@@ -1234,6 +1296,23 @@ function Profile({ viewMode = "owner" }) {
         if (!res.ok) {
           throw new Error(payload.message || "Could not save profile.");
         }
+        const contactPatch =
+          scope === "contact" && payload.user
+            ? contactFieldsFromUser(payload.user)
+            : scope === "contact"
+              ? {
+                  showEmailPublic: Boolean(draft.showEmailPublic),
+                  phone: draft.phone.trim(),
+                  location: draft.location.trim(),
+                  emergencyContact: draft.emergencyContact.trim(),
+                  socialGitHub: trimSocialInput(draft.socialGitHub),
+                  socialUpwork: trimSocialInput(draft.socialUpwork),
+                  socialTelegram: trimSocialInput(draft.socialTelegram),
+                  socialLinkedIn: trimSocialInput(draft.socialLinkedIn),
+                  socialInstagram: trimSocialInput(draft.socialInstagram),
+                  socialFacebook: trimSocialInput(draft.socialFacebook),
+                }
+              : null;
         await refreshAuth();
         setProfile((current) => ({
           ...current,
@@ -1244,17 +1323,7 @@ function Profile({ viewMode = "owner" }) {
                 careerGoals: draft.careerGoals,
                 skills: draft.skills,
               }
-            : {
-                showEmailPublic: Boolean(draft.showEmailPublic),
-                phone: draft.phone.trim(),
-                location: draft.location.trim(),
-                emergencyContact: draft.emergencyContact.trim(),
-                socialTelegram: draft.socialTelegram,
-                socialLinkedIn: draft.socialLinkedIn,
-                socialInstagram: draft.socialInstagram,
-                socialFacebook: draft.socialFacebook,
-                socialUpwork: draft.socialUpwork,
-              }),
+            : contactPatch),
         }));
         setDraft((current) => ({
           ...current,
@@ -1265,17 +1334,7 @@ function Profile({ viewMode = "owner" }) {
                 careerGoals: draft.careerGoals,
                 skills: draft.skills,
               }
-            : {
-                showEmailPublic: Boolean(draft.showEmailPublic),
-                phone: draft.phone.trim(),
-                location: draft.location.trim(),
-                emergencyContact: draft.emergencyContact.trim(),
-                socialTelegram: draft.socialTelegram,
-                socialLinkedIn: draft.socialLinkedIn,
-                socialInstagram: draft.socialInstagram,
-                socialFacebook: draft.socialFacebook,
-                socialUpwork: draft.socialUpwork,
-              }),
+            : contactPatch),
         }));
         toast.success("Profile updated");
         setEditingContact(false);
@@ -1721,26 +1780,31 @@ function Profile({ viewMode = "owner" }) {
                 ) : null}
               </div>
 
-              <div className="relative z-10 flex flex-wrap gap-2">
+              <div className="relative z-10 flex flex-wrap items-center justify-end gap-3 sm:gap-4">
                 {isPeerView ? (
                   <>
                     {user &&
                     peerApiProfile?.id &&
                     viewerIdStr !== String(peerApiProfile.id) ? (
-                      <div className="flex w-full justify-end sm:w-auto sm:justify-start">
-                        <BookEventReportMenu
-                          targetType="user"
-                          targetId={String(peerApiProfile.id)}
-                          shareUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/users/${peerApiProfile.id}`}
-                          align="left"
-                        />
-                      </div>
+                      <BookEventReportMenu
+                        targetType="user"
+                        targetId={String(peerApiProfile.id)}
+                        shareUrl={`${typeof window !== "undefined" ? window.location.origin : ""}/users/${peerApiProfile.id}`}
+                        align="left"
+                      />
+                    ) : null}
+                    <SocialConnectStrip row={profile} size="compact" />
+                    {socialLinksFromRow(profile).length > 0 ? (
+                      <span
+                        className="hidden h-5 w-px shrink-0 bg-slate-200/90 sm:block dark:bg-slate-700/80"
+                        aria-hidden
+                      />
                     ) : null}
                     <button
                       type="button"
                       onClick={() => void handlePeerSubscribe()}
                       disabled={peerActionLoading}
-                      className={`inline-flex items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                      className={`inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-5 py-3 text-sm font-bold shadow-lg transition disabled:cursor-not-allowed disabled:opacity-60 ${
                         peerSubscribed
                           ? "border-2 border-emerald-400/50 bg-emerald-50 text-emerald-900 shadow-emerald-900/10 hover:bg-emerald-100 dark:border-emerald-500/35 dark:bg-emerald-950/50 dark:text-emerald-100 dark:hover:bg-emerald-950/80"
                           : "btn-primary shadow-cyan-900/20"
@@ -1755,13 +1819,22 @@ function Profile({ viewMode = "owner" }) {
                     </button>
                   </>
                 ) : (
-                <Link
-                  to="/settings"
-                  className="btn-secondary gap-2 px-4 py-2 text-sm"
-                >
-                  <Settings className="h-4 w-4" aria-hidden />
-                  Settings
-                </Link>
+                  <>
+                    <SocialConnectStrip row={profile} size="compact" />
+                    {socialLinksFromRow(profile).length > 0 ? (
+                      <span
+                        className="hidden h-5 w-px shrink-0 bg-slate-200/90 sm:block dark:bg-slate-700/80"
+                        aria-hidden
+                      />
+                    ) : null}
+                    <Link
+                      to="/settings"
+                      className="btn-secondary shrink-0 gap-2 px-4 py-2 text-sm"
+                    >
+                      <Settings className="h-4 w-4" aria-hidden />
+                      Settings
+                    </Link>
+                  </>
                 )}
               </div>
             </div>
@@ -1907,36 +1980,48 @@ function Profile({ viewMode = "owner" }) {
                     <Users className="h-5 w-5 shrink-0 text-cyan-700 dark:text-cyan-300" aria-hidden />
                     <div className="min-w-0">
                       <h3 className="font-display text-base font-bold text-slate-900 dark:text-white">
-                        Social & freelance profiles
+                        Social
                       </h3>
-                      <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
-                        Paste a full URL or a handle — visitors get one-tap branded
-                        buttons on your public profile.
-                      </p>
                     </div>
                   </div>
                   {editingContact ? (
                     <div className="mt-4 grid gap-3 sm:grid-cols-2">
                       <FieldRow
-                        label="Telegram"
-                        name="socialTelegram"
-                        value={draft.socialTelegram}
+                        label="GitHub"
+                        name="socialGitHub"
+                        value={draft.socialGitHub ?? ""}
                         editing={editingContact}
                         onChange={updateDraft}
-                        icon={FaTelegram}
+                        icon={FaGithub}
+                      />
+                      <FieldRow
+                        label="Upwork"
+                        name="socialUpwork"
+                        value={draft.socialUpwork ?? ""}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={BriefcaseBusiness}
                       />
                       <FieldRow
                         label="LinkedIn"
                         name="socialLinkedIn"
-                        value={draft.socialLinkedIn}
+                        value={draft.socialLinkedIn ?? ""}
                         editing={editingContact}
                         onChange={updateDraft}
                         icon={FaLinkedinIn}
                       />
                       <FieldRow
+                        label="Telegram"
+                        name="socialTelegram"
+                        value={draft.socialTelegram ?? ""}
+                        editing={editingContact}
+                        onChange={updateDraft}
+                        icon={FaTelegram}
+                      />
+                      <FieldRow
                         label="Instagram"
                         name="socialInstagram"
-                        value={draft.socialInstagram}
+                        value={draft.socialInstagram ?? ""}
                         editing={editingContact}
                         onChange={updateDraft}
                         icon={FaInstagram}
@@ -1944,18 +2029,10 @@ function Profile({ viewMode = "owner" }) {
                       <FieldRow
                         label="Facebook"
                         name="socialFacebook"
-                        value={draft.socialFacebook}
+                        value={draft.socialFacebook ?? ""}
                         editing={editingContact}
                         onChange={updateDraft}
                         icon={FaFacebook}
-                      />
-                      <FieldRow
-                        label="Upwork"
-                        name="socialUpwork"
-                        value={draft.socialUpwork}
-                        editing={editingContact}
-                        onChange={updateDraft}
-                        icon={BriefcaseBusiness}
                       />
                     </div>
                   ) : (
@@ -1963,8 +2040,7 @@ function Profile({ viewMode = "owner" }) {
                       <SocialConnectStrip row={profile} className="mt-4" />
                       {socialLinksFromRow(profile).length === 0 ? (
                         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-                          No public social links yet — choose Edit above to add
-                          yours.
+                          No social links yet — choose Edit above to add yours.
                         </p>
                       ) : null}
                     </>
@@ -2093,7 +2169,14 @@ function Profile({ viewMode = "owner" }) {
           <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
             <div className="space-y-6">
               {activeTab === "overview" ? (
-                <PeerLibraryGrid sharedBooks={peerSharedBooks} />
+                <>
+                  <SocialConnectPanel
+                    title="Social"
+                    row={profile}
+                    hideWhenEmpty
+                  />
+                  <PeerLibraryGrid sharedBooks={peerSharedBooks} />
+                </>
               ) : (
                 <PeerAboutReadOnly profile={profile} />
               )}
@@ -2127,10 +2210,9 @@ function Profile({ viewMode = "owner" }) {
                 </div>
               </section>
               <SocialConnectPanel
-                title="Connect"
-                subtitle="Reach them on the networks they’ve chosen to publish."
+                title="Social"
                 row={profile}
-                emptyHint="No public social links on this profile yet."
+                emptyHint="No social links on this profile yet."
               />
             </aside>
           </div>
