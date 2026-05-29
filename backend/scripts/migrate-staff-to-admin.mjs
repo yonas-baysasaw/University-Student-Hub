@@ -1,11 +1,3 @@
-/**
- * One-time migration: legacy role "staff" -> "admin".
- *
- * Run BEFORE deploying code that removes "staff" from the User schema enum:
- *   node scripts/migrate-staff-to-admin.mjs
- *
- * Requires MONGODB_URL or MONGODB_URI in .env (same as the API server).
- */
 import "dotenv/config";
 import mongoose from "mongoose";
 
