@@ -1,8 +1,15 @@
 import { BookOpen, ChevronDown, ExternalLink, LibraryBig, Maximize2, PanelTop } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
+import BookPdfViewer from './BookPdfViewer';
 
-/** Library book selector + inline reader (iframe) for Study buddy. */
+function bookFileProxyUrl(book) {
+  const id = book?.bookId || book?.id;
+  if (!id || !book?.bookUrl) return '';
+  return `/api/books/${encodeURIComponent(String(id))}/file`;
+}
+
+/** Library book selector + inline reader for Study buddy. */
 function ReadAlongPanel({
   books,
   selectedBookId,
@@ -12,6 +19,9 @@ function ReadAlongPanel({
   layoutVariant = 'default',
   focusRead: focusReadProp,
   onFocusReadChange,
+  currentPage = 1,
+  onPageChange,
+  onTextSelected,
 }) {
   const isWorkspace = layoutVariant === 'workspace';
   const [focusReadInternal, setFocusReadInternal] = useState(false);
@@ -53,7 +63,40 @@ function ReadAlongPanel({
       </button>
     );
 
-  const pickerBlock = (
+  const pickerBlock = isWorkspace ? (
+    !focusRead ? (
+      <div className="shrink-0 border-b border-slate-100 pb-2 dark:border-slate-700">
+        <div className="flex items-center gap-1.5">
+          <label htmlFor="read-along-book" className="sr-only">
+            Select a book
+          </label>
+          <div className="relative min-w-0 flex-1">
+            <select
+              id="read-along-book"
+              className="h-8 w-full appearance-none truncate rounded-lg border border-slate-200/90 bg-white py-0 pl-2.5 pr-8 text-xs font-medium text-slate-800 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-100"
+              value={selectedBookId}
+              onChange={(event) => onBookIdChange(event.target.value)}
+            >
+              <option value="">No book (general chat)</option>
+              {books.map((book) => {
+                const value = String(book.bookId || book.id);
+                return (
+                  <option key={value} value={value}>
+                    {book.title}
+                  </option>
+                );
+              })}
+            </select>
+            <ChevronDown
+              className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              aria-hidden
+            />
+          </div>
+          <FocusReadIconButton />
+        </div>
+      </div>
+    ) : null
+  ) : (
     <div
       className={
         showPageTitle && !focusRead
@@ -68,17 +111,12 @@ function ReadAlongPanel({
               Books from Library
             </h4>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
-              Choose a book to feed into Study buddy.
+              Pick a book to read while you chat.
             </p>
           </div>
         ) : (
           <div className="min-w-[1px] flex-1" aria-hidden />
         )}
-        {isWorkspace ? (
-          <div className="shrink-0 self-start">
-            <FocusReadIconButton />
-          </div>
-        ) : null}
       </div>
       <label htmlFor="read-along-book" className="sr-only">
         Select a book
@@ -191,31 +229,36 @@ function ReadAlongPanel({
       {!focusRead || !isWorkspace ? pickerBlock : null}
 
       <div
-        className={`flex min-h-0 flex-1 flex-col ${focusRead || !showPageTitle ? 'pt-2' : 'pt-6'} ${isWorkspace ? 'overflow-hidden' : ''}`}
+        className={`flex min-h-0 flex-1 flex-col ${focusRead || !showPageTitle ? (isWorkspace ? 'pt-1' : 'pt-2') : 'pt-6'} ${isWorkspace ? 'overflow-hidden' : ''}`}
       >
         {selectedBook?.bookUrl ? (
           <>
             {!focusRead || !isWorkspace ? (
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+              <div
+                className={`flex shrink-0 items-center justify-between gap-2 ${isWorkspace ? 'py-0.5' : 'flex-wrap'}`}
+              >
                 <a
-                  href={selectedBook.bookUrl}
+                  href={bookFileProxyUrl(selectedBook) || selectedBook.bookUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 transition hover:underline dark:text-cyan-400"
+                  className={`inline-flex items-center gap-1 font-semibold text-cyan-700 transition hover:underline dark:text-cyan-400 ${isWorkspace ? 'text-[10px]' : 'gap-1.5 text-xs'}`}
                 >
                   Open book in new tab
-                  <ExternalLink className="h-3.5 w-3.5" aria-hidden />
+                  <ExternalLink
+                    className={isWorkspace ? 'h-3 w-3' : 'h-3.5 w-3.5'}
+                    aria-hidden
+                  />
                 </a>
                 {isWorkspace ? (
-                  <p className="text-[10px] leading-snug text-slate-500 dark:text-slate-400">
-                    Copy text in the viewer, then paste into the chat.
+                  <p className="text-[10px] leading-none text-slate-500 dark:text-slate-400">
+                    Highlight text to ask Liqu AI
                   </p>
                 ) : null}
               </div>
             ) : null}
             <div
               className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-slate-100/80 shadow-inner ring-1 ring-slate-200/50 dark:border-slate-600 dark:bg-slate-900/60 dark:ring-slate-600/50 ${
-                !focusRead || !isWorkspace ? 'mt-3' : 'mt-0'
+                !focusRead || !isWorkspace ? (isWorkspace ? 'mt-1' : 'mt-3') : 'mt-0'
               }`}
             >
               {!(focusRead && isWorkspace) ? (
@@ -237,13 +280,16 @@ function ReadAlongPanel({
                   </span>
                 </div>
               ) : null}
-              <iframe
-                src={selectedBook.bookUrl}
-                title={`${selectedBook.title} reader`}
+              <BookPdfViewer
+                url={bookFileProxyUrl(selectedBook) || selectedBook.bookUrl}
+                title={selectedBook.title}
+                page={currentPage}
+                onPageChange={onPageChange}
+                onTextSelected={onTextSelected}
                 className={
                   isWorkspace
-                    ? 'min-h-[12rem] w-full flex-1 border-0 bg-white dark:bg-slate-950 lg:min-h-0'
-                    : 'h-[calc(24rem-2.25rem)] w-full min-h-[10rem] border-0 bg-white dark:bg-slate-950'
+                    ? 'min-h-[12rem] flex-1 lg:min-h-0'
+                    : 'h-[calc(24rem-2.25rem)] min-h-[10rem]'
                 }
               />
             </div>

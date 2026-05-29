@@ -88,6 +88,9 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    notificationsLastSeenAt: {
+      type: Date,
+    },
     subscriptions: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -146,6 +149,24 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    phone: {
+      type: String,
+      trim: true,
+      maxlength: 40,
+      default: '',
+    },
+    campus: {
+      type: String,
+      trim: true,
+      maxlength: 120,
+      default: '',
+    },
+    emergencyContact: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: '',
+    },
     bio: {
       type: String,
       trim: true,
@@ -200,6 +221,25 @@ const userSchema = new mongoose.Schema(
       maxlength: 400,
       default: '',
     },
+    socialGitHub: {
+      type: String,
+      trim: true,
+      maxlength: 400,
+      default: '',
+    },
+    geminiApiKey: {
+      type: String,
+      select: false,
+    },
+    geminiModelId: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    geminiKeySet: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true },
 );
@@ -211,6 +251,7 @@ userSchema.methods.toJSON = function () {
   delete obj.emailVerificationExpires;
   delete obj.resetPasswordToken;
   delete obj.resetPasswordExpires;
+  delete obj.geminiApiKey;
   return obj;
 };
 

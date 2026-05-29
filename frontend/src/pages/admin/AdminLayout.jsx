@@ -31,7 +31,7 @@ export default function AdminLayout() {
   return (
     <div className="dashboard-ambient page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-5 md:px-6 md:pb-14 md:pt-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[min(200px,28vh)] workspace-hero-mesh opacity-75 dark:opacity-55" />
-      <div className="relative z-[2] mx-auto flex max-w-6xl flex-col gap-6 md:flex-row md:items-start">
+      <div className="relative z-[2] mx-auto flex w-full max-w-[min(100%,1600px)] flex-col gap-6 md:flex-row md:items-start">
         <aside className="w-full shrink-0 md:sticky md:top-24 md:max-w-[240px]">
           <div className="rounded-2xl border border-slate-200/90 bg-white/95 p-3 shadow-sm ring-1 ring-slate-200/80 dark:border-slate-600/80 dark:bg-slate-900/90 dark:ring-slate-600">
             <p className="px-2 pb-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">

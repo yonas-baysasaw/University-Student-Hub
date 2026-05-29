@@ -1,18 +1,18 @@
 import mongoose from 'mongoose';
-import asyncHandler from '../middlewares/asyncHandler.js';
 import { ENV } from '../config/env.js';
+import asyncHandler from '../middlewares/asyncHandler.js';
 import Event from '../models/Event.js';
 import EventComment from '../models/EventComment.js';
 import EventReview from '../models/EventReview.js';
 import User from '../models/User.js';
 import { uploadFileToS3 } from '../services/uploadService.js';
-import { assertCanWrite } from '../utils/userWriteAccess.js';
 import { validateEventCatalogMeta } from '../utils/bookCatalogMeta.js';
 import {
   notifyAllConnectedCalendarInvalidate,
   notifyUserCalendarInvalidate,
   notifyUsersCalendarInvalidate,
 } from '../utils/calendarNotify.js';
+import { assertCanWrite } from '../utils/userWriteAccess.js';
 
 const validId = (id) => mongoose.Types.ObjectId.isValid(id);
 
@@ -22,12 +22,6 @@ export function eventFiniteCapacity(event) {
   const c = event?.capacity;
   if (c == null || !Number.isFinite(Number(c)) || Number(c) <= 0) return null;
   return Math.floor(Number(c));
-}
-
-/** Length of reserved list (works with populated or id-only entries). */
-function reservedCountFromEvent(event) {
-  const raw = Array.isArray(event.reservedBy) ? event.reservedBy : [];
-  return raw.length;
 }
 
 function reservedIdList(event) {
@@ -80,9 +74,7 @@ export function toEventResponse(event, req) {
 
   const rawCap = event.capacity;
   const capacity =
-    rawCap != null &&
-    Number.isFinite(Number(rawCap)) &&
-    Number(rawCap) > 0
+    rawCap != null && Number.isFinite(Number(rawCap)) && Number(rawCap) > 0
       ? Math.floor(Number(rawCap))
       : null;
 
@@ -187,7 +179,9 @@ export const listEvents = asyncHandler(async (req, res) => {
 export const getEventById = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   if (!validId(eventId)) {
-    return res.status(400).json({ success: false, message: 'Invalid event id' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid event id' });
   }
 
   const viewerId = req.user?._id ? String(req.user._id) : null;
@@ -198,10 +192,7 @@ export const getEventById = asyncHandler(async (req, res) => {
   const orgId = String(stub.userId);
   const isOrganizer = Boolean(viewerId && orgId === viewerId);
 
-  let q = Event.findById(eventId).populate(
-    'userId',
-    'username name avatar',
-  );
+  let q = Event.findById(eventId).populate('userId', 'username name avatar');
   if (isOrganizer) {
     q = q.populate('reservedBy', 'username name avatar');
   }
@@ -282,7 +273,9 @@ export const createEvent = asyncHandler(async (req, res) => {
     cap = n === 0 ? null : Math.floor(n);
   }
 
-  const track = String(academicTrack || '').trim().toLowerCase();
+  const track = String(academicTrack || '')
+    .trim()
+    .toLowerCase();
 
   const event = await Event.create({
     userId: req.user._id,
@@ -291,8 +284,7 @@ export const createEvent = asyncHandler(async (req, res) => {
       typeof description === 'string' ? description.slice(0, 5000) : '',
     startsAt: start,
     endsAt: end,
-    location:
-      typeof location === 'string' ? location.trim().slice(0, 300) : '',
+    location: typeof location === 'string' ? location.trim().slice(0, 300) : '',
     meetingUrl:
       typeof meetingUrl === 'string' ? meetingUrl.trim().slice(0, 2000) : '',
     capacity: cap,
@@ -311,18 +303,135 @@ export const createEvent = asyncHandler(async (req, res) => {
   });
 });
 
+export const updateEvent = asyncHandler(async (req, res) => {
+  assertCanWrite(req.user);
+  const { eventId } = req.params;
+  if (!validId(eventId)) {
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid event id' });
+  }
+
+  const event = await Event.findById(eventId);
+  if (!event) {
+    return res.status(404).json({ success: false, message: 'Event not found' });
+  }
+  if (String(event.userId) !== String(req.user._id)) {
+    return res
+      .status(403)
+      .json({ message: 'Only the host can edit this event.' });
+  }
+
+  const {
+    title,
+    description,
+    startsAt,
+    endsAt,
+    location,
+    meetingUrl,
+    capacity,
+    academicTrack,
+    department,
+    visibility: visibilityRaw,
+  } = req.body ?? {};
+
+  const t = typeof title === 'string' ? title.trim() : '';
+  if (!t) {
+    return res.status(400).json({ message: 'Title is required.' });
+  }
+
+  const dept =
+    typeof department === 'string' ? department.trim().slice(0, 160) : '';
+  const catalogErr = validateEventCatalogMeta({
+    academicTrack,
+    department: dept,
+  });
+  if (catalogErr) {
+    return res.status(400).json({ message: catalogErr });
+  }
+
+  const start = startsAt ? new Date(startsAt) : null;
+  if (!start || Number.isNaN(start.getTime())) {
+    return res.status(400).json({ message: 'Valid start time is required.' });
+  }
+
+  let end = null;
+  if (endsAt) {
+    end = new Date(endsAt);
+    if (Number.isNaN(end.getTime())) {
+      return res.status(400).json({ message: 'Invalid end time.' });
+    }
+  }
+
+  let cap = null;
+  if (
+    capacity !== undefined &&
+    capacity !== null &&
+    String(capacity).trim() !== ''
+  ) {
+    const n = Number(capacity);
+    if (!Number.isFinite(n) || n < 0) {
+      return res
+        .status(400)
+        .json({ message: 'Capacity must be a non-negative number.' });
+    }
+    cap = n === 0 ? null : Math.floor(n);
+  }
+
+  const visEnum = ['public', 'private', 'unlisted'];
+  const visNorm = String(visibilityRaw ?? event.visibility ?? 'public')
+    .trim()
+    .toLowerCase();
+
+  event.title = t;
+  event.description =
+    typeof description === 'string' ? description.slice(0, 5000) : '';
+  event.startsAt = start;
+  event.endsAt = end;
+  event.location =
+    typeof location === 'string' ? location.trim().slice(0, 300) : '';
+  event.meetingUrl =
+    typeof meetingUrl === 'string' ? meetingUrl.trim().slice(0, 2000) : '';
+  event.capacity = cap;
+  event.visibility = visEnum.includes(visNorm) ? visNorm : 'public';
+  event.academicTrack = String(academicTrack || '')
+    .trim()
+    .toLowerCase();
+  event.department = dept;
+  event.publishYear = start.getFullYear();
+
+  const notifyIds = [
+    String(event.userId),
+    ...(event.reservedBy || []).map((id) => String(id)),
+  ];
+
+  await event.save();
+  await event.populate('userId', 'username name avatar');
+  await event.populate('reservedBy', 'username name avatar');
+  notifyUsersCalendarInvalidate(notifyIds);
+
+  res.status(200).json({
+    success: true,
+    data: toEventResponse(event.toObject(), req),
+  });
+});
+
 export const deleteEvent = asyncHandler(async (req, res) => {
   assertCanWrite(req.user);
   const { eventId } = req.params;
   if (!validId(eventId)) {
-    return res.status(400).json({ success: false, message: 'Invalid event id' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid event id' });
   }
   const ev = await Event.findById(eventId);
   if (!ev) {
     return res.status(404).json({ success: false, message: 'Event not found' });
   }
   if (String(ev.userId) !== String(req.user._id)) {
-    return res.status(403).json({ message: 'You can only delete your own events.' });
+    return res
+      .status(403)
+      .json({ message: 'You can only delete your own events.' });
   }
   const bid = ev._id;
   const notifyIds = [
@@ -344,7 +453,9 @@ export const reactToEvent = asyncHandler(async (req, res) => {
   const { reaction } = req.body ?? {};
 
   if (!validId(eventId)) {
-    return res.status(400).json({ success: false, message: 'Invalid event id' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid event id' });
   }
 
   if (!['like', 'dislike', null, 'none'].includes(reaction)) {
@@ -390,7 +501,9 @@ export const reserveEventSeat = asyncHandler(async (req, res) => {
   assertCanWrite(req.user);
   const { eventId } = req.params;
   if (!validId(eventId)) {
-    return res.status(400).json({ success: false, message: 'Invalid event id' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid event id' });
   }
 
   const event = await Event.findById(eventId);
@@ -438,7 +551,8 @@ export const reserveEventSeat = asyncHandler(async (req, res) => {
 });
 
 async function loadEventAsOrganizer(eventId, userId) {
-  if (!validId(eventId)) return { error: { status: 400, message: 'Invalid event id' } };
+  if (!validId(eventId))
+    return { error: { status: 400, message: 'Invalid event id' } };
   const event = await Event.findById(eventId);
   if (!event) return { error: { status: 404, message: 'Event not found' } };
   if (String(event.userId) !== String(userId)) {
@@ -452,12 +566,16 @@ export const postEventMedia = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   const { event, error } = await loadEventAsOrganizer(eventId, req.user._id);
   if (error) {
-    return res.status(error.status).json({ success: false, message: error.message });
+    return res
+      .status(error.status)
+      .json({ success: false, message: error.message });
   }
 
   const file = Array.isArray(req.files) ? req.files[0] : req.file;
   if (!file?.buffer) {
-    return res.status(400).json({ success: false, message: 'No image uploaded.' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'No image uploaded.' });
   }
 
   const urls = Array.isArray(event.mediaUrls) ? event.mediaUrls : [];
@@ -493,18 +611,26 @@ export const deleteEventMedia = asyncHandler(async (req, res) => {
 
   const { event, error } = await loadEventAsOrganizer(eventId, req.user._id);
   if (error) {
-    return res.status(error.status).json({ success: false, message: error.message });
+    return res
+      .status(error.status)
+      .json({ success: false, message: error.message });
   }
 
   if (!url) {
-    return res.status(400).json({ success: false, message: 'url is required.' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'url is required.' });
   }
   const urls = Array.isArray(event.mediaUrls) ? event.mediaUrls : [];
   if (!urls.includes(url)) {
-    return res.status(404).json({ success: false, message: 'Image not on this event.' });
+    return res
+      .status(404)
+      .json({ success: false, message: 'Image not on this event.' });
   }
   if (!s3UrlLooksOwnedByBucket(url)) {
-    return res.status(400).json({ success: false, message: 'Invalid image URL.' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Invalid image URL.' });
   }
 
   event.mediaUrls = urls.filter((u) => u !== url);
@@ -522,12 +648,16 @@ export const addEventAttendee = asyncHandler(async (req, res) => {
   const { eventId } = req.params;
   const targetRaw = req.body?.userId ?? req.body?.userID;
   if (!validId(targetRaw)) {
-    return res.status(400).json({ success: false, message: 'Valid userId required.' });
+    return res
+      .status(400)
+      .json({ success: false, message: 'Valid userId required.' });
   }
 
   const { event, error } = await loadEventAsOrganizer(eventId, req.user._id);
   if (error) {
-    return res.status(error.status).json({ success: false, message: error.message });
+    return res
+      .status(error.status)
+      .json({ success: false, message: error.message });
   }
 
   const targetUser = await User.findById(targetRaw).select('_id').lean();
@@ -573,7 +703,9 @@ export const removeEventAttendee = asyncHandler(async (req, res) => {
 
   const { event, error } = await loadEventAsOrganizer(eventId, req.user._id);
   if (error) {
-    return res.status(error.status).json({ success: false, message: error.message });
+    return res
+      .status(error.status)
+      .json({ success: false, message: error.message });
   }
 
   const before = (event.reservedBy || []).length;

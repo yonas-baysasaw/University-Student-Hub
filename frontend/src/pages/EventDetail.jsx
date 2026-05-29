@@ -7,7 +7,7 @@ import {
   ImagePlus,
   Loader2,
   MapPin,
-  MessageSquare,
+  Pencil,
   Star,
   ThumbsDown,
   UserPlus,
@@ -15,15 +15,22 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import defaultProfile from '../assets/profile.png';
+import BookEventReportMenu from '../components/report/BookEventReportMenu.jsx';
 import { useAuth } from '../contexts/AuthContext';
-import { academicTrackLabel } from '../utils/bookUploadMeta';
-import { readJsonOrThrow } from '../utils/http';
+import {
+  ACADEMIC_TRACKS,
+  academicTrackLabel,
+  DEPARTMENTS_BY_TRACK,
+  resolveDepartmentForSubmit,
+  validateEventCatalogFields,
+} from '../utils/bookUploadMeta';
 import { notifyCalendarInvalidate } from '../utils/calendarEvents.js';
 import { visibilityLabel, visibilityTone } from '../utils/formatLabels';
+import { readJsonOrThrow } from '../utils/http';
 
 const MAX_EVENT_MEDIA = 12;
 
@@ -70,6 +77,37 @@ function formatEventWhen(startsAt, endsAt) {
   }
 }
 
+function toDateTimeLocalValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function buildEventEditDraft(event) {
+  const academicTrack = String(event?.academicTrack || '')
+    .trim()
+    .toLowerCase();
+  const dept = String(event?.department || '').trim();
+  const deptOptions = DEPARTMENTS_BY_TRACK[academicTrack] || [];
+  const usesOtherDepartment = dept && !deptOptions.includes(dept);
+
+  return {
+    title: event?.title || '',
+    description: event?.description || '',
+    startsAt: toDateTimeLocalValue(event?.startsAt),
+    endsAt: toDateTimeLocalValue(event?.endsAt),
+    location: event?.location || '',
+    meetingUrl: event?.meetingUrl || '',
+    capacity: event?.capacity != null ? String(event.capacity) : '',
+    academicTrack,
+    department: usesOtherDepartment ? 'Other' : dept,
+    departmentOther: usesOtherDepartment ? dept : '',
+    visibility: event?.visibility || 'public',
+  };
+}
+
 function CollapsibleSection({
   title,
   icon: Icon,
@@ -83,11 +121,14 @@ function CollapsibleSection({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
+        className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-slate-50/80 dark:hover:bg-slate-800/50"
         aria-expanded={open}
       >
         {Icon ? (
-          <Icon className="h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+          <Icon
+            className="h-5 w-5 shrink-0 text-cyan-600 dark:text-cyan-400"
+            aria-hidden
+          />
         ) : null}
         <div className="min-w-0 flex-1">
           <span className="font-display text-sm font-bold text-slate-900 dark:text-white">
@@ -107,7 +148,7 @@ function CollapsibleSection({
         />
       </button>
       {open ? (
-        <div className="border-t border-slate-100 px-4 py-4 dark:border-slate-700">
+        <div className="border-t border-slate-100 px-4 py-3 dark:border-slate-700">
           {children}
         </div>
       ) : null}
@@ -126,7 +167,6 @@ export default function EventDetail() {
 
   const [guestsOpen, setGuestsOpen] = useState(true);
   const [reviewsOpen, setReviewsOpen] = useState(true);
-  const [commentsOpen, setCommentsOpen] = useState(true);
 
   const [actionLoading, setActionLoading] = useState(false);
   const [userReaction, setUserReaction] = useState(null);
@@ -134,6 +174,9 @@ export default function EventDetail() {
   const [guestResults, setGuestResults] = useState([]);
   const [guestSearchBusy, setGuestSearchBusy] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState(() => buildEventEditDraft(null));
   const mediaInputRef = useRef(null);
   const guestSearchInputRef = useRef(null);
 
@@ -144,14 +187,6 @@ export default function EventDetail() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewDeletingId, setReviewDeletingId] = useState(null);
   const reviewDraftLoaded = useRef(false);
-
-  const [comments, setComments] = useState([]);
-  const [commentsLoading, setCommentsLoading] = useState(false);
-  const [commentBody, setCommentBody] = useState('');
-  const [replyToId, setReplyToId] = useState(null);
-  const [commentSubmitting, setCommentSubmitting] = useState(false);
-  const [commentDeletingId, setCommentDeletingId] = useState(null);
-  const [commentNotice, setCommentNotice] = useState('');
 
   const applyEvent = useCallback((payload) => {
     setEvent(payload);
@@ -208,29 +243,13 @@ export default function EventDetail() {
     }
   }, [eventId]);
 
-  const fetchComments = useCallback(async () => {
-    if (!eventId) return;
-    try {
-      setCommentsLoading(true);
-      const res = await fetch(`/api/events/${eventId}/comments`, {
-        credentials: 'include',
-      });
-      const data = await readJsonOrThrow(res, 'Could not load comments');
-      setComments(Array.isArray(data.comments) ? data.comments : []);
-    } catch {
-      setComments([]);
-    } finally {
-      setCommentsLoading(false);
-    }
-  }, [eventId]);
-
   useEffect(() => {
     if (!eventId || loading || error || !event) return;
     fetchReviews();
-    fetchComments();
-  }, [eventId, loading, error, event, fetchReviews, fetchComments]);
+  }, [eventId, loading, error, event, fetchReviews]);
 
   useEffect(() => {
+    if (!eventId) return;
     reviewDraftLoaded.current = false;
     setReviewBody('');
     setReviewRating('');
@@ -241,16 +260,28 @@ export default function EventDetail() {
     const mine = reviews.find((r) => r.viewerOwns);
     if (mine) {
       setReviewBody(mine.body);
-      setReviewRating(
-        mine.rating != null ? String(mine.rating) : '',
-      );
+      setReviewRating(mine.rating != null ? String(mine.rating) : '');
     }
     reviewDraftLoaded.current = true;
   }, [reviewsLoading, reviews]);
 
   const ownerId = event?.organizer?.id;
-  const isOrganizer =
-    Boolean(user && ownerId && String(user._id || user.id) === String(ownerId));
+  const isOrganizer = Boolean(
+    user && ownerId && String(user._id || user.id) === String(ownerId),
+  );
+  const editDeptList = editForm.academicTrack
+    ? DEPARTMENTS_BY_TRACK[editForm.academicTrack] || []
+    : [];
+  const ownReview = useMemo(
+    () => reviews.find((r) => r.viewerOwns) || null,
+    [reviews],
+  );
+  const averageRating = useMemo(() => {
+    const rated = reviews.filter((r) => r.rating != null);
+    if (!rated.length) return null;
+    const total = rated.reduce((sum, r) => sum + Number(r.rating || 0), 0);
+    return total / rated.length;
+  }, [reviews]);
 
   useEffect(() => {
     if (!isOrganizer) {
@@ -280,21 +311,82 @@ export default function EventDetail() {
     return () => clearTimeout(t);
   }, [guestQuery, isOrganizer]);
 
-  const topComments = useMemo(
-    () => comments.filter((c) => !c.parentCommentId),
-    [comments],
-  );
-  const repliesByParent = useMemo(() => {
-    const m = {};
-    for (const c of comments) {
-      if (c.parentCommentId) {
-        const k = String(c.parentCommentId);
-        if (!m[k]) m[k] = [];
-        m[k].push(c);
+  const updateEditField = (field, value) => {
+    setEditForm((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'academicTrack') {
+        next.department = '';
+        next.departmentOther = '';
       }
+      if (field === 'department' && value !== 'Other') {
+        next.departmentOther = '';
+      }
+      return next;
+    });
+  };
+
+  const openEditModal = () => {
+    if (!event || !isOrganizer) return;
+    setEditForm(buildEventEditDraft(event));
+    setEditOpen(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!event?._id || !isOrganizer) return;
+
+    const t = editForm.title.trim();
+    if (!t) {
+      toast.error('Title is required.');
+      return;
     }
-    return m;
-  }, [comments]);
+    if (!editForm.startsAt) {
+      toast.error('Start date and time are required.');
+      return;
+    }
+
+    const resolvedDept = resolveDepartmentForSubmit(editForm);
+    const catErr = validateEventCatalogFields({
+      academicTrack: editForm.academicTrack,
+      department: resolvedDept,
+    });
+    if (catErr) {
+      toast.error(catErr);
+      return;
+    }
+
+    const body = {
+      title: t,
+      description: editForm.description.trim(),
+      startsAt: new Date(editForm.startsAt).toISOString(),
+      location: editForm.location.trim(),
+      meetingUrl: editForm.meetingUrl.trim(),
+      capacity: editForm.capacity.trim(),
+      academicTrack: editForm.academicTrack,
+      department: resolvedDept,
+      visibility: editForm.visibility,
+    };
+    if (editForm.endsAt) body.endsAt = new Date(editForm.endsAt).toISOString();
+
+    setEditSaving(true);
+    try {
+      const res = await fetch(`/api/events/${event._id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await readJsonOrThrow(res, 'Could not update event');
+      applyEvent(data.data);
+      setEditOpen(false);
+      notifyCalendarInvalidate();
+      toast.success('Event updated');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
 
   const handleReaction = async (type) => {
     if (!event?._id || !user || actionLoading) return;
@@ -489,59 +581,6 @@ export default function EventDetail() {
     }
   };
 
-  const handleCommentSubmit = async (e) => {
-    e.preventDefault();
-    setCommentNotice('');
-    if (!user) {
-      setCommentNotice('Sign in to comment.');
-      return;
-    }
-    const text = commentBody.trim();
-    if (!text) {
-      setCommentNotice('Write something first.');
-      return;
-    }
-    setCommentSubmitting(true);
-    try {
-      const res = await fetch(`/api/events/${event._id}/comments`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          body: text,
-          parentCommentId: replyToId,
-        }),
-      });
-      await readJsonOrThrow(res, 'Could not post comment');
-      setCommentBody('');
-      setReplyToId(null);
-      setCommentNotice('Posted.');
-      await fetchComments();
-    } catch (err) {
-      setCommentNotice(err.message);
-    } finally {
-      setCommentSubmitting(false);
-    }
-  };
-
-  const handleDeleteComment = async (cid) => {
-    if (!event?._id || !cid) return;
-    setCommentDeletingId(cid);
-    setCommentNotice('');
-    try {
-      const res = await fetch(
-        `/api/events/${event._id}/comments/${encodeURIComponent(cid)}`,
-        { method: 'DELETE', credentials: 'include' },
-      );
-      await readJsonOrThrow(res, 'Could not delete comment');
-      await fetchComments();
-    } catch (err) {
-      setCommentNotice(err.message);
-    } finally {
-      setCommentDeletingId(null);
-    }
-  };
-
   const cap = event?.capacity;
   const reserved = event?.reservedCount ?? 0;
   const attendees = Array.isArray(event?.attendees) ? event.attendees : [];
@@ -554,8 +593,8 @@ export default function EventDetail() {
     reserved === 1 ? '1 person attending' : `${reserved} people attending`;
 
   return (
-    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
-      <div className="mx-auto max-w-3xl space-y-6">
+    <div className="page-surface min-h-[calc(100vh-5.5rem)] px-3 pb-8 pt-3 md:px-6 md:pb-10 md:pt-5">
+      <div className="mx-auto max-w-3xl space-y-4">
         <Link
           to="/events"
           className="inline-flex items-center gap-2 text-sm font-semibold text-cyan-700 hover:text-cyan-900 dark:text-cyan-400 dark:hover:text-cyan-200"
@@ -571,7 +610,9 @@ export default function EventDetail() {
           </div>
         ) : error || !event ? (
           <div className="panel-card rounded-3xl p-8 text-center">
-            <p className="text-slate-700 dark:text-slate-300">{error || 'Event not found.'}</p>
+            <p className="text-slate-700 dark:text-slate-300">
+              {error || 'Event not found.'}
+            </p>
             <button
               type="button"
               onClick={() => navigate('/events')}
@@ -582,7 +623,7 @@ export default function EventDetail() {
           </div>
         ) : (
           <>
-            <article className="panel-card space-y-4 rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-br from-white via-white to-cyan-50/15 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/25 sm:p-7">
+            <article className="panel-card space-y-3 rounded-[1.35rem] border border-slate-200/85 bg-gradient-to-br from-white via-white to-cyan-50/15 p-4 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-indigo-950/25 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1 space-y-2">
                   <div className="flex flex-wrap gap-1.5">
@@ -606,6 +647,16 @@ export default function EventDetail() {
                 </div>
                 {user ? (
                   <div className="flex flex-wrap gap-2">
+                    {isOrganizer ? (
+                      <button
+                        type="button"
+                        onClick={openEditModal}
+                        className="inline-flex items-center gap-1 rounded-xl border border-cyan-200 bg-cyan-50/80 px-3 py-2 text-xs font-bold text-cyan-900 transition hover:bg-cyan-100 dark:border-cyan-800 dark:bg-cyan-950/40 dark:text-cyan-100"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                        Edit
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       disabled={actionLoading}
@@ -652,12 +703,18 @@ export default function EventDetail() {
 
               <div className="flex flex-wrap gap-3 text-sm text-slate-600 dark:text-slate-400">
                 <span className="inline-flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                  <Clock
+                    className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400"
+                    aria-hidden
+                  />
                   {formatEventWhen(event.startsAt, event.endsAt)}
                 </span>
                 {event.location ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                    <MapPin
+                      className="h-4 w-4 shrink-0 text-cyan-600 dark:text-cyan-400"
+                      aria-hidden
+                    />
                     {event.location}
                   </span>
                 ) : null}
@@ -746,7 +803,10 @@ export default function EventDetail() {
                       {event.organizer.name}
                     </p>
                   </div>
-                  <UserRound className="ml-auto h-4 w-4 text-slate-400" aria-hidden />
+                  <UserRound
+                    className="ml-auto h-4 w-4 text-slate-400"
+                    aria-hidden
+                  />
                 </Link>
               ) : null}
             </article>
@@ -801,7 +861,10 @@ export default function EventDetail() {
                       {mediaBusy ? (
                         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                       ) : (
-                        <ImagePlus className="h-4 w-4 text-cyan-600 dark:text-cyan-400" aria-hidden />
+                        <ImagePlus
+                          className="h-4 w-4 text-cyan-600 dark:text-cyan-400"
+                          aria-hidden
+                        />
                       )}
                       Add photos ({mediaUrls.length}/{MAX_EVENT_MEDIA})
                     </button>
@@ -939,9 +1002,7 @@ export default function EventDetail() {
                     <>
                       <p className="mb-3 text-sm text-slate-600 dark:text-slate-400">
                         {peopleAttendingLabel}.
-                        {cap != null && cap > 0
-                          ? ` Capacity is ${cap}.`
-                          : ''}{' '}
+                        {cap != null && cap > 0 ? ` Capacity is ${cap}.` : ''}{' '}
                         Guest names are visible only to the host.
                       </p>
                       {user ? (
@@ -975,61 +1036,106 @@ export default function EventDetail() {
                 </CollapsibleSection>
 
                 <CollapsibleSection
-                  title="People’s reviews"
+                  title="Reviews"
                   icon={Star}
                   open={reviewsOpen}
                   onToggle={() => setReviewsOpen((v) => !v)}
                   summary={
                     reviewsLoading
                       ? 'Loading…'
-                      : `${reviews.length} review${reviews.length === 1 ? '' : 's'}`
+                      : averageRating
+                        ? `${averageRating.toFixed(1)}/5 · ${reviews.length} review${reviews.length === 1 ? '' : 's'}`
+                        : `${reviews.length} review${reviews.length === 1 ? '' : 's'}`
                   }
                 >
                   {user ? (
-                    <form onSubmit={handleReviewSubmit} className="mb-4 space-y-2">
-                      <label className="block text-xs font-bold uppercase tracking-wide text-slate-500">
-                        Rating (optional)
-                        <select
-                          value={reviewRating}
-                          onChange={(e) => setReviewRating(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-                        >
-                          <option value="">No stars</option>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <option key={n} value={String(n)}>
-                              {n} star{n > 1 ? 's' : ''}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    <form
+                      onSubmit={handleReviewSubmit}
+                      className="mb-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-950/30"
+                    >
+                      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-bold uppercase tracking-wide text-slate-500">
+                          {ownReview ? 'Update your review' : 'Add your review'}
+                        </p>
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((n) => {
+                            const selected = Number(reviewRating) >= n;
+                            return (
+                              <button
+                                key={n}
+                                type="button"
+                                onClick={() => setReviewRating(String(n))}
+                                className={`rounded-md p-1 transition ${
+                                  selected
+                                    ? 'text-amber-500'
+                                    : 'text-slate-300 hover:text-amber-400 dark:text-slate-600'
+                                }`}
+                                aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                              >
+                                <Star
+                                  className={`h-4 w-4 ${selected ? 'fill-current' : ''}`}
+                                  aria-hidden
+                                />
+                              </button>
+                            );
+                          })}
+                          {reviewRating ? (
+                            <button
+                              type="button"
+                              onClick={() => setReviewRating('')}
+                              className="ml-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            >
+                              Clear
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                       <textarea
                         value={reviewBody}
                         onChange={(e) => setReviewBody(e.target.value)}
-                        rows={3}
+                        rows={2}
                         placeholder="Share your experience…"
                         className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
                       />
-                      <button
-                        type="submit"
-                        disabled={reviewSubmitting}
-                        className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
-                      >
-                        {reviewSubmitting ? 'Saving…' : 'Save review'}
-                      </button>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="submit"
+                          disabled={reviewSubmitting}
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900"
+                        >
+                          {reviewSubmitting
+                            ? 'Saving…'
+                            : ownReview
+                              ? 'Update review'
+                              : 'Save review'}
+                        </button>
+                        {ownReview ? (
+                          <button
+                            type="button"
+                            disabled={reviewDeletingId === ownReview.id}
+                            onClick={() => handleDeleteReview(ownReview.id)}
+                            className="rounded-xl px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
+                          >
+                            Delete
+                          </button>
+                        ) : null}
+                      </div>
                     </form>
                   ) : (
-                    <p className="mb-3 text-sm text-slate-500">Sign in to review.</p>
+                    <p className="mb-2 text-sm text-slate-500">
+                      Sign in to review.
+                    </p>
                   )}
                   {reviewsLoading ? (
                     <p className="text-sm text-slate-500">Loading reviews…</p>
                   ) : reviews.length === 0 ? (
                     <p className="text-sm text-slate-500">No reviews yet.</p>
                   ) : (
-                    <ul className="space-y-3">
+                    <ul className="space-y-2">
                       {reviews.map((r) => (
                         <li
                           key={r.id}
-                          className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/40"
+                          className="rounded-xl border border-slate-100 bg-white/75 p-3 dark:border-slate-700 dark:bg-slate-950/40"
                         >
                           <div className="flex items-start gap-2">
                             <img
@@ -1042,166 +1148,22 @@ export default function EventDetail() {
                                 <span className="text-sm font-bold text-slate-900 dark:text-white">
                                   {r.author?.name}
                                 </span>
-                                {r.viewerOwns ? (
-                                  <button
-                                    type="button"
-                                    disabled={reviewDeletingId === r.id}
-                                    onClick={() => handleDeleteReview(r.id)}
-                                    className="text-[11px] font-bold text-rose-600"
-                                  >
-                                    Delete
-                                  </button>
+                                {r.rating ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <Star
+                                      className="h-3 w-3 fill-current"
+                                      aria-hidden
+                                    />
+                                    {r.rating}/5
+                                  </span>
                                 ) : null}
                               </div>
                               <p className="text-xs text-slate-500">
                                 {formatReviewTimestamp(r.createdAt)}
-                                {r.rating ? ` · ${r.rating}/5` : ''}
                               </p>
                               <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
                                 {r.body}
                               </p>
-                            </div>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </CollapsibleSection>
-
-                <CollapsibleSection
-                  title="Comments"
-                  icon={MessageSquare}
-                  open={commentsOpen}
-                  onToggle={() => setCommentsOpen((v) => !v)}
-                  summary={`${topComments.length} thread${topComments.length === 1 ? '' : 's'}`}
-                >
-                  {user ? (
-                    <form onSubmit={handleCommentSubmit} className="mb-4 space-y-2">
-                      {replyToId ? (
-                        <p className="text-xs text-cyan-700 dark:text-cyan-400">
-                          Replying —{' '}
-                          <button
-                            type="button"
-                            className="font-bold underline"
-                            onClick={() => setReplyToId(null)}
-                          >
-                            cancel
-                          </button>
-                        </p>
-                      ) : null}
-                      <textarea
-                        value={commentBody}
-                        onChange={(e) => setCommentBody(e.target.value)}
-                        rows={2}
-                        placeholder="Ask a question or say hello…"
-                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-950"
-                      />
-                      <button
-                        type="submit"
-                        disabled={commentSubmitting}
-                        className="rounded-xl bg-cyan-700 px-4 py-2 text-xs font-bold text-white dark:bg-cyan-600"
-                      >
-                        {commentSubmitting ? 'Posting…' : 'Post comment'}
-                      </button>
-                      {commentNotice ? (
-                        <p className="text-xs text-slate-600">{commentNotice}</p>
-                      ) : null}
-                    </form>
-                  ) : (
-                    <p className="mb-3 text-sm text-slate-500">Sign in to comment.</p>
-                  )}
-                  {commentsLoading ? (
-                    <p className="text-sm text-slate-500">Loading…</p>
-                  ) : topComments.length === 0 ? (
-                    <p className="text-sm text-slate-500">No comments yet.</p>
-                  ) : (
-                    <ul className="space-y-3">
-                      {topComments.map((c) => (
-                        <li
-                          key={c.id}
-                          className="rounded-xl border border-slate-100 bg-white p-3 dark:border-slate-700 dark:bg-slate-950/30"
-                        >
-                          <div className="flex gap-2">
-                            <img
-                              src={c.author?.avatar || defaultProfile}
-                              alt=""
-                              className="h-8 w-8 shrink-0 rounded-full object-cover"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <div className="flex flex-wrap items-center justify-between gap-1">
-                                <span className="text-sm font-bold text-slate-900 dark:text-white">
-                                  {c.author?.name}
-                                </span>
-                                <div className="flex gap-2">
-                                  {user ? (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setReplyToId(c.id);
-                                        setCommentNotice('');
-                                      }}
-                                      className="text-[11px] font-bold uppercase text-cyan-700 dark:text-cyan-400"
-                                    >
-                                      Reply
-                                    </button>
-                                  ) : null}
-                                  {(c.viewerOwns || isOrganizer) && (
-                                    <button
-                                      type="button"
-                                      disabled={commentDeletingId === c.id}
-                                      onClick={() => handleDeleteComment(c.id)}
-                                      className="text-[11px] font-bold text-rose-600"
-                                    >
-                                      Delete
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                              <p className="text-xs text-slate-500">
-                                {formatReviewTimestamp(c.createdAt)}
-                              </p>
-                              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                                {c.body}
-                              </p>
-                              {(repliesByParent[c.id] || []).length > 0 ? (
-                                <ul className="mt-2 space-y-2 border-l-2 border-cyan-200/60 pl-3 dark:border-cyan-800">
-                                  {(repliesByParent[c.id] || []).map((r) => (
-                                    <li key={r.id}>
-                                      <div className="flex gap-2">
-                                        <img
-                                          src={r.author?.avatar || defaultProfile}
-                                          alt=""
-                                          className="h-7 w-7 rounded-full object-cover"
-                                        />
-                                        <div className="min-w-0 flex-1">
-                                          <div className="flex items-center justify-between gap-1">
-                                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                                              {r.author?.name}
-                                            </span>
-                                            {(r.viewerOwns || isOrganizer) && (
-                                              <button
-                                                type="button"
-                                                disabled={
-                                                  commentDeletingId === r.id
-                                                }
-                                                onClick={() =>
-                                                  handleDeleteComment(r.id)
-                                                }
-                                                className="text-[10px] font-bold text-rose-600"
-                                              >
-                                                Delete
-                                              </button>
-                                            )}
-                                          </div>
-                                          <p className="whitespace-pre-wrap text-sm text-slate-600 dark:text-slate-300">
-                                            {r.body}
-                                          </p>
-                                        </div>
-                                      </div>
-                                    </li>
-                                  ))}
-                                </ul>
-                              ) : null}
                             </div>
                           </div>
                         </li>
@@ -1214,6 +1176,265 @@ export default function EventDetail() {
           </>
         )}
       </div>
+      {editOpen &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/55 p-0 sm:items-center sm:p-4"
+            role="presentation"
+          >
+            <button
+              type="button"
+              className="absolute inset-0 cursor-default"
+              aria-label="Close"
+              onClick={() => {
+                if (!editSaving) setEditOpen(false);
+              }}
+            />
+            <div
+              role="dialog"
+              aria-labelledby="event-edit-title"
+              className="relative z-[201] flex max-h-[min(92dvh,820px)] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white shadow-2xl dark:border-slate-600 dark:bg-slate-900 sm:rounded-3xl"
+            >
+              <div className="shrink-0 border-b border-slate-100 px-4 py-3 dark:border-slate-700">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h2
+                      id="event-edit-title"
+                      className="font-display text-lg font-bold text-slate-900 dark:text-white"
+                    >
+                      Edit event
+                    </h2>
+                    <p className="mt-0.5 text-[11px] leading-snug text-slate-500 dark:text-slate-400">
+                      Update the details attendees see.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={editSaving}
+                    onClick={() => setEditOpen(false)}
+                    className="shrink-0 rounded-xl p-2 text-slate-500 hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-slate-800"
+                  >
+                    <X className="h-5 w-5" aria-hidden />
+                    <span className="sr-only">Close</span>
+                  </button>
+                </div>
+              </div>
+              <form
+                onSubmit={handleEditSubmit}
+                className="flex min-h-0 flex-1 flex-col"
+              >
+                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                  <label className="block">
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                      Title
+                    </span>
+                    <input
+                      required
+                      value={editForm.title}
+                      onChange={(e) => updateEditField('title', e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                      maxLength={200}
+                    />
+                  </label>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Starts
+                      </span>
+                      <input
+                        type="datetime-local"
+                        required
+                        value={editForm.startsAt}
+                        onChange={(e) =>
+                          updateEditField('startsAt', e.target.value)
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Ends
+                      </span>
+                      <input
+                        type="datetime-local"
+                        value={editForm.endsAt}
+                        onChange={(e) =>
+                          updateEditField('endsAt', e.target.value)
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                      Description
+                    </span>
+                    <textarea
+                      value={editForm.description}
+                      onChange={(e) =>
+                        updateEditField('description', e.target.value)
+                      }
+                      rows={3}
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                    />
+                  </label>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Location
+                      </span>
+                      <input
+                        value={editForm.location}
+                        onChange={(e) =>
+                          updateEditField('location', e.target.value)
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                        maxLength={300}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                        Capacity
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editForm.capacity}
+                        onChange={(e) =>
+                          updateEditField('capacity', e.target.value)
+                        }
+                        className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                        placeholder="0 = unlimited"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="block">
+                    <span className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+                      Meeting link
+                    </span>
+                    <input
+                      type="url"
+                      value={editForm.meetingUrl}
+                      onChange={(e) =>
+                        updateEditField('meetingUrl', e.target.value)
+                      }
+                      className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                      placeholder="https://..."
+                    />
+                  </label>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/90 px-3 py-3 dark:border-slate-700 dark:bg-slate-800/40">
+                    <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+                      Catalog
+                    </p>
+                    <div className="mt-2 space-y-2">
+                      <label className="block">
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                          Academic field
+                        </span>
+                        <select
+                          required
+                          value={editForm.academicTrack}
+                          onChange={(e) =>
+                            updateEditField('academicTrack', e.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                        >
+                          <option value="">Select...</option>
+                          {ACADEMIC_TRACKS.map((tr) => (
+                            <option key={tr.id} value={tr.id}>
+                              {tr.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="block">
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                          School / faculty / department
+                        </span>
+                        <select
+                          required
+                          value={editForm.department}
+                          disabled={!editForm.academicTrack}
+                          onChange={(e) =>
+                            updateEditField('department', e.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm disabled:opacity-50 dark:border-slate-600 dark:bg-slate-950"
+                        >
+                          <option value="">
+                            {editForm.academicTrack
+                              ? 'Select...'
+                              : 'Choose a field first'}
+                          </option>
+                          {editDeptList.map((d) => (
+                            <option key={d} value={d}>
+                              {d}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {editForm.department === 'Other' ? (
+                        <label className="block">
+                          <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                            Name your department
+                          </span>
+                          <input
+                            required
+                            value={editForm.departmentOther}
+                            onChange={(e) =>
+                              updateEditField('departmentOther', e.target.value)
+                            }
+                            maxLength={160}
+                            className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                          />
+                        </label>
+                      ) : null}
+                      <label className="block">
+                        <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400">
+                          Visibility
+                        </span>
+                        <select
+                          value={editForm.visibility}
+                          onChange={(e) =>
+                            updateEditField('visibility', e.target.value)
+                          }
+                          className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm dark:border-slate-600 dark:bg-slate-950"
+                        >
+                          <option value="public">Public</option>
+                          <option value="unlisted">Unlisted</option>
+                          <option value="private">Private</option>
+                        </select>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white/95 px-4 py-3 backdrop-blur-sm dark:border-slate-700 dark:bg-slate-900/95">
+                  <button
+                    type="button"
+                    disabled={editSaving}
+                    onClick={() => setEditOpen(false)}
+                    className="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-slate-800"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="rounded-2xl bg-gradient-to-r from-cyan-600 to-fuchsia-600 px-5 py-2.5 text-sm font-bold text-white shadow-md disabled:opacity-50"
+                  >
+                    {editSaving ? 'Saving...' : 'Save changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

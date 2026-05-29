@@ -1,7 +1,6 @@
 import {
   Bell,
   ChevronDown,
-  ExternalLink,
   LogOut,
   Settings,
   Shield,
@@ -12,6 +11,7 @@ import { createPortal } from 'react-dom';
 import { Link, NavLink } from 'react-router-dom';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 const menuWidth = 272;
 
@@ -26,6 +26,7 @@ const baseNavLinks = [
 
 function Navbar({ children }) {
   const { user } = useAuth();
+  const { hasUnread, unreadCount } = useNotifications();
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
   const buttonRef = useRef(null);
@@ -144,10 +145,18 @@ function Navbar({ children }) {
           <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
             <NavLink
               to="/notifications"
-              title="Notifications"
-              aria-label="Notifications"
+              title={
+                hasUnread
+                  ? `Notifications (${unreadCount} unread)`
+                  : 'Notifications'
+              }
+              aria-label={
+                hasUnread
+                  ? `Notifications, ${unreadCount} unread`
+                  : 'Notifications'
+              }
               className={({ isActive }) =>
-                `flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-slate-600 transition-colors duration-150 dark:text-slate-400 ${
+                `relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-slate-600 transition-colors duration-150 dark:text-slate-400 ${
                   isActive
                     ? 'border-slate-200/90 bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/90 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:ring-slate-600/90'
                     : 'border-slate-200/70 bg-white/90 hover:border-cyan-300/80 hover:text-slate-900 hover:shadow-sm dark:border-slate-600 dark:bg-slate-800/90 dark:hover:border-cyan-600/50 dark:hover:text-slate-100'
@@ -155,6 +164,12 @@ function Navbar({ children }) {
               }
             >
               <Bell className="h-[18px] w-[18px]" strokeWidth={2} aria-hidden />
+              {hasUnread ? (
+                <span
+                  className="absolute right-0.5 top-0.5 flex h-2.5 w-2.5 items-center justify-center rounded-full border-2 border-white bg-rose-500 dark:border-slate-900"
+                  aria-hidden
+                />
+              ) : null}
             </NavLink>
             <div className="relative">
               <button
@@ -251,22 +266,6 @@ function Navbar({ children }) {
                 />
                 My profile
               </Link>
-            </li>
-            <li>
-              <a
-                href="https://portal.aau.edu.et/login"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-700/80"
-                onClick={() => setMenuOpen(false)}
-              >
-                <ExternalLink
-                  className="h-4 w-4 shrink-0 text-slate-400 dark:text-slate-500"
-                  strokeWidth={2}
-                  aria-hidden
-                />
-                Portal
-              </a>
             </li>
 
             <li className="my-1.5 h-px bg-slate-200/90 dark:bg-slate-600/80" />

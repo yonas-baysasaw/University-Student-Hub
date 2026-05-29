@@ -14,6 +14,9 @@ async function generateLiquAiReply({
   bookId,
   user,
   userId,
+  pageNumber,
+  selectedText,
+  chapterFilter,
 }) {
   assertCanWrite(user);
 
@@ -35,7 +38,6 @@ async function generateLiquAiReply({
 
   const responseText = await service.chat(messagesForLlm);
 
-  // Persist to session (Liqu AI only, not support widget sessions)
   let session = sessionId
     ? await ChatSession.findOne({
         _id: sessionId,
@@ -54,10 +56,13 @@ async function generateLiquAiReply({
   }
 
   const userMsg = messages[messages.length - 1];
-  session.messages.push(
-    { role: userMsg.role, content: userMsg.content },
-    { role: 'assistant', content: responseText },
-  );
+  session.messages.push({ role: userMsg.role, content: userMsg.content });
+  session.messages.push({
+    role: 'assistant',
+    content: responseText,
+    references: ragReferences,
+    grounding,
+  });
   await session.save();
 
   return {
@@ -92,8 +97,6 @@ async function chatController(req, res, next) {
     return next(error);
   }
 }
-
-// ── Chat sessions CRUD ────────────────────────────────────────────────────────
 
 async function listSessionsController(req, res, next) {
   try {
@@ -143,7 +146,6 @@ async function deleteSessionController(req, res, next) {
   }
 }
 
-// ── List available Gemini models ───────────────────────────────────────────────
 
 async function listModelsController(req, res, next) {
   try {

@@ -5,6 +5,7 @@ import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import {
   AlertTriangle,
+  Check,
   ChevronLeft,
   ChevronRight,
   Loader2,
@@ -54,6 +55,31 @@ const VIEW_OPTIONS = [
 const DEFAULT_LAYERS = Object.fromEntries(
   LAYER_DEFS.map((l) => [l.key, true]),
 );
+
+function CalendarLayerToggle({ label, color, checked, onChange, className = '' }) {
+  return (
+    <label
+      className={`flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 hover:bg-white/80 focus-within:ring-2 focus-within:ring-cyan-500/40 dark:hover:bg-slate-800/80 ${className}`}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={onChange}
+        className="sr-only"
+      />
+      <span
+        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-sm ring-1 ring-inset ring-black/10 transition dark:ring-white/15"
+        style={{ backgroundColor: checked ? color : `${color}33` }}
+        aria-hidden
+      >
+        {checked ? (
+          <Check className="h-3 w-3 stroke-[3] text-white" aria-hidden />
+        ) : null}
+      </span>
+      <span className="truncate">{label}</span>
+    </label>
+  );
+}
 
 /**
  * @param {Date} d
@@ -487,20 +513,13 @@ function CalendarPage() {
               <ul className="space-y-1.5">
                 {LAYER_DEFS.map(({ key, label, color }) => (
                   <li key={key}>
-                    <label className="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-sm text-slate-700 hover:bg-white/80 dark:text-slate-200 dark:hover:bg-slate-800/80">
-                      <input
-                        type="checkbox"
-                        checked={layers[key] !== false}
-                        onChange={() => toggleLayer(key)}
-                        className="sr-only"
-                      />
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-sm"
-                        style={{ backgroundColor: color }}
-                        aria-hidden
-                      />
-                      <span className="truncate">{label}</span>
-                    </label>
+                    <CalendarLayerToggle
+                      label={label}
+                      color={color}
+                      checked={layers[key] !== false}
+                      onChange={() => toggleLayer(key)}
+                      className="text-sm text-slate-700 dark:text-slate-200"
+                    />
                   </li>
                 ))}
               </ul>
@@ -630,19 +649,13 @@ function CalendarPage() {
               <ul className="mt-3 grid grid-cols-2 gap-2">
                 {LAYER_DEFS.map(({ key, label, color }) => (
                   <li key={key}>
-                    <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-200">
-                      <input
-                        type="checkbox"
-                        checked={layers[key] !== false}
-                        onChange={() => toggleLayer(key)}
-                        className="rounded border-slate-300"
-                      />
-                      <span
-                        className="h-2.5 w-2.5 rounded-sm"
-                        style={{ backgroundColor: color }}
-                      />
-                      {label}
-                    </label>
+                    <CalendarLayerToggle
+                      label={label}
+                      color={color}
+                      checked={layers[key] !== false}
+                      onChange={() => toggleLayer(key)}
+                      className="text-xs font-medium text-slate-700 dark:text-slate-200"
+                    />
                   </li>
                 ))}
               </ul>

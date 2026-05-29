@@ -237,6 +237,24 @@ export const patchAdminUser = asyncHandler(async (req, res) => {
     if (!['user', 'admin', 'lecturer'].includes(body.role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
+    const demotingAdmin =
+      target.role === 'admin' && body.role !== 'admin';
+    if (demotingAdmin) {
+      if (String(target._id) === String(req.user._id)) {
+        return res
+          .status(400)
+          .json({ message: 'You cannot remove your own admin access' });
+      }
+      const adminCount = await User.countDocuments({
+        role: 'admin',
+        status: { $ne: 'deleted' },
+      });
+      if (adminCount <= 1) {
+        return res
+          .status(400)
+          .json({ message: 'At least one administrator must remain' });
+      }
+    }
     target.role = body.role;
   }
   if (body.permissions !== undefined) {

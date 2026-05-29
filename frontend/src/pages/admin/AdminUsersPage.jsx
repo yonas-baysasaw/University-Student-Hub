@@ -150,15 +150,15 @@ export default function AdminUsersPage({
           <SkeletonRows rows={7} />
         ) : users.length ? (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[920px] text-left text-sm">
+            <table className="w-full table-fixed text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50/80 text-xs font-semibold uppercase text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
-                  <th className="px-4 py-3">User</th>
-                  <th className="px-4 py-3">Department</th>
-                  <th className="px-4 py-3">Role</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3">Controls</th>
-                  <th className="px-4 py-3 text-right">Actions</th>
+                  <th className="w-[22%] px-4 py-3">User</th>
+                  <th className="w-[14%] px-4 py-3">Department</th>
+                  <th className="w-[12%] px-4 py-3">Role</th>
+                  <th className="w-[10%] px-4 py-3">Status</th>
+                  <th className="w-[12%] px-4 py-3">Controls</th>
+                  <th className="w-[30%] px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">

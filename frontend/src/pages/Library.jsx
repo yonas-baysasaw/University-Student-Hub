@@ -37,6 +37,36 @@ import {
   visibilityTone,
 } from '../utils/formatLabels';
 
+function RagPrepBadge({ item }) {
+  const status = item?.ragIndexStatus;
+  if (status === 'ready') {
+    return (
+      <span className="text-emerald-600 dark:text-emerald-400">
+        · Ready for chat
+      </span>
+    );
+  }
+  if (status === 'indexing') {
+    const pct = Math.min(
+      100,
+      Math.max(0, Math.round(Number(item.ragIndexProgressPercent) || 0)),
+    );
+    return (
+      <span className="text-cyan-600 dark:text-cyan-400">
+        · Reading… {pct}%
+      </span>
+    );
+  }
+  if (status === 'failed') {
+    return (
+      <span className="text-rose-500 dark:text-rose-400">
+        · Couldn&apos;t read
+      </span>
+    );
+  }
+  return null;
+}
+
 const GUEST_SAVED_KEY = 'library.guestSavedIds';
 
 /** Visible below title — department, course, year, field — one line while browsing. */
@@ -375,11 +405,7 @@ function LibraryBookListRow({
                 <span>{dateShort}</span>
               </>
             ) : null}
-            {item.ragIndexStatus === 'ready' ? (
-              <span className="text-emerald-600 dark:text-emerald-400">
-                · Liqu-ready
-              </span>
-            ) : null}
+            <RagPrepBadge item={item} />
           </p>
         </div>
 
@@ -723,12 +749,7 @@ function LibraryBookGridCard({
           {item.publishYear != null && Number.isFinite(Number(item.publishYear))
             ? ` · ${item.publishYear}`
             : ''}
-          {item.ragIndexStatus === 'ready' ? (
-            <span className="text-emerald-600 dark:text-emerald-400 lg:text-emerald-600 dark:lg:text-emerald-300">
-              {' '}
-              · Liqu-ready
-            </span>
-          ) : null}
+          <RagPrepBadge item={item} />
         </p>
 
         {item.academicTrack ||
@@ -1389,13 +1410,6 @@ function Library() {
               <h1 className="font-display text-balance text-3xl font-bold tracking-tight text-slate-900 md:text-4xl dark:text-white">
                 Campus library
               </h1>
-              <p className="max-w-xl text-[0.9375rem] leading-relaxed text-slate-500 dark:text-slate-500">
-                Browse shared materials, bookmark what you need, and jump into{' '}
-                <span className="font-display font-bold text-cyan-600 dark:text-cyan-400">
-                  Liqu AI Study buddy
-                </span>{' '}
-                with one click.
-              </p>
             </div>
           </div>
 
@@ -1456,15 +1470,16 @@ function Library() {
         ) : null}
 
         <div className="library-chromatic-ring shadow-xl shadow-fuchsia-900/10 dark:shadow-cyan-950/25">
-          <div className="library-chromatic-ring__inner border border-white/75 bg-white/82 p-5 shadow-inner backdrop-blur-xl dark:border-slate-600/55 dark:bg-slate-900/78 md:p-6">
-            <div className="flex flex-wrap gap-2 border-b border-slate-100/90 pb-5 dark:border-slate-700/80" role="toolbar" aria-label="Library scope">
+          <div className="library-chromatic-ring__inner border border-white/75 bg-white/82 p-3 shadow-inner backdrop-blur-xl dark:border-slate-600/55 dark:bg-slate-900/78 md:p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+              <div className="flex flex-wrap gap-2" role="toolbar" aria-label="Library scope">
               <button
                 type="button"
                 title="Show all books"
                 aria-label="Show all books"
                 aria-pressed={!savedOnly}
                 onClick={() => patchParams({ saved: null })}
-                className={`inline-flex h-10 items-center justify-center gap-2 rounded-full px-3.5 text-xs font-bold transition sm:px-4 ${
+                className={`inline-flex h-8 items-center justify-center gap-2 rounded-full px-3 text-xs font-bold transition sm:px-3.5 ${
                   !savedOnly
                     ? 'bg-gradient-to-r from-slate-900 to-slate-800 text-white shadow-md dark:from-cyan-600 dark:to-fuchsia-700'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700'
@@ -1479,7 +1494,7 @@ function Library() {
                 aria-label={`Saved books only, ${savedCount} saved`}
                 aria-pressed={savedOnly}
                 onClick={() => patchParams({ saved: '1' })}
-                className={`inline-flex h-10 items-center justify-center gap-2 rounded-full px-3.5 text-xs font-bold transition sm:px-4 ${
+                className={`inline-flex h-8 items-center justify-center gap-2 rounded-full px-3 text-xs font-bold transition sm:px-3.5 ${
                   savedOnly
                     ? 'bg-amber-100 text-amber-950 ring-2 ring-amber-400/30 dark:bg-amber-500/20 dark:text-amber-100'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300'
@@ -1491,17 +1506,17 @@ function Library() {
                 />
                 <span className="tabular-nums max-sm:sr-only">{savedCount}</span>
               </button>
-            </div>
+              </div>
 
-            <div className="relative mt-5">
+              <div className="relative min-w-0 flex-1">
               <Search
-                className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
                 aria-hidden
               />
               <input
                 type="search"
                 autoComplete="off"
-                className="input-field h-11 w-full border-slate-200/90 bg-white/90 pl-10 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
+                className="input-field h-9 w-full border-slate-200/90 bg-white/90 pl-9 text-sm dark:border-slate-600 dark:bg-slate-950/80 dark:text-slate-100"
                 placeholder="Search title, department, course…"
                 value={queryInput}
                 onChange={(e) => onQueryInputChange(e.target.value)}
@@ -1509,9 +1524,10 @@ function Library() {
                 aria-label="Search library"
                 title="Search title, department, course"
               />
+              </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap items-end gap-3 border-b border-slate-100/90 pb-4 dark:border-slate-700/80">
+            <div className="mt-2 flex flex-wrap items-center gap-2 border-b border-slate-100/90 pb-2 dark:border-slate-700/80">
               <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
                 <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-fuchsia-600 opacity-80 dark:text-fuchsia-400" aria-hidden />
                 <label htmlFor="library-sort" className="sr-only">
@@ -1600,7 +1616,7 @@ function Library() {
                   aria-controls="library-filter-dialog"
                   title="Open filters"
                   onClick={() => setFiltersOpen(true)}
-                  className="relative inline-flex h-9 shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3.5 text-[11px] font-bold text-white shadow-md ring-1 ring-white/10 transition hover:brightness-110 dark:from-fuchsia-900 dark:via-slate-900 dark:to-cyan-900"
+                  className="relative inline-flex h-8 shrink-0 items-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 px-3 text-[11px] font-bold text-white shadow-md ring-1 ring-white/10 transition hover:brightness-110 dark:from-fuchsia-900 dark:via-slate-900 dark:to-cyan-900"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" aria-hidden />
                   <span className="max-sm:sr-only">Filters</span>

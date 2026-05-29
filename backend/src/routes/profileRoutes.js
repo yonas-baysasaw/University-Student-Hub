@@ -6,13 +6,19 @@ import Book from '../models/Books.js';
 import Chat from '../models/Chat.js';
 import Message from '../models/Message.js';
 import User from '../models/User.js';
+import { testGeminiApiKey, listGeminiModels } from '../utils/geminiApiClient.js';
+import {
+  encryptGeminiApiKey,
+  isValidGeminiKeyFormat,
+} from '../utils/geminiKeyCrypto.js';
+import { validatePasswordPolicy } from '../utils/passwordPolicy.js';
 import { serializeCurrentUser } from '../utils/userSerializer.js';
 import { blockReadOnlyUser } from '../utils/userWriteAccess.js';
 
 const router = express.Router();
 
 const PUBLIC_PROFILE_FIELDS =
-  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialTelegram socialLinkedIn socialInstagram socialFacebook socialUpwork';
+  'username name displayName avatar createdAt subscribers department schoolYear accountType email showEmailPublic bio interests careerGoals skills socialGitHub socialUpwork socialTelegram socialLinkedIn socialInstagram socialFacebook';
 
 /** @param {unknown} body @param {string} key @param {number} maxLen */
 function readOptionalTrimmedString(body, key, maxLen) {
@@ -109,6 +115,8 @@ router.get(
           typeof user.socialFacebook === 'string' ? user.socialFacebook : '',
         socialUpwork:
           typeof user.socialUpwork === 'string' ? user.socialUpwork : '',
+        socialGitHub:
+          typeof user.socialGitHub === 'string' ? user.socialGitHub : '',
       },
       stats: {
         sharedBooks: sharedBooks.length,
@@ -393,10 +401,9 @@ router.put(
         .json({ message: 'Current and new password required' });
     }
 
-    if (newPassword.length < 8) {
-      return res
-        .status(400)
-        .json({ message: 'New password must be at least 8 characters' });
+    const passwordCheck = validatePasswordPolicy(newPassword);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ message: passwordCheck.message });
     }
 
     const match = await bcrypt.compare(currentPassword, req.user.password);
@@ -464,11 +471,12 @@ router.put(
     if (geminiModelId !== undefined) req.user.geminiModelId = geminiModelId;
 
     const socialKeys = [
+      ['socialGitHub', 'socialGitHub'],
+      ['socialUpwork', 'socialUpwork'],
       ['socialTelegram', 'socialTelegram'],
       ['socialLinkedIn', 'socialLinkedIn'],
       ['socialInstagram', 'socialInstagram'],
       ['socialFacebook', 'socialFacebook'],
-      ['socialUpwork', 'socialUpwork'],
     ];
     for (const [bodyKey, docKey] of socialKeys) {
       const v = readOptionalTrimmedString(req.body, bodyKey, 400);
@@ -556,6 +564,84 @@ router.put(
 
     res.json({
       message: 'Profile updated',
+      user: serializeCurrentUser(req.user),
+    });
+  }),
+);
+
+/* ===== Liqu AI / Gemini BYOK ===== */
+router.post(
+  '/gemini/test',
+  ensureAuth,
+  blockReadOnlyUser,
+  asyncHandler(async (req, res) => {
+    const apiKey =
+      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    if (!isValidGeminiKeyFormat(apiKey)) {
+      return res.status(400).json({
+        message: 'Enter a valid Google Gemini API key (starts with AIza).',
+      });
+    }
+    try {
+      await testGeminiApiKey(apiKey);
+      const models = await listGeminiModels(apiKey);
+      return res.json({ ok: true, message: 'API key is valid.', models });
+    } catch (error) {
+      return res.status(400).json({
+        message: error.message || 'API key test failed.',
+      });
+    }
+  }),
+);
+
+router.put(
+  '/gemini',
+  ensureAuth,
+  blockReadOnlyUser,
+  asyncHandler(async (req, res) => {
+    const apiKey =
+      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    const modelId =
+      typeof req.body?.modelId === 'string' ? req.body.modelId.trim() : '';
+
+    if (!isValidGeminiKeyFormat(apiKey)) {
+      return res.status(400).json({
+        message: 'Enter a valid Google Gemini API key (starts with AIza).',
+      });
+    }
+
+    try {
+      await testGeminiApiKey(apiKey);
+    } catch (error) {
+      return res.status(400).json({
+        message: error.message || 'API key validation failed.',
+      });
+    }
+
+    req.user.geminiApiKey = encryptGeminiApiKey(apiKey);
+    req.user.geminiModelId = modelId;
+    req.user.geminiKeySet = true;
+    await req.user.save();
+
+    return res.json({
+      message: 'Liqu AI settings saved.',
+      user: serializeCurrentUser(req.user),
+    });
+  }),
+);
+
+router.delete(
+  '/gemini',
+  ensureAuth,
+  blockReadOnlyUser,
+  asyncHandler(async (req, res) => {
+    req.user.geminiApiKey = undefined;
+    req.user.geminiModelId = '';
+    req.user.geminiKeySet = false;
+    await req.user.save();
+
+    return res.json({
+      message: 'Liqu AI key cleared.',
       user: serializeCurrentUser(req.user),
     });
   }),

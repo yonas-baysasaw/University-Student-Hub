@@ -27,6 +27,9 @@ export const serializeCurrentUser = (user) => {
     name: u.name,
     email: u.email,
     showEmailPublic: !!u.showEmailPublic,
+    phone: u.phone || '',
+    campus: u.campus || '',
+    emergencyContact: u.emergencyContact || '',
     displayName: u.displayName,
     provider: u.provider,
     photo: u.avatar,
@@ -50,9 +53,12 @@ export const serializeCurrentUser = (user) => {
     socialInstagram: u.socialInstagram || '',
     socialFacebook: u.socialFacebook || '',
     socialUpwork: u.socialUpwork || '',
+    socialGitHub: u.socialGitHub || '',
     emailVerified: !hasLocalPassword || u.email_verified !== false,
     platformReadOnly: !!u.platformReadOnly,
     instructorPostingSuspended: !!u.instructorPostingSuspended,
     status: u.status || 'active',
+    geminiConfigured: !!u.geminiKeySet,
+    geminiModelId: u.geminiModelId || '',
   };
 };

@@ -6,6 +6,7 @@ import {
   Archive as ArchiveIcon,
   Sparkles,
   Users,
+  X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
@@ -47,6 +48,7 @@ function ClassRoom() {
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [classroomName, setClassroomName] = useState('');
   const [classroomCode, setClassroomCode] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -234,6 +236,24 @@ function ClassRoom() {
     try {
       await patchClassroom(id, { archived: next });
       toast.success(next ? 'Classroom archived.' : 'Classroom restored.');
+      setData((current) =>
+        current
+          ? {
+              ...current,
+              chats: (current.chats ?? []).map((chat) =>
+                String(chat._id) === id
+                  ? {
+                      ...chat,
+                      metadata: {
+                        ...(chat.metadata ?? {}),
+                        archived: next,
+                      },
+                    }
+                  : chat,
+              ),
+            }
+          : current,
+      );
       await fetchChats();
       notifyClassroomsChanged();
       if (scheduleForId === id) setScheduleForId(null);
@@ -278,7 +298,7 @@ function ClassRoom() {
         style={{
           animationDelay: `${Math.min(index * 55, 420)}ms`,
         }}
-        className="classroom-card-lift fade-in-up group relative overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 p-5 pt-4 shadow-md dark:border-slate-700/85 dark:from-slate-900 dark:to-slate-950/95"
+        className="classroom-card-lift fade-in-up group relative rounded-[1.35rem] border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/95 p-5 pt-4 shadow-md focus-within:z-50 hover:z-50 dark:border-slate-700/85 dark:from-slate-900 dark:to-slate-950/95"
       >
         <div className="pointer-events-none absolute -right-6 -top-10 h-28 w-28 rounded-full bg-cyan-400/10 blur-2xl transition-opacity group-hover:opacity-100 dark:bg-cyan-500/15" />
 
@@ -359,14 +379,20 @@ function ClassRoom() {
           {classroom.members?.length === 1 ? 'member' : 'members'}
         </p>
 
-        <Link
-          to={`/classroom/${id}`}
-          className="relative mt-5 inline-flex w-full whitespace-nowrap items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
-          aria-label={`Open classroom: ${classroom.name}`}
-        >
-          Open classroom
-          <ArrowRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
-        </Link>
+        {archived ? (
+          <div className="relative mt-5 inline-flex w-full whitespace-nowrap items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm font-bold text-slate-500 dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-400">
+            Restore to open classroom
+          </div>
+        ) : (
+          <Link
+            to={`/classroom/${id}`}
+            className="relative mt-5 inline-flex w-full whitespace-nowrap items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 px-4 py-3 text-sm font-bold text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/10 transition hover:brightness-110 dark:from-cyan-700 dark:to-cyan-900"
+            aria-label={`Open classroom: ${classroom.name}`}
+          >
+            Open classroom
+            <ArrowRight className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+          </Link>
+        )}
       </article>
     );
   };
@@ -460,15 +486,28 @@ function ClassRoom() {
         </header>
 
         <section className="rounded-3xl border border-slate-200/90 bg-white/80 p-5 shadow-xl shadow-slate-900/[0.06] backdrop-blur-md dark:border-slate-700/90 dark:bg-slate-900/55 md:p-7">
-          <div className="flex flex-wrap items-start gap-4 border-b border-slate-100 pb-5 dark:border-slate-700/80">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-cyan-800 dark:to-slate-900">
-              <BookOpen className="h-5 w-5 opacity-95" aria-hidden />
+          <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-700/80">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-900 to-slate-700 text-white shadow-md dark:from-cyan-800 dark:to-slate-900">
+                <BookOpen className="h-5 w-5 opacity-95" aria-hidden />
+              </div>
+              <div>
+                <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
+                  Your spaces
+                </h2>
+              </div>
             </div>
-            <div>
-              <h2 className="font-display text-lg font-bold text-slate-900 dark:text-white">
-                Your spaces
-              </h2>
-            </div>
+            <button
+              type="button"
+              onClick={() => setShowArchiveModal(true)}
+              className="ml-auto inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/95 px-4 py-2 text-sm font-bold text-slate-700 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-900 dark:border-slate-600 dark:bg-slate-800/90 dark:text-slate-100 dark:hover:border-cyan-700 dark:hover:bg-slate-700"
+            >
+              <ArchiveIcon className="h-4 w-4" aria-hidden />
+              Archive
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                {archivedRooms.length}
+              </span>
+            </button>
           </div>
 
           {classrooms.length === 0 ? (
@@ -504,7 +543,7 @@ function ClassRoom() {
                 </h3>
                 {activeRooms.length === 0 ? (
                   <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-4 py-6 text-sm text-slate-600 dark:border-slate-600 dark:bg-slate-900/40 dark:text-slate-400">
-                    No active classrooms. Restore one from the archive below or
+                    No active classrooms. Open Archive to restore one or
                     create a new space.
                   </p>
                 ) : (
@@ -513,29 +552,64 @@ function ClassRoom() {
                   </div>
                 )}
               </div>
-
-              {archivedRooms.length > 0 ? (
-                <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-slate-700 dark:bg-slate-900/40 md:p-5">
-                  <div className="mb-4 flex flex-wrap items-center gap-2">
-                    <ArchiveIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" aria-hidden />
-                    <h3 className="font-display text-sm font-bold uppercase tracking-[0.12em] text-slate-600 dark:text-slate-300">
-                      Archived
-                    </h3>
-                    <span className="text-xs text-slate-500 dark:text-slate-400">
-                      Hidden from dashboard summaries—restore anytime.
-                    </span>
-                  </div>
-                  <div className="grid gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
-                    {archivedRooms.map((c, i) =>
-                      renderClassroomCard(c, i + activeRooms.length),
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
           )}
         </section>
       </div>
+
+      {showArchiveModal ? (
+        <div
+          className="fixed inset-0 z-[1001] flex items-start justify-center overflow-y-auto bg-slate-950/55 px-4 py-6 backdrop-blur-md md:py-10"
+          role="presentation"
+          onClick={() => setShowArchiveModal(false)}
+          onKeyDown={(e) => e.key === 'Escape' && setShowArchiveModal(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="archive-class-title"
+            className="fade-in-up relative w-full max-w-5xl rounded-3xl border border-slate-200/90 bg-white p-5 shadow-[0_28px_80px_-24px_rgba(15,23,42,0.45)] dark:border-slate-600 dark:bg-slate-900 md:p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-100 pb-5 dark:border-slate-700/80">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700 ring-1 ring-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:ring-slate-700">
+                  <ArchiveIcon className="h-5 w-5" aria-hidden />
+                </span>
+                <div>
+                  <h3
+                    id="archive-class-title"
+                    className="font-display text-xl font-bold text-slate-900 dark:text-white"
+                  >
+                    Archived classrooms
+                  </h3>
+                  <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Restore a class to make it active again, or delete it permanently.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowArchiveModal(false)}
+                aria-label="Close archive"
+                className="rounded-full border border-slate-200 bg-white p-2 text-slate-500 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-900 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-cyan-700 dark:hover:bg-slate-700"
+              >
+                <X className="h-4 w-4" aria-hidden />
+              </button>
+            </div>
+
+            {archivedRooms.length === 0 ? (
+              <p className="mt-6 rounded-2xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center text-sm font-medium text-slate-600 dark:border-slate-600 dark:bg-slate-800/40 dark:text-slate-400">
+                No archived classrooms.
+              </p>
+            ) : (
+              <div className="mt-6 grid gap-4 md:grid-cols-2 md:gap-5 xl:grid-cols-3">
+                {archivedRooms.map((c, i) => renderClassroomCard(c, i))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {scheduleForId && scheduleClassroom ? (
         <ClassroomScheduleEditor

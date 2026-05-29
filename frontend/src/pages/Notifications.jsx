@@ -2,6 +2,7 @@ import { AtSign, Megaphone, RefreshCw } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { readJsonOrThrow } from '../utils/http';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 /** @param {string} iso */
 function localDateKeyFromIso(iso) {
@@ -60,6 +61,7 @@ function formatRelativeTime(iso) {
 }
 
 export default function Notifications() {
+  const { markSeen } = useNotifications();
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -88,6 +90,10 @@ export default function Notifications() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    markSeen();
+  }, [markSeen]);
 
   const { groups, sortedKeys } = useMemo(() => {
     /** @type {Map<string, typeof items>} */

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import bcrypt from "bcrypt";
 import User from "../models/User.js";
+import { validatePasswordPolicy } from "../utils/passwordPolicy.js";
 import { sendVerificationEmail } from "./verificationEmail.js";
 
 const ensureProviderArray = (user) => {
@@ -28,6 +29,13 @@ export const createLocalUser = async ({
 }) => {
   if (!email || !password) {
     const error = new Error("Email and password are required");
+    error.status = 400;
+    throw error;
+  }
+
+  const passwordCheck = validatePasswordPolicy(password);
+  if (!passwordCheck.valid) {
+    const error = new Error(passwordCheck.message);
     error.status = 400;
     throw error;
   }
@@ -100,6 +108,13 @@ export const createLocalUser = async ({
 export const createPortalAdminUser = async ({ username, email, password }) => {
   if (!email || !password) {
     const error = new Error("Email and password are required");
+    error.status = 400;
+    throw error;
+  }
+
+  const passwordCheck = validatePasswordPolicy(password);
+  if (!passwordCheck.valid) {
+    const error = new Error(passwordCheck.message);
     error.status = 400;
     throw error;
   }

@@ -1,5 +1,5 @@
 import { Megaphone, MessageSquare, FolderOpen, Sparkles } from 'lucide-react';
-import { NavLink, useParams } from 'react-router-dom';
+import { Link, NavLink, useParams } from 'react-router-dom';
 
 const ICONS = {
   discussion: MessageSquare,
@@ -27,8 +27,8 @@ function ClassroomTabs({ trailing = null, liquAction = null }) {
   ];
 
   return (
-    <nav className="mb-5 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-2 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-700 dark:bg-slate-900/40 dark:ring-white/[0.04]">
-      <div className="flex min-h-[52px] items-stretch gap-2 sm:min-h-0">
+    <nav className="mb-3 rounded-2xl border border-slate-200/80 bg-slate-50/90 p-1.5 shadow-sm ring-1 ring-slate-900/[0.03] dark:border-slate-700 dark:bg-slate-900/40 dark:ring-white/[0.04]">
+      <div className="flex min-h-[46px] items-stretch gap-2 sm:min-h-0">
         <ul className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto pb-0.5 pt-0.5 md:gap-2 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-300/80 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -39,7 +39,7 @@ function ClassroomTabs({ trailing = null, liquAction = null }) {
                   end={tab.end}
                   aria-label={tab.label}
                   className={({ isActive }) =>
-                    `flex min-h-[44px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide transition md:px-4 ${
+                    `flex min-h-[38px] items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wide transition md:px-4 ${
                       isActive
                         ? 'bg-gradient-to-r from-slate-900 to-cyan-800 text-white shadow-md shadow-slate-900/25 ring-1 ring-white/10 dark:from-slate-800 dark:to-cyan-900'
                         : 'border border-transparent bg-white text-slate-600 hover:border-cyan-200 hover:bg-cyan-50/80 hover:text-cyan-900 dark:bg-slate-900/80 dark:text-slate-400 dark:hover:border-cyan-800 dark:hover:bg-slate-800 dark:hover:text-cyan-100'
@@ -56,12 +56,21 @@ function ClassroomTabs({ trailing = null, liquAction = null }) {
             );
           })}
         </ul>
-        {liquAction ? (
+        {liquAction?.to ? (
+          <Link
+            to={liquAction.to}
+            aria-label={liquAction.label || 'Liqu AI'}
+            className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-md shadow-cyan-900/25 transition hover:brightness-110 md:px-4 dark:from-cyan-700 dark:to-indigo-950"
+          >
+            <Sparkles className="h-4 w-4 shrink-0 opacity-90 max-md:h-5 max-md:w-5" aria-hidden />
+            <span className="hidden md:inline">{liquAction.label || 'Liqu AI'}</span>
+          </Link>
+        ) : liquAction ? (
           <button
             type="button"
             aria-label={liquAction.label || 'Liqu AI'}
             onClick={liquAction.onClick}
-            className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 px-3 py-2.5 text-[11px] font-bold uppercase tracking-wide text-white shadow-md shadow-cyan-900/25 transition hover:brightness-110 md:px-4 dark:from-cyan-700 dark:to-indigo-950"
+            className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-cyan-500/35 bg-gradient-to-r from-cyan-600 to-indigo-800 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white shadow-md shadow-cyan-900/25 transition hover:brightness-110 md:px-4 dark:from-cyan-700 dark:to-indigo-950"
           >
             <Sparkles className="h-4 w-4 shrink-0 opacity-90 max-md:h-5 max-md:w-5" aria-hidden />
             <span className="hidden md:inline">{liquAction.label || 'Liqu AI'}</span>

@@ -35,6 +35,7 @@ import {
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
+import { useProcessing } from '../contexts/ProcessingContext';
 import { useAuth } from '../contexts/AuthContext';
 import {
   ACADEMIC_TRACKS,
@@ -48,6 +49,10 @@ import {
   examPaperTypeLabel,
 } from '../utils/examPaperLabels';
 import { readJsonOrThrow } from '../utils/http';
+import {
+  EXAM_IMPORT_ACCEPT,
+  validateExamImportFile,
+} from '../utils/examImportFormats';
 
 const TABS = [
   {
@@ -64,7 +69,7 @@ const TABS = [
   },
   {
     key: 'import',
-    label: 'Import PDF',
+    label: 'Import document',
     sub: 'AI extraction',
     icon: Upload,
   },
@@ -148,52 +153,52 @@ function Exams() {
   const [tab, setTab] = useState('vault');
 
   return (
-    <div className="liqu-ai-ambient page-surface px-3 pb-10 pt-4 md:px-6 md:pb-14 md:pt-8">
+    <div className="liqu-ai-ambient page-surface px-3 pb-6 pt-3 md:px-6 md:pb-8 md:pt-5">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-4">
+        <div className="mb-2">
           <Link
             to="/liqu-ai"
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-4 py-2 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-cyan-700/50 dark:hover:text-cyan-100"
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur-sm transition hover:border-cyan-300/60 hover:text-cyan-900 dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300 dark:hover:border-cyan-700/50 dark:hover:text-cyan-100"
           >
             <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
             Back to Liqu AI
           </Link>
         </div>
-        <header className="panel-card fade-in-up relative mb-6 overflow-hidden rounded-3xl p-6 md:p-8">
+        <header className="panel-card fade-in-up relative mb-4 overflow-hidden rounded-2xl p-4 md:p-5">
           <div
-            className="workspace-hero-mesh pointer-events-none absolute inset-0 rounded-3xl opacity-70"
+            className="workspace-hero-mesh pointer-events-none absolute inset-0 rounded-2xl opacity-70"
             aria-hidden
           />
           <div className="relative">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 dark:text-cyan-400">
               Liqu AI · Exam studio
             </p>
-            <h1 className="mt-2 font-display text-3xl tracking-tight text-slate-900 dark:text-slate-50 md:text-4xl">
+            <h1 className="mt-1 font-display text-2xl tracking-tight text-slate-900 dark:text-slate-50 md:text-3xl">
               Welcome to the exam collections
             </h1>
           </div>
         </header>
 
-        <div className="mb-5 grid gap-2 sm:grid-cols-3">
+        <div className="mb-3 grid gap-2 sm:grid-cols-3">
           {TABS.map(({ key, label, sub, icon: Icon }) => (
             <button
               key={key}
               type="button"
               onClick={() => setTab(key)}
-              className={`panel-card flex items-start gap-3 rounded-2xl p-4 text-left transition md:p-5 ${
+              className={`panel-card flex items-center gap-2.5 rounded-2xl p-3 text-left transition md:p-3.5 ${
                 tab === key
                   ? 'ring-2 ring-cyan-500/50 shadow-md dark:ring-cyan-400/40'
                   : 'opacity-95 hover:border-cyan-200/70 dark:hover:border-cyan-800/50'
               }`}
             >
               <span
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br ${
                   tab === key
                     ? 'from-cyan-500/25 to-indigo-500/20 ring-1 ring-cyan-500/30 dark:from-cyan-600/25 dark:to-indigo-900/30'
                     : 'from-slate-300/35 to-slate-400/20 dark:from-slate-600/30 dark:to-slate-700/25'
                 }`}
               >
-                <Icon className="h-5 w-5 text-slate-800 dark:text-slate-100" />
+                <Icon className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <span className="min-w-0">
                 <span className="block font-display text-sm font-semibold text-slate-900 dark:text-slate-50">
@@ -558,13 +563,18 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
     ];
   }, [form]);
 
-  async function startPractice() {
+  async function startPractice(selectedOnly = false) {
     try {
+      const ids = selectedOnly ? [...selSet] : [];
+      const body =
+        ids.length > 0
+          ? { count: Math.min(50, ids.length), questionIds: ids }
+          : { count: 10 };
       const res = await fetch('/api/vault/questions/practice-batch', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ count: 10 }),
+        body: JSON.stringify(body),
       });
       const data = await readJsonOrThrow(res, 'Practice fetch failed');
       if (!data.questions?.length) {
@@ -579,17 +589,17 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
   }
 
   return (
-    <div className="space-y-12">
-      <section className="space-y-4" aria-labelledby="vault-papers-heading">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="space-y-8">
+      <section className="space-y-3" aria-labelledby="vault-papers-heading">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 ring-1 ring-cyan-500/25 dark:from-cyan-600/25 dark:to-indigo-900/30">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-cyan-500/20 to-indigo-500/15 ring-1 ring-cyan-500/25 dark:from-cyan-600/25 dark:to-indigo-900/30">
                 <FileStack className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <h2
                 id="vault-papers-heading"
-                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+                className="font-display text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50"
               >
                 Your papers
               </h2>
@@ -622,27 +632,27 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
               onClick={onOpenImport}
             >
               <Upload className="h-4 w-4 shrink-0" aria-hidden />
-              Import PDF
+              Import document
             </button>
           ) : null}
         </div>
 
         {myPapersLoading ? (
-          <div className="flex items-center justify-center py-14 text-slate-500">
+          <div className="flex items-center justify-center py-10 text-slate-500">
             <span className="loading loading-spinner" />
             <span className="ml-2 text-sm">Loading your papers…</span>
           </div>
         ) : myPapers.length === 0 ? (
-          <div className="panel-card rounded-2xl border border-dashed border-slate-200/90 px-6 py-10 text-center dark:border-slate-700/90">
+          <div className="panel-card rounded-2xl border border-dashed border-slate-200/90 px-6 py-8 text-center dark:border-slate-700/90">
             <FileStack className="mx-auto h-9 w-9 text-slate-400 dark:text-slate-500" />
             <p className="mt-3 text-sm font-medium text-slate-700 dark:text-slate-300">
               No papers in this lens
             </p>
             <p className="mx-auto mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">
               {papersVisibility === 'private'
-                ? 'No private extracts yet — try All or import a PDF (stays private until you switch to Community).'
+                ? 'No private extracts yet — try All or import a document (stays private until you switch to Community).'
                 : papersVisibility === 'public'
-                  ? 'Nothing listed on the bank from you yet — publish from drafts below or expose a PDF.'
+                  ? 'Nothing listed on the bank from you yet — publish from drafts below or share an imported paper.'
                   : 'Import a syllabus or compose questions and publish — your shelf stays organized here.'}
             </p>
             {typeof onOpenImport === 'function' ? (
@@ -651,7 +661,7 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
                 className="btn-primary mt-4 px-5 py-2 text-sm"
                 onClick={onOpenImport}
               >
-                Go to Import PDF
+                Go to Import document
               </button>
             ) : null}
           </div>
@@ -703,21 +713,21 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
         )}
       </section>
 
-      <section className="space-y-4" aria-labelledby="vault-drafts-heading">
-        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200/80 pt-10 dark:border-slate-700/80">
+      <section className="space-y-3" aria-labelledby="vault-drafts-heading">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-200/80 pt-6 dark:border-slate-700/80">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-slate-300/25 ring-1 ring-slate-200/70 dark:from-indigo-900/35 dark:to-slate-700/35 dark:ring-slate-600/60">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/15 to-slate-300/25 ring-1 ring-slate-200/70 dark:from-indigo-900/35 dark:to-slate-700/35 dark:ring-slate-600/60">
                 <GraduationCap className="h-4 w-4 text-slate-800 dark:text-slate-100" />
               </span>
               <h2
                 id="vault-drafts-heading"
-                className="font-display text-lg font-semibold tracking-tight text-slate-900 dark:text-slate-50"
+                className="font-display text-base font-semibold tracking-tight text-slate-900 dark:text-slate-50"
               >
                 Question drafts
               </h2>
             </div>
-            <p className="mt-2 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
               Stem-and-option work in progress — stays on-device until you batch
               publish as a curated paper above.
             </p>
@@ -754,12 +764,12 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-slate-500">
+          <div className="flex items-center justify-center py-10 text-slate-500">
             <span className="loading loading-spinner" />
           </div>
         ) : rows.length === 0 ? (
-          <div className="panel-card rounded-2xl border border-slate-200/70 px-6 py-10 text-center dark:border-slate-700/70">
-            <GraduationCap className="mx-auto h-10 w-10 text-cyan-600/70" />
+          <div className="panel-card rounded-2xl border border-slate-200/70 px-6 py-8 text-center dark:border-slate-700/70">
+            <GraduationCap className="mx-auto h-9 w-9 text-cyan-600/70" />
             <p className="mt-3 font-display text-base font-semibold text-slate-900 dark:text-slate-50">
               No drafts yet — only MCQs missing
             </p>
@@ -1213,24 +1223,33 @@ Task: Rewrite this question to target application (Bloom taxonomy) rather than r
 
       {/* Sticky footer for multi-select */}
       {selSet.size > 0 && (
-        <div className="fixed bottom-6 left-1/2 z-[2147483620] flex w-[min(100%-1.25rem,32rem)] -translate-x-1/2 items-center justify-between gap-3 rounded-2xl border border-cyan-200/80 bg-white/96 px-4 py-3 shadow-xl backdrop-blur-md dark:border-cyan-800/50 dark:bg-slate-900/95">
+        <div className="fixed bottom-6 left-1/2 z-[2147483620] flex w-[min(100%-1.25rem,36rem)] -translate-x-1/2 flex-wrap items-center justify-between gap-3 rounded-2xl border border-cyan-200/80 bg-white/96 px-4 py-3 shadow-xl backdrop-blur-md dark:border-cyan-800/50 dark:bg-slate-900/95">
           <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
             {selSet.size} selected
           </span>
-          <button
-            type="button"
-            className="btn-primary px-5 py-2 text-xs shadow-sm"
-            onClick={openPublishWizard}
-          >
-            Compose paper…
-          </button>
-          <button
-            type="button"
-            className="text-xs text-slate-500 underline hover:no-underline"
-            onClick={() => setSelSet(new Set())}
-          >
-            Clear
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="btn-secondary px-4 py-2 text-xs"
+              onClick={() => startPractice(true)}
+            >
+              Practice selected
+            </button>
+            <button
+              type="button"
+              className="btn-primary px-5 py-2 text-xs shadow-sm"
+              onClick={openPublishWizard}
+            >
+              Compose paper…
+            </button>
+            <button
+              type="button"
+              className="text-xs text-slate-500 underline hover:no-underline"
+              onClick={() => setSelSet(new Set())}
+            >
+              Clear
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1440,7 +1459,7 @@ function BankTab() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-nowrap items-center gap-2">
         <input
           type="text"
           placeholder="Search papers…"
@@ -1449,7 +1468,7 @@ function BankTab() {
             setSearch(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 max-w-none flex-1 min-w-[10rem] sm:max-w-md sm:min-w-[14rem]"
+          className="input-field h-9 min-w-0 w-auto flex-1 text-sm"
         />
         <select
           value={statusFilter}
@@ -1457,15 +1476,16 @@ function BankTab() {
             setStatusFilter(e.target.value);
             setPage(1);
           }}
-          className="input-field h-9 shrink-0 text-sm"
+          aria-label="Filter by status"
+          className="input-field h-9 w-[7.5rem] max-w-[7.5rem] shrink-0 px-2 text-xs"
         >
-          <option value="">All statuses</option>
+          <option value="">All</option>
           <option value="complete">Ready</option>
           <option value="processing">Processing</option>
           <option value="pending">Queued</option>
           <option value="failed">Failed</option>
         </select>
-        <span className="ml-auto whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+        <span className="shrink-0 whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
           {total} paper{total !== 1 ? 's' : ''}
         </span>
       </div>
@@ -1489,7 +1509,7 @@ function BankTab() {
             No papers yet.
           </p>
           <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">
-            Import a PDF or publish from your vault.
+            Import a document or publish from your vault.
           </p>
         </div>
       )}
@@ -1750,8 +1770,8 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
     exam.processingStatus === 'pending';
   const isOwner =
     currentUserId &&
-    (exam.uploadedBy?._id ?? exam.uploadedBy?.id ?? exam.uploadedBy) ===
-      currentUserId;
+    String(exam.uploadedBy?.id ?? exam.uploadedBy?._id ?? '') ===
+      String(currentUserId);
 
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(exam.filename);
@@ -1873,7 +1893,7 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                   </span>
                 ) : (
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.04em] text-slate-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                    PDF paper
+                    Uploaded paper
                   </span>
                 )}
                 {exam.visibility === 'private' && isOwner ? (
@@ -1983,6 +2003,40 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
             {exam.totalQuestions} question{exam.totalQuestions !== 1 ? 's' : ''}
           </p>
 
+          {isProcessing && (exam.processingBatchTotal ?? 0) > 0 ? (
+            <div className="mt-2">
+              <div className="mb-1 flex items-center justify-between text-[10px] font-medium text-slate-500">
+                <span>
+                  Extracting batch {exam.processingBatchCurrent ?? 0}/
+                  {exam.processingBatchTotal}
+                </span>
+                <span>
+                  {Math.round(
+                    ((exam.processingBatchCurrent ?? 0) /
+                      exam.processingBatchTotal) *
+                      100,
+                  )}
+                  %
+                </span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all duration-500"
+                  style={{
+                    width: `${Math.max(
+                      4,
+                      Math.round(
+                        ((exam.processingBatchCurrent ?? 0) /
+                          exam.processingBatchTotal) *
+                          100,
+                      ),
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          ) : null}
+
           <ExamPaperEngagement
             exam={exam}
             currentUserId={currentUserId}
@@ -2006,7 +2060,14 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
                   Extracting questions…
                 </>
               ) : exam.processingStatus === 'failed' ? (
-                <span className="text-rose-600">Processing failed</span>
+                <span className="text-rose-600">
+                  Processing failed
+                  {exam.processingError ? (
+                    <span className="mt-1 block font-normal text-rose-500/90">
+                      {exam.processingError}
+                    </span>
+                  ) : null}
+                </span>
               ) : (
                 <span>Not yet available</span>
               )}
@@ -2231,6 +2292,84 @@ function ExamCard({ exam, currentUserId, onDelete, onUpdate }) {
 
 // ── PDF import ─────────────────────────────────────────────────────────────────
 
+function ExtractionPipelinePanel() {
+  const steps = [
+    { label: 'Upload', hint: 'Secure private storage' },
+    { label: 'Parse', hint: 'Text from PDF/DOCX/PPTX' },
+    { label: 'AI batches', hint: 'MCQs appear incrementally' },
+    { label: 'Ready', hint: 'Practice anytime' },
+  ];
+  return (
+    <div className="relative z-[1] mt-5 rounded-2xl border border-slate-200/90 bg-white/80 p-4 shadow-sm dark:border-slate-300/90 dark:bg-white/90">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-800">
+        Extraction pipeline
+      </p>
+      <ol className="mt-3 grid gap-2 sm:grid-cols-4">
+        {steps.map((step, i) => (
+          <li
+            key={step.label}
+            className="rounded-xl border border-slate-200/80 bg-slate-50/90 px-3 py-2 dark:border-slate-200 dark:bg-slate-50"
+          >
+            <span className="text-[10px] font-bold text-cyan-700">
+              {i + 1}. {step.label}
+            </span>
+            <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+              {step.hint}
+            </p>
+          </li>
+        ))}
+      </ol>
+      <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+        Tip: text-based PDFs extract fastest. Scanned pages may yield fewer MCQs
+        unless OCR text is embedded.
+      </p>
+    </div>
+  );
+}
+
+function ActiveExtractionJobsStrip() {
+  const processing = useProcessing();
+  if (processing.size === 0) return null;
+
+  const items = Array.from(processing.entries());
+
+  return (
+    <div className="relative z-[1] mt-4 space-y-2">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+        Active extractions
+      </p>
+      {items.map(([examId, job]) => {
+        const pct =
+          job.totalBatches > 0
+            ? Math.round((job.batchNumber / job.totalBatches) * 100)
+            : 0;
+        return (
+          <div
+            key={examId}
+            className="rounded-xl border border-cyan-200/70 bg-cyan-50/80 px-3 py-2 dark:border-cyan-800/40 dark:bg-cyan-950/30"
+          >
+            <div className="flex items-center justify-between gap-2 text-xs font-semibold text-slate-800 dark:text-slate-100">
+              <span className="min-w-0 truncate">
+                {job.filename || 'Processing exam…'}
+              </span>
+              <span className="shrink-0 tabular-nums text-[10px] text-slate-500">
+                {job.batchNumber}/{job.totalBatches}
+                {job.totalQuestions > 0 ? ` · ${job.totalQuestions} Q` : ''}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 transition-all"
+                style={{ width: `${Math.max(pct, 4)}%` }}
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function validatePdfCatalogForUpload(form) {
   const track = String(form.academicTrack || '').trim().toLowerCase();
   if (!['engineering', 'social', 'natural'].includes(track)) {
@@ -2272,16 +2411,14 @@ function PdfImportTab({ onUploaded }) {
   const [importCourse, setImportCourse] = useState('');
   const [importPaperType, setImportPaperType] = useState('other');
   const [displayTitle, setDisplayTitle] = useState('');
+  const [extractionMode, setExtractionMode] = useState('standard');
   const inputRef = useRef(null);
 
   function pickFile(picked) {
     if (!picked) return;
-    if (picked.type !== 'application/pdf') {
-      setError('Only PDF files are allowed.');
-      return;
-    }
-    if (picked.size > 10 * 1024 * 1024) {
-      setError('File must be smaller than 10 MB.');
+    const err = validateExamImportFile(picked);
+    if (err) {
+      setError(err);
       return;
     }
     setError('');
@@ -2319,12 +2456,13 @@ function PdfImportTab({ onUploaded }) {
 
     try {
       const form = new FormData();
-      form.append('pdf', file);
+      form.append('file', file);
       form.append('visibility', privacyPrivate ? 'private' : 'public');
       form.append('academicTrack', String(importTrack).trim().toLowerCase());
       form.append('department', resolvedDept);
       form.append('courseSubject', String(importCourse).trim());
       form.append('paperType', String(importPaperType).trim());
+      form.append('extractionMode', extractionMode);
       const dt = String(displayTitle || '').trim();
       if (dt) form.append('displayTitle', dt);
 
@@ -2344,7 +2482,7 @@ function PdfImportTab({ onUploaded }) {
       const data = await readJsonOrThrow(res, 'Upload failed');
       setSuccess(data);
       setFile(null);
-      toast.success('PDF uploaded', {
+      toast.success('Document uploaded', {
         description: 'AI is extracting questions in the background.',
       });
     } catch (err) {
@@ -2401,8 +2539,8 @@ function PdfImportTab({ onUploaded }) {
                       Open practice workspace
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
-                      Start drills on these MCQs — the header shows extraction until every
-                      question is ready.
+                      Questions appear batch-by-batch — start practicing as soon
+                      as the first set is ready.
                     </span>
                   </span>
                   <Sparkles className="mt-1 h-5 w-5 shrink-0 text-amber-300/90 opacity-90" aria-hidden />
@@ -2422,7 +2560,7 @@ function PdfImportTab({ onUploaded }) {
                   </span>
                   <span className="min-w-0">
                     <span className="block font-display text-sm font-bold text-white">
-                      Import another PDF
+                      Import another document
                     </span>
                     <span className="mt-0.5 block text-xs leading-snug text-slate-400 group-hover:text-slate-300">
                       Run the upload flow again for a fresh paper while this one finishes.
@@ -2473,14 +2611,15 @@ function PdfImportTab({ onUploaded }) {
         <div className="min-w-0">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-400/40 bg-gradient-to-r from-cyan-50 to-teal-50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.12em] text-cyan-900 shadow-sm dark:border-cyan-300/50 dark:from-cyan-100/80 dark:to-sky-100/70 dark:text-cyan-950">
             <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
-            PDF → MCQs in one lane
+            Document → MCQs in one lane
           </span>
           <h2 className="mt-2 font-display text-xl font-bold tracking-tight text-slate-900 dark:text-slate-900 md:text-2xl">
-            Bring a syllabus PDF or past paper
+            Bring a past paper or syllabus
           </h2>
           <p className="mt-1 max-w-xl text-sm leading-relaxed text-slate-600 dark:text-slate-600">
-            We upload to your vault privately, OCR & chunk the PDF, then auto-build practice
-            questions — max <strong className="text-cyan-700 dark:text-cyan-700">10 MB</strong>.
+            PDF, Word (.docx), PowerPoint (.pptx), or plain text — we upload privately,
+            extract content, then auto-build practice questions — max{' '}
+            <strong className="text-cyan-700 dark:text-cyan-700">10 MB</strong>.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-2xl border border-slate-200/95 bg-white px-3 py-2 text-xs shadow-sm backdrop-blur-sm dark:border-slate-300/90 dark:bg-white/90">
@@ -2506,6 +2645,49 @@ function PdfImportTab({ onUploaded }) {
         </div>
       </div>
 
+      <ActiveExtractionJobsStrip />
+
+      <div className="relative z-[1] mt-4 rounded-2xl border border-slate-200/90 bg-white/85 p-4 shadow-sm dark:border-slate-300/90 dark:bg-white/90">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-600">
+          Extraction depth
+        </p>
+        <div className="mt-2 inline-flex flex-wrap gap-1 rounded-xl border border-slate-200/90 bg-slate-50 p-1 dark:border-slate-200 dark:bg-slate-50">
+          {[
+            {
+              id: 'standard',
+              label: 'Standard',
+              hint: 'Balanced speed & coverage',
+            },
+            {
+              id: 'thorough',
+              label: 'Thorough',
+              hint: 'Smaller sections, more MCQs',
+            },
+          ].map(({ id, label, hint }) => (
+            <button
+              key={id}
+              type="button"
+              title={hint}
+              onClick={() => setExtractionMode(id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                extractionMode === id
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-white dark:text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-slate-500">
+          {extractionMode === 'thorough'
+            ? 'Scans the document in finer sections — best for dense syllabi and long papers.'
+            : 'Recommended for most past papers and mock exams.'}
+        </p>
+      </div>
+
+      <ExtractionPipelinePanel />
+
       {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-and-drop requires event handlers on a container div; clickable action is on the inner <button> */}
       <div
         className={`relative z-[1] mt-6 rounded-2xl border-2 border-dashed transition ${
@@ -2526,12 +2708,12 @@ function PdfImportTab({ onUploaded }) {
           type="button"
           className="flex w-full cursor-pointer flex-col items-center justify-center rounded-2xl bg-gradient-to-b from-white to-slate-50/30 p-10 transition hover:from-cyan-50 hover:to-white focus:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:from-white dark:to-slate-50/50 dark:hover:from-sky-50"
           onClick={() => inputRef.current?.click()}
-          aria-label="Click or drag to upload PDF"
+          aria-label="Click or drag to upload exam document"
         >
           <input
             ref={inputRef}
             type="file"
-            accept="application/pdf"
+            accept={EXAM_IMPORT_ACCEPT}
             className="hidden"
             onChange={(e) => pickFile(e.target.files[0])}
           />
@@ -2548,10 +2730,10 @@ function PdfImportTab({ onUploaded }) {
           ) : (
             <>
               <p className="mt-3 font-semibold text-slate-700 dark:text-slate-800">
-                Drop your PDF here or tap to browse
+                Drop your file here or tap to browse
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Locked to vault behavior by default—you stay in control.
+                PDF, DOCX, PPTX, or TXT · max 10 MB
               </p>
             </>
           )}
@@ -2581,7 +2763,7 @@ function PdfImportTab({ onUploaded }) {
             <input
               value={displayTitle}
               onChange={(e) => setDisplayTitle(e.target.value)}
-              placeholder="Defaults to PDF filename without .pdf"
+              placeholder="Defaults to filename without extension"
               className="mt-1 input-field w-full text-sm"
             />
           </label>
@@ -2715,7 +2897,7 @@ function PdfImportTab({ onUploaded }) {
           title={
             file
               ? 'Upload requires catalog fields above'
-              : 'Pick a PDF first'
+              : 'Pick a file first'
           }
         >
           {uploading ? 'Working…' : (

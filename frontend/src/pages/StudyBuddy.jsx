@@ -1,6 +1,6 @@
 import { ArrowLeft, BookOpen, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import LiquAiChatPanel from '../components/LiquAiChatPanel';
 import ReadAlongPanel from '../components/ReadAlongPanel';
 import { HUB_QUICK_PROMPTS } from '../constants/supportPrompts';
@@ -57,6 +57,10 @@ function StudyBuddy() {
   const [splitLeftPct, setSplitLeftPct] = useState(readSplitPct);
   const [mobileMaterialOpen, setMobileMaterialOpen] = useState(false);
   const [readerFocusRead, setReaderFocusRead] = useState(false);
+  const [studyMode, setStudyMode] = useState('chat');
+  const [readerPage, setReaderPage] = useState(1);
+  const [selectedText, setSelectedText] = useState('');
+  const [chapterFilter, setChapterFilter] = useState('');
   const splitBeforeFocusRef = useRef(null);
   const readerFocusReadRef = useRef(false);
   const splitDragRef = useRef({
@@ -67,8 +71,16 @@ function StudyBuddy() {
   const splitContainerRef = useRef(null);
   const splitHandleRef = useRef(null);
   const isLg = useIsLg();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const bookIdFromUrl = searchParams.get('bookId') ?? '';
+
+  useEffect(() => {
+    if (location.state?.studyMode) {
+      setStudyMode(String(location.state.studyMode));
+    }
+  }, [location.state?.studyMode]);
 
   useEffect(() => {
     readerFocusReadRef.current = readerFocusRead;
@@ -109,6 +121,12 @@ function StudyBuddy() {
       matched ? String(matched.bookId || matched.id) : '',
     );
   }, [bookIdFromUrl, books]);
+
+  useEffect(() => {
+    setReaderPage(1);
+    setSelectedText('');
+    setChapterFilter('');
+  }, [selectedBookId]);
 
   const selectedBook = useMemo(
     () =>
@@ -208,7 +226,29 @@ function StudyBuddy() {
     layoutVariant: 'workspace',
     focusRead: readerFocusRead,
     onFocusReadChange: handleReaderFocusReadChange,
+    currentPage: readerPage,
+    onPageChange: setReaderPage,
+    onTextSelected: ({ text }) => setSelectedText(text),
   };
+
+  const handleOpenInReader = useCallback(({ page }) => {
+    if (Number.isFinite(page) && page > 0) setReaderPage(page);
+    if (!isLg) setMobileMaterialOpen(true);
+  }, [isLg]);
+
+  const handlePracticeFromMessage = useCallback(
+    (message) => {
+      setStudyMode('exam_prep');
+      const qs = selectedBookId ? `?bookId=${encodeURIComponent(selectedBookId)}` : '';
+      navigate(`/liqu-ai/study-buddy${qs}`, {
+        state: {
+          prefill: `Create 3 practice questions with answers from this material:\n\n${message?.content || ''}`,
+          studyMode: 'exam_prep',
+        },
+      });
+    },
+    [navigate, selectedBookId],
+  );
 
   const contextPillLabel = selectedBook?.title
     ? selectedBook.title.length > 42
@@ -339,6 +379,16 @@ function StudyBuddy() {
                   workspacePresentation="studyBuddy"
                   sessionSidebarMode="rail"
                   denseStudyChrome={readerFocusRead}
+                  studyMode={studyMode}
+                  onStudyModeChange={setStudyMode}
+                  pageNumber={readerPage}
+                  selectedText={selectedText}
+                  onClearSelectedText={() => setSelectedText('')}
+                  chapterFilter={chapterFilter}
+                  onChapterFilterChange={setChapterFilter}
+                  onOpenInReader={handleOpenInReader}
+                  onPracticeFromMessage={handlePracticeFromMessage}
+                  autoPrepareBook
                   className="h-full min-h-0 border-0 bg-transparent shadow-none"
                 />
               </div>
@@ -377,7 +427,7 @@ function StudyBuddy() {
 
             <div className="hidden min-h-0 min-w-0 flex-1 flex-col overflow-hidden lg:flex lg:mt-0">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-900">
-                <div className="flex min-h-0 flex-1 flex-col p-5">
+                <div className="flex min-h-0 flex-1 flex-col p-2 lg:p-3">
                   <ReadAlongPanel
                     {...readAlongPanelProps}
                     showPageTitle={false}

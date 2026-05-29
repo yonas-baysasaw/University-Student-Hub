@@ -1,6 +1,10 @@
 import asyncHandler from '../middlewares/asyncHandler.js';
 import ClassroomMention from '../models/ClassroomMention.js';
 import { getRecentAnnouncementsForUser } from '../services/dashboardService.js';
+import {
+  getUnreadNotificationCount,
+  markNotificationsSeen,
+} from '../services/notificationsService.js';
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 150;
@@ -45,4 +49,14 @@ export const listNotificationFeed = asyncHandler(async (req, res) => {
   );
 
   res.json({ items: items.slice(0, limit) });
+});
+
+export const getUnreadCount = asyncHandler(async (req, res) => {
+  const count = await getUnreadNotificationCount(req.user._id);
+  res.json({ count, hasUnread: count > 0 });
+});
+
+export const markSeen = asyncHandler(async (req, res) => {
+  await markNotificationsSeen(req.user._id);
+  res.json({ ok: true, count: 0, hasUnread: false });
 });

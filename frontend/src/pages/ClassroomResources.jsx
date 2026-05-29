@@ -1,7 +1,10 @@
 import {
   AlertTriangle,
+  ArrowLeft,
   BookOpen,
   CalendarClock,
+  ChevronDown,
+  ChevronUp,
   CheckCircle2,
   ClipboardList,
   Clock,
@@ -22,7 +25,13 @@ import {
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from 'react-router-dom';
 import { toast } from 'sonner';
 import ClassroomHero from '../components/ClassroomHero';
 import ClassroomParticipantsDrawer from '../components/ClassroomParticipantsDrawer';
@@ -153,6 +162,7 @@ function ClassroomResourcesContent({ chatId }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const [chatName, setChatName] = useState('Class Resources');
   const [resourceTitle, setResourceTitle] = useState('');
   const [resourceDescription, setResourceDescription] = useState('');
@@ -161,6 +171,7 @@ function ClassroomResourcesContent({ chatId }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [dragOverMaterials, setDragOverMaterials] = useState(false);
   const [materialCategoryFilter, setMaterialCategoryFilter] = useState('all');
+  const [materialsComposerOpen, setMaterialsComposerOpen] = useState(false);
 
   const [resources, setResources] = useState([]);
   const [canManage, setCanManage] = useState(false);
@@ -171,6 +182,12 @@ function ClassroomResourcesContent({ chatId }) {
 
   const [workspaceTab, setWorkspaceTab] = useState('materials');
 
+  useEffect(() => {
+    if (searchParams.get('tab') === 'assignments') {
+      setWorkspaceTab('assignments');
+    }
+  }, [searchParams]);
+
   const [assignments, setAssignments] = useState([]);
   const [assignmentsMeta, setAssignmentsMeta] = useState({
     canManage: false,
@@ -178,6 +195,7 @@ function ClassroomResourcesContent({ chatId }) {
   });
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [assignmentFormBusy, setAssignmentFormBusy] = useState(false);
+  const [assignmentComposerOpen, setAssignmentComposerOpen] = useState(false);
 
   const [newAssignmentTitle, setNewAssignmentTitle] = useState('');
   const [newAssignmentInstructions, setNewAssignmentInstructions] =
@@ -238,7 +256,7 @@ function ClassroomResourcesContent({ chatId }) {
     const paste = assignmentPaste.trim();
     if (paste) {
       parts.push(
-        `**Assignment / instructions (instructor paste):**\n${paste.slice(0, 4000)}`,
+        `**Extra context:**\n${paste.slice(0, 4000)}`,
       );
     }
     return parts.join('\n\n');
@@ -249,6 +267,12 @@ function ClassroomResourcesContent({ chatId }) {
     creator,
     admins,
   });
+
+  useEffect(() => {
+    if (searchParams.get('liqu') === '1') {
+      setLiquDrawerOpen(true);
+    }
+  }, [searchParams]);
 
   const resourceNamesContext = useMemo(() => {
     const names = resources
@@ -342,7 +366,7 @@ function ClassroomResourcesContent({ chatId }) {
 
     if (assignmentPaste.trim()) {
       parts.push(
-        `Instructor notes / assignment context:\n${assignmentPaste.trim().slice(0, 4000)}`,
+        `Extra context:\n${assignmentPaste.trim().slice(0, 4000)}`,
       );
     }
 
@@ -362,9 +386,10 @@ function ClassroomResourcesContent({ chatId }) {
 
   const liquQuickPrompts = useMemo(
     () => [
-      'Summarize for students',
-      'Draft a class announcement',
-      'Generate study questions',
+      'What are people discussing?',
+      'Summarize announcements',
+      'What material is posted?',
+      'What assignment should I submit?',
     ],
     [],
   );
@@ -376,19 +401,22 @@ function ClassroomResourcesContent({ chatId }) {
         ? `Highlighted material: ${mat.fileName || mat.title} (${mat.fileName ? guessKindFromFileName(mat.fileName) : mat.link ? 'link' : 'material'}).\n`
         : '';
       const pasteBlock = assignmentPaste.trim()
-        ? `Instructor pasted context:\n${assignmentPaste.trim().slice(0, 4000)}\n\n`
+        ? `Extra pasted context:\n${assignmentPaste.trim().slice(0, 4000)}\n\n`
         : '';
       const ctx = `Class: ${chatName}. ${resourceNamesContext}\n${matLine}${pasteBlock}\n`;
       const map = {
-        'Summarize for students':
+        'What are people discussing?':
           ctx +
-          'Write a short, friendly summary of the key ideas students should take away from the current materials. Use clear bullet points.',
-        'Draft a class announcement':
+          'Summarize the recent classroom discussion. Tell me the main topics, questions people asked, and anything I should respond to or follow up on.',
+        'Summarize announcements':
           ctx +
-          'Draft a concise LMS-style announcement (2–4 sentences) highlighting what students should focus on this week.',
-        'Generate study questions':
+          'Summarize the recent announcements in simple student-friendly bullets. Highlight deadlines, important updates, and what I should do next.',
+        'What material is posted?':
           ctx +
-          'Suggest 8 thoughtful study or exam-style questions based on the materials described. Mix comprehension and application.',
+          'List the materials posted in this classroom. Group them by type when possible and explain what each one is useful for.',
+        'What assignment should I submit?':
+          ctx +
+          'Show the assignments I need to submit. Include due dates, submission status if available, and the next action I should take.',
       };
       const prefill = map[label] || `${ctx}${label}`;
       navigate(
@@ -419,7 +447,7 @@ function ClassroomResourcesContent({ chatId }) {
   }, [resources, liquFocusMaterialId]);
 
   useEffect(() => {
-    if (!chatId || !viewerCanManageClassroom) {
+    if (!chatId) {
       setLiquDiscussionMessages([]);
       return;
     }
@@ -447,10 +475,10 @@ function ClassroomResourcesContent({ chatId }) {
     return () => {
       cancelled = true;
     };
-  }, [chatId, viewerCanManageClassroom]);
+  }, [chatId]);
 
   useEffect(() => {
-    if (!chatId || !viewerCanManageClassroom || !liquDrawerOpen) {
+    if (!chatId || !liquDrawerOpen) {
       setLiquAnnouncements([]);
       return;
     }
@@ -478,7 +506,7 @@ function ClassroomResourcesContent({ chatId }) {
     return () => {
       cancelled = true;
     };
-  }, [chatId, viewerCanManageClassroom, liquDrawerOpen]);
+  }, [chatId, liquDrawerOpen]);
 
   const closeSummitModal = useCallback(() => {
     setSubmitModal(null);
@@ -579,13 +607,12 @@ function ClassroomResourcesContent({ chatId }) {
   }, [workspaceTab, loadAssignmentsList]);
 
   useEffect(() => {
-    if (!liquDrawerOpen || !viewerCanManageClassroom) return;
+    if (!liquDrawerOpen) return;
     if (assignments.length > 0) return;
     setLiquAssignmentsLoading(true);
     loadAssignmentsList().finally(() => setLiquAssignmentsLoading(false));
   }, [
     liquDrawerOpen,
-    viewerCanManageClassroom,
     assignments.length,
     loadAssignmentsList,
   ]);
@@ -820,15 +847,6 @@ function ClassroomResourcesContent({ chatId }) {
     setSubmitModal(assignment);
   };
 
-  const openSummitInstructorPreview = (assignment) => {
-    setSubmitSummitPreview(true);
-    setSubmitFile(null);
-    setSubmitNote('');
-    setSubmitAck(false);
-    setSummitDropHover(false);
-    setSubmitModal(assignment);
-  };
-
   const saveGrade = async () => {
     if (!gradeModal?.assignmentId) return;
     setGradeBusy(true);
@@ -873,9 +891,11 @@ function ClassroomResourcesContent({ chatId }) {
   const headerActions = (
     <Link
       to="/classroom"
-      className="btn-secondary px-4 py-2 text-xs font-bold uppercase tracking-wide"
+      className="btn-secondary inline-flex h-9 w-9 items-center justify-center rounded-full p-0"
+      aria-label="All classrooms"
+      title="All classrooms"
     >
-      All classrooms
+      <ArrowLeft className="h-4 w-4" aria-hidden />
     </Link>
   );
 
@@ -916,11 +936,7 @@ function ClassroomResourcesContent({ chatId }) {
 
           <ClassroomTabs
             trailing={tabsTrailingParticipants}
-            liquAction={
-              viewerCanManageClassroom
-                ? { label: 'Liqu AI', onClick: () => setLiquDrawerOpen(true) }
-                : null
-            }
+            liquAction={{ label: 'Liqu AI', onClick: () => setLiquDrawerOpen(true) }}
           />
 
           {loadError ? (
@@ -961,19 +977,35 @@ function ClassroomResourcesContent({ chatId }) {
           {workspaceTab === 'materials' ? (
             <>
               {canManage ? (
-                <section className="rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-white to-indigo-50/35 p-5 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95 md:p-6">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
+                <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-gradient-to-br from-white via-white to-indigo-50/35 shadow-sm dark:border-slate-700 dark:from-slate-900 dark:via-slate-900 dark:to-slate-950/95">
+                  <button
+                    type="button"
+                    onClick={() => setMaterialsComposerOpen((open) => !open)}
+                    className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-white/60 dark:hover:bg-slate-800/60 md:px-6"
+                    aria-expanded={materialsComposerOpen}
+                  >
+                    <div className="min-w-0">
                       <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
                         Share course materials
                       </h3>
                       <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
-                        Drop files, attach links, and tag by academic category so students scan faster.
+                        {materialsComposerOpen
+                          ? 'Drop files, attach links, and tag by academic category so students scan faster.'
+                          : 'Collapsed — open when you want to publish a material.'}
                       </p>
                     </div>
-                  </div>
+                    {materialsComposerOpen ? (
+                      <ChevronUp className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+                    )}
+                  </button>
 
-                  <form onSubmit={submitResource} className="mt-6 space-y-4">
+                  {materialsComposerOpen ? (
+                    <form
+                      onSubmit={submitResource}
+                      className="space-y-4 border-t border-slate-100 px-5 pb-5 pt-4 dark:border-slate-700 md:px-6 md:pb-6"
+                    >
                     <div
                       className={`relative rounded-2xl border-2 border-dashed px-4 py-10 text-center transition ${
                         dragOverMaterials
@@ -1065,7 +1097,8 @@ function ClassroomResourcesContent({ chatId }) {
                     >
                       {saving ? 'Publishing…' : 'Publish material'}
                     </button>
-                  </form>
+                    </form>
+                  ) : null}
                 </section>
               ) : (
                 <section
@@ -1169,7 +1202,6 @@ function ClassroomResourcesContent({ chatId }) {
                       <article
                         key={item.id}
                         className={`fade-in-up flex flex-col rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition hover:border-cyan-200/90 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/70 dark:hover:border-cyan-900 ${
-                          viewerCanManageClassroom &&
                           liquFocusMaterialId === item.id
                             ? 'ring-2 ring-cyan-500/40'
                             : ''
@@ -1200,31 +1232,29 @@ function ClassroomResourcesContent({ chatId }) {
                           </div>
                         </div>
                         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4 dark:border-slate-700/80">
-                          {viewerCanManageClassroom ? (
-                            <button
-                              type="button"
-                              title={
-                                liquFocusMaterialId === item.id
-                                  ? 'Remove Liqu AI highlight'
-                                  : 'Use this file in Liqu AI context'
-                              }
-                              onClick={() =>
-                                setLiquFocusMaterialId((cur) =>
-                                  cur === item.id ? null : item.id,
-                                )
-                              }
-                              className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wide ring-1 transition min-[380px]:flex-none ${
-                                liquFocusMaterialId === item.id
-                                  ? 'bg-cyan-600 text-white ring-cyan-500'
-                                  : 'bg-white text-cyan-800 ring-cyan-200/80 hover:bg-cyan-50 dark:bg-slate-800 dark:text-cyan-200 dark:ring-cyan-900'
-                              }`}
-                            >
-                              <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              {liquFocusMaterialId === item.id
-                                ? 'Liqu focus'
-                                : 'For Liqu'}
-                            </button>
-                          ) : null}
+                          <button
+                            type="button"
+                            title={
+                              liquFocusMaterialId === item.id
+                                ? 'Remove Liqu AI highlight'
+                                : 'Use this file in Liqu AI context'
+                            }
+                            onClick={() =>
+                              setLiquFocusMaterialId((cur) =>
+                                cur === item.id ? null : item.id,
+                              )
+                            }
+                            className={`inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold uppercase tracking-wide ring-1 transition min-[380px]:flex-none ${
+                              liquFocusMaterialId === item.id
+                                ? 'bg-cyan-600 text-white ring-cyan-500'
+                                : 'bg-white text-cyan-800 ring-cyan-200/80 hover:bg-cyan-50 dark:bg-slate-800 dark:text-cyan-200 dark:ring-cyan-900'
+                            }`}
+                          >
+                            <Sparkles className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                            {liquFocusMaterialId === item.id
+                              ? 'Liqu focus'
+                              : 'For Liqu'}
+                          </button>
                           {item.link ? (
                             <a
                               href={item.link}
@@ -1283,19 +1313,37 @@ function ClassroomResourcesContent({ chatId }) {
           ) : (
             <>
               {assignmentsMeta.canManage ? (
-                <section className="rounded-2xl border border-violet-200/90 bg-gradient-to-br from-white via-violet-50/40 to-indigo-50/35 p-5 shadow-sm dark:border-violet-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/40 md:p-6">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <GraduationCap className="h-8 w-8 text-violet-600 dark:text-violet-400" aria-hidden />
-                    <div>
+                <section className="overflow-hidden rounded-2xl border border-violet-200/90 bg-gradient-to-br from-white via-violet-50/40 to-indigo-50/35 shadow-sm dark:border-violet-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-violet-950/40">
+                  <button
+                    type="button"
+                    onClick={() => setAssignmentComposerOpen((open) => !open)}
+                    className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition hover:bg-white/60 dark:hover:bg-slate-800/60 md:px-6"
+                    aria-expanded={assignmentComposerOpen}
+                  >
+                    <div className="flex min-w-0 items-center gap-3">
+                      <GraduationCap className="h-8 w-8 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+                      <div className="min-w-0">
                       <h3 className="font-display text-xl font-bold text-slate-900 dark:text-white">
                         Create assignment
                       </h3>
                       <p className="text-sm text-slate-600 dark:text-slate-400">
-                        Publish expectations, attach a brief, and collect uploads automatically.
+                        {assignmentComposerOpen
+                          ? 'Publish expectations, attach a brief, and collect uploads automatically.'
+                          : 'Collapsed - open when you want to publish an assignment.'}
                       </p>
                     </div>
                   </div>
-                  <form onSubmit={createAssignment} className="mt-6 grid gap-4 md:grid-cols-2">
+                    {assignmentComposerOpen ? (
+                      <ChevronUp className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 shrink-0 text-slate-500" aria-hidden />
+                    )}
+                  </button>
+                  {assignmentComposerOpen ? (
+                    <form
+                      onSubmit={createAssignment}
+                      className="grid gap-4 border-t border-violet-100 px-5 pb-5 pt-4 dark:border-violet-900/40 md:grid-cols-2 md:px-6 md:pb-6"
+                    >
                     <input
                       type="text"
                       placeholder="Assignment title"
@@ -1379,7 +1427,8 @@ function ClassroomResourcesContent({ chatId }) {
                     >
                       {assignmentFormBusy ? 'Publishing…' : 'Publish assignment'}
                     </button>
-                  </form>
+                    </form>
+                  ) : null}
                 </section>
               ) : null}
 
@@ -1543,15 +1592,6 @@ function ClassroomResourcesContent({ chatId }) {
                             ) : null}
                             {assignmentsMeta.canManage ? (
                               <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-2 dark:border-slate-700 sm:border-t-0 sm:pt-0">
-                                <button
-                                  type="button"
-                                  onClick={() => openSummitInstructorPreview(a)}
-                                  className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl border border-violet-300/90 bg-gradient-to-br from-violet-50 to-white px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-violet-950 shadow-sm ring-1 ring-violet-200/80 transition hover:border-violet-400 dark:border-violet-800 dark:from-violet-950/40 dark:to-slate-900 dark:text-violet-100 dark:ring-violet-900 sm:flex-none"
-                                  title="See the student Summit turn-in flow"
-                                >
-                                  <Mountain className="h-4 w-4 shrink-0" aria-hidden />
-                                  Summit
-                                </button>
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -2031,59 +2071,64 @@ function ClassroomResourcesContent({ chatId }) {
         </div>
       ) : null}
 
-      {viewerCanManageClassroom && liquDrawerOpen ? (
+      {liquDrawerOpen ? (
         <>
           <button
             type="button"
-            className="fixed inset-0 z-[199] bg-slate-950/50 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[199] bg-slate-950/35 backdrop-blur-[3px] transition-opacity dark:bg-slate-950/55"
             aria-label="Close Liqu AI"
             onClick={() => setLiquDrawerOpen(false)}
           />
           <div
-            className="fixed inset-y-0 right-0 z-[200] flex w-full max-w-lg flex-col border-l border-slate-200/90 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
+            className="fade-in-up fixed inset-x-0 bottom-0 z-[200] mx-auto flex h-[min(88dvh,46rem)] w-full max-w-5xl flex-col overflow-hidden rounded-t-[2rem] border border-slate-200/90 bg-white shadow-[0_-24px_80px_-28px_rgba(15,23,42,0.55)] dark:border-slate-700 dark:bg-slate-950 md:inset-y-4 md:left-auto md:right-4 md:bottom-auto md:h-[calc(100dvh-2rem)] md:w-[min(92vw,34rem)] md:rounded-[2rem] md:shadow-[0_24px_80px_-24px_rgba(15,23,42,0.65)]"
             role="dialog"
             aria-modal="true"
-            aria-label="Liqu AI for instructors"
+            aria-label="Liqu AI classroom assistant"
           >
-            <div className="flex shrink-0 items-center justify-between border-b border-slate-200/90 px-4 py-3 dark:border-slate-700">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
-                  Instructor · {chatName}
-                </p>
-                <p className="font-display text-lg font-bold text-slate-900 dark:text-white">
-                  Liqu AI
-                </p>
+            <div className="shrink-0 border-b border-slate-200/80 px-4 pb-3 pt-2 dark:border-slate-800 sm:px-6">
+              <div className="mx-auto mb-2 h-1 w-12 rounded-full bg-slate-300 dark:bg-slate-700" />
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">
+                    Classroom assistant
+                  </p>
+                  <h2 className="truncate font-display text-xl font-semibold tracking-tight text-slate-950 dark:text-white">
+                    Liqu AI · {chatName}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLiquDrawerOpen(false)}
+                  className="rounded-full border border-slate-200 bg-white p-2.5 text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white"
+                  aria-label="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setLiquDrawerOpen(false)}
-                className="rounded-xl border border-slate-200 p-2 text-slate-600 dark:border-slate-600 dark:text-slate-300"
-                aria-label="Close"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <details className="mt-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-3 py-2 text-sm dark:border-slate-800 dark:bg-slate-900/60">
+                <summary className="cursor-pointer select-none text-xs font-semibold text-slate-600 transition hover:text-slate-950 dark:text-slate-300 dark:hover:text-white">
+                  Context options
+                </summary>
+                <div className="mt-3 space-y-2">
+                  <textarea
+                    value={assignmentPaste}
+                    onChange={(e) => setAssignmentPaste(e.target.value)}
+                    rows={3}
+                    placeholder="Paste extra context, assignment instructions, or a rubric if you want Liqu AI to use it."
+                    className="w-full resize-y rounded-2xl border border-slate-200 bg-white p-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/15 dark:border-slate-700 dark:bg-slate-950/70 dark:text-slate-100"
+                  />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Optional. Liqu AI already uses classroom discussion, announcements,
+                    materials, and assignments when available.
+                  </p>
+                </div>
+              </details>
             </div>
-            <div className="flex shrink-0 flex-col gap-2 border-b border-slate-200/90 px-4 py-3 dark:border-slate-700">
-              <label className="text-[11px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Assignment context (optional paste)
-              </label>
-              <textarea
-                value={assignmentPaste}
-                onChange={(e) => setAssignmentPaste(e.target.value)}
-                rows={3}
-                placeholder="Paste assignment instructions or a rubric excerpt — included in Liqu context and quick actions."
-                className="w-full resize-y rounded-xl border border-slate-200 bg-slate-50/90 p-2.5 text-xs text-slate-800 placeholder:text-slate-400 dark:border-slate-600 dark:bg-slate-950/60 dark:text-slate-100"
-              />
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                Use “For Liqu” on a material card to include that file in context
-                and quick actions.
-              </p>
-            </div>
-            <div className="min-h-0 flex-1 overflow-hidden px-2 pb-3 pt-2">
+            <div className="min-h-0 flex-1 overflow-hidden px-3 pb-4 pt-3 sm:px-5">
               <LiquAiChatPanel
                 variant="gemini"
-                className="h-[calc(100vh-8rem)] min-h-[420px]"
-                bookTitle={`Classroom: ${chatName}`}
+                className="h-full min-h-0"
+                bookTitle={chatName}
                 contextBlurb={liquContextBlurb}
                 requestContext={liquRequestContext}
                 contextScope="classroom"

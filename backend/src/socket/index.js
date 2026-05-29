@@ -195,7 +195,16 @@ export const initSocketServer = async (server, sessionMiddleware) => {
     });
 
     // ── AI streaming chat ────────────────────────────────────────────────────
-    socket.on('ai:chat', async ({ messages, sessionId, bookId, mode, contextScope }) => {
+    socket.on('ai:chat', async ({
+      messages,
+      sessionId,
+      bookId,
+      mode,
+      contextScope,
+      pageNumber,
+      selectedText,
+      chapterFilter,
+    }) => {
       try {
         const result = await generateLiquAiReply({
           messages,
@@ -205,6 +214,9 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           contextScope,
           user,
           userId: user._id,
+          pageNumber,
+          selectedText,
+          chapterFilter,
         });
         socket.emit('ai:sessionId', { sessionId: result.sessionId });
         socket.emit('ai:chunk', { chunk: result.response });
@@ -212,6 +224,9 @@ export const initSocketServer = async (server, sessionMiddleware) => {
           fullResponse: result.response,
           sessionId: result.sessionId,
           references: result.references,
+          ragUsed: result.ragUsed,
+          ragNote: result.ragNote,
+          grounding: result.grounding,
         });
       } catch (err) {
         console.error('ai:chat socket error:', err);

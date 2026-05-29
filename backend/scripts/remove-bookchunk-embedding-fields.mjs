@@ -1,11 +1,3 @@
-/**
- * One-time migration: remove legacy embedding fields from `bookchunks`.
- *
- * Run:
- *   node scripts/remove-bookchunk-embedding-fields.mjs
- *
- * Requires MONGODB_URL or MONGODB_URI in .env.
- */
 import "dotenv/config";
 import mongoose from "mongoose";
 

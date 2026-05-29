@@ -1,9 +1,28 @@
 import mongoose from 'mongoose';
 
+const referenceSchema = new mongoose.Schema(
+  {
+    bookId: { type: String, default: '' },
+    bookTitle: { type: String, default: '' },
+    excerptNumber: { type: Number, default: 0 },
+    chapter: { type: String, default: '' },
+    section: { type: String, default: '' },
+    pageStart: { type: Number, default: null },
+    pageEnd: { type: Number, default: null },
+  },
+  { _id: false },
+);
+
 const messageSchema = new mongoose.Schema(
   {
     role: { type: String, enum: ['user', 'assistant'], required: true },
     content: { type: String, required: true },
+    references: { type: [referenceSchema], default: undefined },
+    grounding: {
+      type: String,
+      enum: ['book', 'library', 'none'],
+      default: undefined,
+    },
   },
   { timestamps: true },
 );

@@ -32,13 +32,16 @@ import {
   UserRound,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import defaultProfile from '../assets/profile.png';
 import { useAuth } from '../contexts/AuthContext';
 import { getStoredThemePreference, setThemePreference } from '../theme.js';
-import { getPasswordStrength } from '../utils/passwordStrength';
+import {
+  getPasswordStrength,
+  validateCampusPassword,
+} from '../utils/passwordStrength';
 
 const LOCAL_SETTINGS_KEY = 'ush-settings-preferences-v2';
 
@@ -354,6 +357,7 @@ function Settings() {
   const [modelId, setModelId] = useState(user?.geminiModelId ?? '');
   const [showKey, setShowKey] = useState(false);
   const [models, setModels] = useState([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
   const [testingKey, setTestingKey] = useState(false);
   const [savingKey, setSavingKey] = useState(false);
 
@@ -396,7 +400,33 @@ function Settings() {
     });
     setResetEmail(user?.email || '');
     setModelId(user?.geminiModelId || '');
+    if (user?.geminiConfigured) {
+      setApiKey('');
+    }
   }, [user]);
+
+  const loadModels = useCallback(async () => {
+    setModelsLoading(true);
+    try {
+      const res = await fetch('/api/ai/models', { credentials: 'include' });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload.message || 'Could not load AI models.');
+      }
+      setModels(Array.isArray(payload.models) ? payload.models : []);
+    } catch (error) {
+      setModels([]);
+      toast.error(error.message || 'Could not load AI models.');
+    } finally {
+      setModelsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user?.id) {
+      loadModels();
+    }
+  }, [user?.id, loadModels]);
 
   useEffect(() => {
     let active = true;
@@ -576,8 +606,9 @@ function Settings() {
       toast.error('New passwords do not match.');
       return;
     }
-    if (newPassword.length < 8) {
-      toast.error('New password must be at least 8 characters.');
+    const passwordCheck = validateCampusPassword(newPassword);
+    if (!passwordCheck.valid) {
+      toast.error(passwordCheck.message);
       return;
     }
 
@@ -1327,7 +1358,13 @@ function Settings() {
                   </div>
                   <div className="mt-4 space-y-3">
                     {[
-                      ['This browser', 'Africa/Addis_Ababa timezone', Monitor],
+                      [
+                        'This browser',
+                        typeof Intl !== 'undefined'
+                          ? `${Intl.DateTimeFormat().resolvedOptions().timeZone} timezone`
+                          : 'Your local timezone',
+                        Monitor,
+                      ],
                       ['Recent login', 'Email or Google sign-in', History],
                     ].map(([title, subtitle, Icon]) => (
                       <div
@@ -1440,7 +1477,7 @@ function Settings() {
                         byokActive ? 'success' : 'info',
                       )}`}
                     >
-                      {byokActive ? 'Legacy key detected' : 'Server-managed'}
+                      {byokActive ? 'Your key active' : 'Server-managed'}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
@@ -1453,7 +1490,11 @@ function Settings() {
                         type={showKey ? 'text' : 'password'}
                         value={apiKey}
                         onChange={(event) => setApiKey(event.target.value)}
-                        placeholder="AIza..."
+                        placeholder={
+                          byokActive
+                            ? 'Key saved — enter a new key to replace'
+                            : 'AIza...'
+                        }
                         className="input-field pr-11 text-sm"
                         autoComplete="off"
                       />
@@ -1474,8 +1515,13 @@ function Settings() {
                       value={modelId}
                       onChange={(event) => setModelId(event.target.value)}
                       className="input-field text-sm"
+                      disabled={modelsLoading}
                     >
-                      <option value="">Default server model</option>
+                      <option value="">
+                        {modelsLoading
+                          ? 'Loading models...'
+                          : 'Default server model'}
+                      </option>
                       {models.map((model) => (
                         <option key={model.name} value={model.name}>
                           {model.displayName || model.name}
@@ -1503,7 +1549,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={clearByok}
-                      disabled={savingKey}
+                      disabled={savingKey || !byokActive}
                       className="btn-secondary px-4 py-2.5 text-sm text-rose-600 disabled:opacity-50"
                     >
                       Clear key

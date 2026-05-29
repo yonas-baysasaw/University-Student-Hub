@@ -105,11 +105,18 @@ async function createVaultQuestion(req, res, next) {
       });
     }
 
+    const ca = Number(correctAnswer);
+    if (!Number.isFinite(ca) || ca < 0 || ca >= opts.length) {
+      return res.status(400).json({
+        message: 'correctAnswer must be a valid option index.',
+      });
+    }
+
     const doc = await PersonalMcq.create({
       owner: userId,
       question: question.trim(),
       options: opts,
-      correctAnswer: Number(correctAnswer),
+      correctAnswer: Math.floor(ca),
       explanation: explanation != null ? String(explanation).trim() : '',
       subject: subject != null ? String(subject).trim() : '',
       topic: topic != null ? String(topic).trim() : '',
@@ -353,6 +360,33 @@ async function practiceBatch(req, res, next) {
       Math.max(1, Number(req.body?.count) || 10),
     );
     const subject = String(req.body?.subject || '').trim();
+    const questionIds = Array.isArray(req.body?.questionIds)
+      ? req.body.questionIds.map(String).filter(Boolean)
+      : [];
+
+    if (questionIds.length > 0) {
+      const rows = await PersonalMcq.find({
+        _id: { $in: questionIds },
+        owner: userId,
+      }).lean();
+
+      if (rows.length === 0) {
+        return res.json({ questions: [], total: 0 });
+      }
+
+      const shuffled = rows.sort(() => Math.random() - 0.5);
+      const sample = shuffled.slice(0, Math.min(count, shuffled.length));
+      const questions = sample.map((r, i) => ({
+        id: r._id,
+        questionIndex: i,
+        question: r.question,
+        options: r.options,
+        correctAnswer: r.correctAnswer,
+        explanation: r.explanation ?? '',
+      }));
+
+      return res.json({ questions, total: rows.length });
+    }
 
     const filter = { owner: userId };
     if (subject) filter.subject = new RegExp(subject, 'i');

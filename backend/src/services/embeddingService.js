@@ -1,7 +1,23 @@
 import { ENV } from '../config/env.js';
+import { resolveGeminiCredentialsForUser } from './geminiService.js';
 
 function normalizeForEmbedding(text) {
   return String(text || '').replace(/\s+/g, ' ').trim();
+}
+
+function resolveEmbedCredentials(credentials) {
+  if (credentials?.apiKey) {
+    return {
+      apiKey: String(credentials.apiKey).trim(),
+      modelId:
+        String(credentials.embedModelId || ENV.GEMINI_EMBED_MODEL_ID || 'text-embedding-004').trim(),
+    };
+  }
+  const resolved = resolveGeminiCredentialsForUser(credentials || null);
+  return {
+    apiKey: resolved.apiKey,
+    modelId: String(ENV.GEMINI_EMBED_MODEL_ID || 'text-embedding-004').trim(),
+  };
 }
 
 export function cosineSimilarity(a, b) {
@@ -23,14 +39,19 @@ export function cosineSimilarity(a, b) {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
-export async function embedText(text) {
+/**
+ * @param {string} text
+ * @param {{ apiKey?: string; embedModelId?: string; geminiApiKey?: string; geminiModelId?: string } | null} [credentials]
+ */
+export async function embedText(text, credentials = null) {
   const input = normalizeForEmbedding(text);
   if (!input) return null;
 
-  const apiKey = String(ENV.GEMINI_API_KEY || '').trim();
-  const modelId = String(ENV.GEMINI_EMBED_MODEL_ID || 'text-embedding-004').trim();
+  const { apiKey, modelId } = resolveEmbedCredentials(credentials);
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is missing on the server.');
+    throw new Error(
+      'GEMINI_API_KEY is missing. Add your key in Settings or set it on the server.',
+    );
   }
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:embedContent?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
@@ -55,7 +76,42 @@ export async function embedText(text) {
   return emb.map((x) => Number(x || 0));
 }
 
-export async function rewriteQueryForSearch(query) {
+/**
+ * Embed many texts with bounded concurrency.
+ * @param {string[]} texts
+ * @param {object | null} [credentials]
+ * @param {number} [concurrency=5]
+ */
+export async function embedTexts(texts, credentials = null, concurrency = 5) {
+  const list = Array.isArray(texts) ? texts : [];
+  const out = new Array(list.length);
+  let i = 0;
+
+  async function worker() {
+    while (i < list.length) {
+      const idx = i;
+      i += 1;
+      try {
+        out[idx] = (await embedText(list[idx], credentials)) || [];
+      } catch {
+        out[idx] = [];
+      }
+    }
+  }
+
+  const workers = Array.from(
+    { length: Math.min(concurrency, Math.max(1, list.length)) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return out;
+}
+
+/**
+ * @param {string} query
+ * @param {Array<{ role: string, content: string }>} [messages]
+ */
+export async function rewriteQueryForSearch(query, messages = []) {
   const q = String(query || '').trim();
   if (!q) return '';
 
@@ -67,7 +123,26 @@ export async function rewriteQueryForSearch(query) {
     .replace(/\s+/g, ' ')
     .trim();
 
+  const recent = (Array.isArray(messages) ? messages : [])
+    .filter((m) => m.role === 'user' && typeof m.content === 'string')
+    .slice(-3, -1)
+    .map((m) => m.content.trim())
+    .filter(Boolean);
+
+  if (recent.length && rewritten.length < 40) {
+    rewritten = `${recent.join(' ')} ${rewritten}`.replace(/\s+/g, ' ').trim();
+  }
+
   if (!/[?.!]$/.test(rewritten)) rewritten = `${rewritten}?`;
   if (rewritten.length < 12) return q;
   return rewritten;
+}
+
+export function expandQueryFromMessages(messages) {
+  const users = (Array.isArray(messages) ? messages : [])
+    .filter((m) => m.role === 'user' && typeof m.content === 'string')
+    .map((m) => m.content.trim())
+    .filter(Boolean);
+  if (!users.length) return '';
+  return users.slice(-3).join('\n');
 }

@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import AuthShell from '../components/AuthShell';
+import {
+  AuthAlert,
+  AuthField,
+  AuthInlineLink,
+  AuthPrimaryButton,
+  CampusAuthLayout,
+} from '../components/auth/campusAuth';
 import { useAuth } from '../contexts/AuthContext';
 
 function PasswordReset() {
@@ -9,11 +15,19 @@ function PasswordReset() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sent, setSent] = useState(false);
+
+  useEffect(() => {
+    if (user?.email) {
+      setEmail(user.email);
+    }
+  }, [user?.email]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError('');
     setStatus('');
+    setSent(false);
 
     const trimmedEmail = email.trim();
     if (!trimmedEmail) {
@@ -33,12 +47,12 @@ function PasswordReset() {
       if (!res.ok) {
         throw new Error(payload.message || 'Unable to send reset link.');
       }
+      setSent(true);
       setStatus(
         payload.message ||
           'If an account exists for this email, we sent reset instructions.',
       );
     } catch (submitError) {
-      console.error(submitError);
       setError(submitError.message || 'Unable to send reset email.');
     } finally {
       setLoading(false);
@@ -46,45 +60,60 @@ function PasswordReset() {
   };
 
   return (
-    <AuthShell
+    <CampusAuthLayout
+      mode="reset"
       title="Reset password"
-      subtitle="We email you a secure link that opens our set-new-password page"
-    >
-      <form className="space-y-4" onSubmit={handleSubmit}>
-        <input
-          type="email"
-          placeholder="Email address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="input-field text-sm"
-        />
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="btn-primary h-11 w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loading ? 'Sending email…' : 'Email password reset link'}
-        </button>
-
-        {(error || status) && (
-          <p
-            className={`rounded-xl px-3 py-2 text-center text-sm ${error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'}`}
-          >
-            {error || status}
-          </p>
-        )}
-      </form>
-
-      <div className="mt-4 text-center text-sm">
+      subtitle="We'll email you a secure link to set a new password"
+      showTabs={false}
+      footer={
         <Link
           to={user ? '/' : '/login'}
-          className="font-medium text-slate-500 transition hover:text-slate-700 hover:underline dark:text-slate-400 dark:hover:text-slate-200"
+          className="auth-campus-link"
         >
           {user ? 'Back to dashboard' : 'Back to sign in'}
         </Link>
-      </div>
-    </AuthShell>
+      }
+    >
+      <p className="auth-campus-hint">
+        Accounts that only use{' '}
+        <strong>Continue with Google</strong> do not receive reset emails until
+        you add a campus password via reset, or sign in with Google.
+      </p>
+
+      <form className="auth-campus-form-stack" onSubmit={handleSubmit}>
+        {(error || status) && (
+          <AuthAlert type={error ? 'error' : 'success'}>
+            {error || status}
+          </AuthAlert>
+        )}
+
+        {sent ? (
+          <p className="auth-campus-hint">
+            Check your inbox and spam folder. The link expires in one hour.
+          </p>
+        ) : null}
+
+        <AuthField
+          id="reset-email"
+          label="Email address"
+          type="email"
+          placeholder="Enter your email address"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          autoComplete="email"
+          disabled={sent}
+        />
+
+        <AuthPrimaryButton loading={loading} disabled={sent}>
+          {loading ? 'Sending email…' : 'Email password reset link'}
+        </AuthPrimaryButton>
+      </form>
+
+      <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+        Remember your password?{' '}
+        <AuthInlineLink to="/login">Sign in</AuthInlineLink>
+      </p>
+    </CampusAuthLayout>
   );
 }
 

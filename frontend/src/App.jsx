@@ -11,6 +11,7 @@ import Navbar from './components/Navbar';
 import AdminRoute from './components/AdminRoute';
 import SupportChatWidget from './components/SupportChatWidget';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { NotificationsProvider } from './contexts/NotificationsContext';
 import { ProcessingProvider } from './contexts/ProcessingContext';
 import { SocketProvider } from './contexts/SocketContext';
 import AdminAnalytics from './pages/admin/AdminAnalytics.jsx';
@@ -41,6 +42,7 @@ import Home from './pages/Home';
 import Landing from './pages/Landing';
 import Library from './pages/Library';
 import LiquAI from './pages/LiquAI';
+import CampusAuthRoute from './components/auth/CampusAuthRoute';
 import Login from './pages/login';
 import NotFound from './pages/NotFound';
 import Notifications from './pages/Notifications';
@@ -83,7 +85,8 @@ function AppRoutes() {
 
   if (user) {
     return (
-      <Navbar>
+      <NotificationsProvider>
+        <Navbar>
         <SupportChatWidget />
         <div key={location.pathname} className="route-fade">
           <Routes>
@@ -176,8 +179,8 @@ function AppRoutes() {
 
   return (
     <>
-      {!hideGlobalNavForLanding && <Nav />}
-      <div key={location.pathname} className="route-fade">
+      {!hideGlobalNav && <Nav />}
+      <div key={routeFadeKey} className="route-fade">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/admin/signup" element={<AdminSignup />} />
@@ -186,8 +189,10 @@ function AppRoutes() {
             path="/admin"
             element={<Navigate to="/admin/login?next=/admin" replace />}
           />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+          <Route element={<CampusAuthRoute />}>
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+          </Route>
           <Route path="/password/reset" element={<PasswordReset />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/reset-password/:token" element={<Reset />} />

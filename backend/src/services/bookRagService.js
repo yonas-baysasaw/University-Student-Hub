@@ -362,6 +362,10 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
     return;
   }
 
+  const credentials = userLikeFromCredentials(
+    await loadUserGeminiCredentials(userId),
+  );
+
   const bookDoc = await findAccessibleBookDocument(bookId, userId);
   if (!bookDoc) {
     ragLog(
@@ -413,6 +417,7 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
     ragLog(String(bookId), 'extracting', 'textFromBuffer finished', {
       ms: Date.now() - tExtract,
       textChars: text?.length ?? 0,
+      pageCount: pages.length,
     });
     if (!text || text.trim().length < MIN_TEXT_TO_INDEX) {
       ragLog(
@@ -427,8 +432,9 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
       await patchBookRagFields(bid, {
         ragIndexStatus: 'failed',
         ragIndexPhase: '',
-        ragIndexError:
+        ragIndexError: mapRagErrorToUserMessage(
           'Not enough extractable text (scanned PDFs or unsupported format).',
+        ),
         ragIndexTotalChunks: 0,
         ragIndexDoneChunks: 0,
         ragIndexProgressPercent: 0,
@@ -445,6 +451,7 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
     ragLog(String(bookId), 'chunking', 'splitTextForRagEmbedding done', {
       pieces: pieces.length,
       ms: Date.now() - tChunk,
+      chapters: chapterMap.length,
     });
     if (pieces.length === 0) {
       await patchBookRagFields(bid, {
@@ -514,6 +521,9 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
       ragIndexError: '',
       ragIndexedAt: new Date(),
       ragIndexProgressPercent: 100,
+      ragPageCount: pages.length || null,
+      ragChapterMap: chapterMap,
+      ragPrepVersion: RAG_PREP_VERSION,
     });
     ragLog(String(bookId), 'ready', 'ragIndexStatus=ready');
   } catch (e) {
@@ -526,7 +536,7 @@ export async function runRagIndexPipeline(bookId, userId, userLike) {
     await patchBookRagFields(bid, {
       ragIndexStatus: 'failed',
       ragIndexPhase: '',
-      ragIndexError: msg,
+      ragIndexError: mapRagErrorToUserMessage(msg),
       ragIndexProgressPercent: 0,
     });
   }
@@ -615,6 +625,55 @@ export async function scheduleRagIndexForBook(bookId, userId, userLike) {
   return { started: true, bookId: String(bookId) };
 }
 
+function buildChapterOutlineFromMap(bookTitle, chapterMap, bookId, bookUrl) {
+  const chapters = sortChapterMap(chapterMap).filter((ch) =>
+    String(ch?.title || '').trim(),
+  );
+  if (!chapters.length) return null;
+
+  const lines = chapters.map((ch, i) => {
+    const title = String(ch.title).trim();
+    const ps = ch.pageStart;
+    const pe = ch.pageEnd;
+    let pageSuffix = '';
+    if (ps != null && Number.isFinite(Number(ps))) {
+      if (pe != null && Number.isFinite(Number(pe)) && pe !== ps) {
+        pageSuffix = ` (pages ${ps}–${pe})`;
+      } else {
+        pageSuffix = ` (page ${ps})`;
+      }
+    }
+    return `${i + 1}. ${title}${pageSuffix}`;
+  });
+
+  const heading = bookTitle?.trim()
+    ? `Chapter outline for **${bookTitle.trim()}**`
+    : 'Chapter outline for this book';
+
+  const firstPage = chapters.find((ch) => ch.pageStart != null)?.pageStart ?? null;
+  const lastPage =
+    [...chapters].reverse().find((ch) => ch.pageEnd != null)?.pageEnd ?? firstPage;
+
+  return {
+    context: `${heading}:\n\n${lines.join('\n')}`,
+    directResponse: formatChapterOutlineReply(bookTitle, chapters),
+    references: [
+      {
+        bookId: String(bookId),
+        bookTitle: bookTitle || 'Untitled',
+        bookUrl: String(bookUrl || ''),
+        chunkIndex: 0,
+        excerptNumber: 1,
+        score: 1,
+        chapter: '',
+        section: 'Chapter outline',
+        pageStart: firstPage,
+        pageEnd: lastPage,
+      },
+    ],
+  };
+}
+
 /**
  * @param {string} bookId
  * @param {import('mongoose').Types.ObjectId} userId
@@ -698,6 +757,18 @@ export async function augmentMessagesWithBookRag(
       ragNote: 'index_required',
     };
   }
+
+  if (directResponse) {
+    return {
+      messages: [...messages],
+      ragUsed: true,
+      ragNote: 'chapter_outline',
+      references: references || [],
+      grounding: 'book',
+      directResponse,
+    };
+  }
+
   if (!context) {
     return { messages: [...messages], ragUsed: false, ragNote: reason };
   }
@@ -741,7 +812,7 @@ export async function getRagIndexStatus(bookId, userId) {
     ...canReadBookFilter(userId),
   })
     .select(
-      'title ragIndexStatus ragIndexPhase ragIndexTotalChunks ragIndexDoneChunks ragIndexError ragIndexedAt ragIndexProgressPercent',
+      'title ragIndexStatus ragIndexPhase ragIndexTotalChunks ragIndexDoneChunks ragIndexError ragIndexedAt ragIndexProgressPercent ragPageCount ragChapterMap ragPrepVersion',
     )
     .lean();
   if (!book) {
@@ -761,9 +832,13 @@ export async function getRagIndexStatus(bookId, userId) {
     ragIndexTotalChunks: book.ragIndexTotalChunks ?? 0,
     ragIndexDoneChunks: book.ragIndexDoneChunks ?? 0,
     ragIndexProgressPercent: legacyRagIndexPercentEstimate(book),
-    ragIndexError: book.ragIndexError || '',
+    ragIndexError: mapRagErrorToUserMessage(book.ragIndexError || ''),
     ragIndexedAt: book.ragIndexedAt
       ? new Date(book.ragIndexedAt).toISOString()
       : null,
+    ragPageCount: book.ragPageCount ?? 0,
+    ragChapterMap: Array.isArray(book.ragChapterMap) ? book.ragChapterMap : [],
+    ragPrepVersion: book.ragPrepVersion ?? 0,
+    needsReindex: (book.ragPrepVersion ?? 0) < RAG_PREP_VERSION,
   };
 }
