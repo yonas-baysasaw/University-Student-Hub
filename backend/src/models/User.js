@@ -21,8 +21,25 @@ const userSchema = new mongoose.Schema(
     password: {
       type: String,
     },
+    resetPasswordToken: {
+      type: String,
+      index: true,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
     avatar: {
       type: String,
+    },
+    geminiApiKey: {
+      type: String,
+      trim: true,
+      default: '',
+    },
+    geminiModelId: {
+      type: String,
+      trim: true,
+      default: '',
     },
     email_verified: {
       type: Boolean,

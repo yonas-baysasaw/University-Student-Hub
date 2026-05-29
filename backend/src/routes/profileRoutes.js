@@ -202,7 +202,23 @@ router.post(
 
 /* ===== Get Current User Profile ===== */
 router.get('/', ensureAuth, (req, res) => {
-  res.json(serializeCurrentUser(req.user));
+  const photo = req.user.avatar;
+  const geminiConfigured = !!String(req.user.geminiApiKey || '').trim();
+
+  res.json({
+    id: req.user._id,
+    username: req.user.username,
+    name: req.user.name,
+    email: req.user.email,
+    displayName: req.user.displayName,
+    provider: req.user.provider,
+    photo,
+    avatar: req.user.avatar || null,
+    lastSeen: req.user.lastSeen || null,
+    geminiConfigured,
+    geminiModelId: req.user.geminiModelId || '',
+    hasLocalPassword: !!req.user.password,
+  });
 });
 
 /** Directory search for host invite pickers (min 2 chars). */
@@ -442,6 +458,18 @@ router.put(
     }
     if (skills !== undefined) req.user.skills = skills;
 
+    const geminiApiKey = readOptionalTrimmedString(req.body, 'geminiApiKey', 4096);
+    if (geminiApiKey === null) {
+      return res.status(400).json({ message: 'Invalid geminiApiKey' });
+    }
+    if (geminiApiKey !== undefined) req.user.geminiApiKey = geminiApiKey;
+
+    const geminiModelId = readOptionalTrimmedString(req.body, 'geminiModelId', 128);
+    if (geminiModelId === null) {
+      return res.status(400).json({ message: 'Invalid geminiModelId' });
+    }
+    if (geminiModelId !== undefined) req.user.geminiModelId = geminiModelId;
+
     const socialKeys = [
       ['socialGitHub', 'socialGitHub'],
       ['socialUpwork', 'socialUpwork'],
@@ -458,32 +486,51 @@ router.put(
       if (v !== undefined) req.user[docKey] = v;
     }
 
-    const phone = readOptionalTrimmedString(req.body, 'phone', 40);
-    if (phone === null) {
-      return res.status(400).json({ message: 'Invalid phone' });
-    }
-    if (phone !== undefined) req.user.phone = phone;
-
-    const campus = readOptionalTrimmedString(req.body, 'campus', 120);
-    if (campus === null) {
-      return res.status(400).json({ message: 'Invalid campus' });
-    }
-    if (campus !== undefined) req.user.campus = campus;
-
-    const emergencyContact = readOptionalTrimmedString(
-      req.body,
-      'emergencyContact',
-      200,
-    );
-    if (emergencyContact === null) {
-      return res.status(400).json({ message: 'Invalid emergencyContact' });
-    }
-    if (emergencyContact !== undefined) {
-      req.user.emergencyContact = emergencyContact;
+    if (username !== undefined) {
+      const nextUsername = String(username).trim();
+      if (!nextUsername) {
+        return res.status(400).json({ message: 'Username cannot be empty' });
+      }
+      if (nextUsername.length < 3 || nextUsername.length > 32) {
+        return res
+          .status(400)
+          .json({ message: 'Username must be between 3 and 32 characters' });
+      }
+      const taken = await User.findOne({
+        username: nextUsername,
+        _id: { $ne: req.user._id },
+      })
+        .select('_id')
+        .lean();
+      if (taken) {
+        return res.status(409).json({ message: 'Username is already taken' });
+      }
+      req.user.username = nextUsername;
     }
 
-    if (username !== undefined) req.user.username = username;
-    if (displayName !== undefined) req.user.displayName = displayName;
+    if (name !== undefined || displayName !== undefined) {
+      const rawName = name ?? displayName;
+      const nextName = String(rawName).trim();
+      if (!nextName) {
+        return res.status(400).json({ message: 'Name cannot be empty' });
+      }
+      if (nextName.length > 80) {
+        return res
+          .status(400)
+          .json({ message: 'Name must be 80 characters or fewer' });
+      }
+      req.user.name = nextName;
+    }
+
+    if (avatar !== undefined) {
+      const nextAvatar = String(avatar || '').trim();
+      if (nextAvatar.length > 2048) {
+        return res
+          .status(400)
+          .json({ message: 'Avatar URL is too long (max 2048 chars)' });
+      }
+      req.user.avatar = nextAvatar || '';
+    }
 
     if (req.user.accountType === 'student') {
       if (department !== undefined) {

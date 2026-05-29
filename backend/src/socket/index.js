@@ -206,13 +206,13 @@ export const initSocketServer = async (server, sessionMiddleware) => {
       chapterFilter,
     }) => {
       try {
-        assertCanWrite(user);
         const result = await generateLiquAiReply({
           messages,
           sessionId,
           bookId,
           mode,
           contextScope,
+          user,
           userId: user._id,
           pageNumber,
           selectedText,

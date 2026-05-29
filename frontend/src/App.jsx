@@ -171,25 +171,11 @@ function AppRoutes() {
           </Routes>
         </div>
       </Navbar>
-      </NotificationsProvider>
+      
     );
   }
-
-  const campusAuthPaths = [
-    '/login',
-    '/signup',
-    '/password/reset',
-    '/verify-email',
-  ];
-  const isCampusAuthPage =
-    campusAuthPaths.includes(location.pathname) ||
-    location.pathname.startsWith('/reset-password/');
-  const hideGlobalNav =
-    location.pathname === '/' || isCampusAuthPage;
-  const campusAuthTabPaths = ['/login', '/signup'];
-  const routeFadeKey = campusAuthTabPaths.includes(location.pathname)
-    ? 'campus-auth'
-    : location.pathname;
+// hi this is yabsra
+  const hideGlobalNavForLanding = location.pathname === '/';
 
   return (
     <>

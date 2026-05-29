@@ -80,7 +80,7 @@ const faqItems = [
   {
     question: 'Can I use my own AI key?',
     answer:
-      'Yes. Add your Google Gemini API key under Settings → Liqu AI access. Your key is stored encrypted and used for Liqu AI chat. If you clear it, the assistant falls back to the server-managed key.',
+      'Yes. You can test, save, and clear a Gemini key in Settings. If you leave it empty, Liqu AI keeps using the server-managed default.',
   },
 ];
 
@@ -429,6 +429,31 @@ function Settings() {
   }, [user?.id, loadModels]);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadAiModels() {
+      try {
+        const res = await fetch('/api/ai/models', { credentials: 'include' });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(payload.message || 'Could not load AI models.');
+        }
+        if (active) {
+          setModels(Array.isArray(payload.models) ? payload.models : []);
+        }
+      } catch {
+        if (active) setModels([]);
+      }
+    }
+
+    loadAiModels();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id]);
+
+  useEffect(() => {
     saveLocalSettings(user?.id, localSettings);
   }, [localSettings, user?.id]);
 
@@ -635,61 +660,66 @@ function Settings() {
   }
 
   async function testKey() {
-    const trimmedKey = apiKey.trim();
-    if (!trimmedKey) {
-      toast.error('Enter a Gemini API key to test.');
+    const nextApiKey = apiKey.trim();
+    if (!nextApiKey) {
+      toast.error('Enter an API key to test.');
       return;
     }
     setTestingKey(true);
     try {
-      const res = await fetch('/api/profile/gemini/test', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: trimmedKey }),
-      });
+      const res = await fetch(
+        `/api/ai/models?apiKey=${encodeURIComponent(nextApiKey)}`,
+        { credentials: 'include' },
+      );
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.message || 'API key test failed.');
+        throw new Error(payload.message || 'Could not test API key.');
       }
-      if (Array.isArray(payload.models) && payload.models.length > 0) {
-        setModels(payload.models);
+      const nextModels = Array.isArray(payload.models) ? payload.models : [];
+      setModels(nextModels);
+      if (!modelId && nextModels[0]?.name) {
+        setModelId(nextModels[0].name);
       }
-      toast.success(payload.message || 'API key is valid.');
+      toast.success(
+        nextModels.length
+          ? `API key works. Found ${nextModels.length} model${nextModels.length === 1 ? '' : 's'}.`
+          : 'API key works.',
+      );
     } catch (error) {
-      toast.error(error.message || 'API key test failed.');
+      toast.error(error.message || 'Could not test API key.');
     } finally {
       setTestingKey(false);
     }
   }
 
   async function saveByok() {
-    const trimmedKey = apiKey.trim();
-    if (!trimmedKey) {
-      toast.error('Enter a Gemini API key to save.');
+    const nextApiKey = apiKey.trim();
+    const nextModelId = modelId.trim();
+    if (!nextApiKey && !byokActive) {
+      toast.error('Enter an API key before saving.');
       return;
     }
     setSavingKey(true);
     try {
-      const res = await fetch('/api/profile/gemini', {
+      const body = { geminiModelId: nextModelId };
+      if (nextApiKey) {
+        body.geminiApiKey = nextApiKey;
+      }
+
+      const res = await fetch('/api/profile', {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey: trimmedKey, modelId: modelId.trim() }),
+        body: JSON.stringify(body),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.message || 'Could not save Liqu AI settings.');
+        throw new Error(payload.message || 'Could not save AI settings.');
       }
-      setApiKey('');
-      if (payload.user?.geminiModelId) {
-        setModelId(payload.user.geminiModelId);
-      }
+      toast.success('Custom AI key saved.');
       await refreshAuth();
-      await loadModels();
-      toast.success(payload.message || 'Liqu AI settings saved.');
     } catch (error) {
-      toast.error(error.message || 'Could not save Liqu AI settings.');
+      toast.error(error.message || 'Could not save AI settings.');
     } finally {
       setSavingKey(false);
     }
@@ -698,21 +728,23 @@ function Settings() {
   async function clearByok() {
     setSavingKey(true);
     try {
-      const res = await fetch('/api/profile/gemini', {
-        method: 'DELETE',
+      const res = await fetch('/api/profile', {
+        method: 'PUT',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ geminiApiKey: '', geminiModelId: '' }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(payload.message || 'Could not clear Liqu AI key.');
+        throw new Error(payload.message || 'Could not clear AI key.');
       }
       setApiKey('');
       setModelId('');
+      setModels([]);
+      toast.success('Custom AI key cleared.');
       await refreshAuth();
-      await loadModels();
-      toast.success(payload.message || 'Liqu AI key cleared.');
     } catch (error) {
-      toast.error(error.message || 'Could not clear Liqu AI key.');
+      toast.error(error.message || 'Could not clear AI key.');
     } finally {
       setSavingKey(false);
     }
@@ -1449,9 +1481,8 @@ function Settings() {
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Add your Google Gemini API key to use your own quota for Liqu
-                    AI chat. Leave the model on default to use the server&apos;s
-                    preferred model when no override is set.
+                    Use your own Gemini key, or leave it empty to keep the
+                    server-managed default.
                   </p>
                   <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_14rem]">
                     <div className="relative">
@@ -1510,7 +1541,7 @@ function Settings() {
                     <button
                       type="button"
                       onClick={saveByok}
-                      disabled={savingKey}
+                      disabled={savingKey || (!apiKey.trim() && !byokActive)}
                       className="btn-primary px-4 py-2.5 text-sm disabled:opacity-50"
                     >
                       {savingKey ? 'Saving...' : 'Save AI settings'}
