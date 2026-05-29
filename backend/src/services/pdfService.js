@@ -110,10 +110,7 @@ async function extractTextFromPDF(buffer) {
   return cleanExtractedText(joined);
 }
 
-/**
- * Extract per-page text from a PDF buffer.
- * Returns [{ pageNumber, text }].
- */
+
 async function extractTextPagesFromPDF(buffer) {
   const pdfjs = await getPdfjs();
   const data = new Uint8Array(buffer);
@@ -137,12 +134,7 @@ async function extractTextPagesFromPDF(buffer) {
   return pages;
 }
 
-/**
- * Render each PDF page to a PNG base64 string (for scanned/image-based PDFs).
- * Requires the `canvas` npm package.
- * Returns an array of { base64: string, mimeType: 'image/png' } objects.
- * Ported from did-exit/js/pdf-processor.js extractImagesFromPDF.
- */
+
 async function extractImagesFromPDF(buffer) {
   const canvasCreate = await loadCanvas();
   const canvasFactory = createCanvasFactory(canvasCreate);
@@ -179,8 +171,6 @@ async function extractImagesFromPDF(buffer) {
 function hashContent(text) {
   return crypto.createHash('sha256').update(text).digest('hex');
 }
-
-// ── Internal helpers (ported verbatim from did-exit) ─────────────────────────
 
 function processPageText(textContent) {
   let pageText = '';
