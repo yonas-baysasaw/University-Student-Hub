@@ -171,16 +171,15 @@ function AppRoutes() {
           </Routes>
         </div>
       </Navbar>
-      
+        </NotificationsProvider>
     );
   }
-// hi this is yabsra
   const hideGlobalNavForLanding = location.pathname === '/';
 
   return (
     <>
-      {!hideGlobalNav && <Nav />}
-      <div key={routeFadeKey} className="route-fade">
+        {!hideGlobalNavForLanding && <Nav />}
+        <div key={location.pathname} className="route-fade">
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/admin/signup" element={<AdminSignup />} />
